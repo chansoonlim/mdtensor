@@ -2,8 +2,7 @@ name: Build Single Header
 
 on:
   push:
-    branches:
-      - stable
+    branches: [ main ]
 
 jobs:
   deploy:
