@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - run: sudo apt-get install python3
-      - run: ./make_single_header.py ./mdtensor/mdtensor.hpp > /tmp/mdtensor.hpp
+      - run: python3 ./make_single_header.py ./mdtensor/mdtensor.hpp > /tmp/mdtensor.hpp
       - uses: actions/checkout@v6
         with:
           ref: single-header
