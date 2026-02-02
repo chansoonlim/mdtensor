@@ -1,0 +1,21 @@
+{
+    "build": {
+        "dockerfile": "dockerfile",
+        "context": ".."
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-azuretools.vscode-docker",
+                "bazelbuild.vscode-bazel",
+                "ms-vscode.cpptools",
+                "ms-vscode.cpptools-extension-pack",
+                "xaver.clang-format",
+                "gruntfuggly.todo-tree",
+                "mhutchie.git-graph",
+                "github.vscode-github-actions",
+                "github.copilot"
+            ]
+        }
+    }
+}

@@ -1,0 +1,2 @@
+common --action_env=BAZEL_CXXOPTS="-std=c++20"
+common --compilation_mode=opt

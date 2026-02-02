@@ -1,0 +1,90 @@
+module(
+    name = "mdtensor",
+    version = "1.0.0",
+)
+
+bazel_dep(name = "platforms", version = "0.0.11")
+bazel_dep(name = "rules_cc", version = "0.2.14")
+
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+git_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
+new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
+
+# Google Test
+git_repository(
+    name = "gtest",
+    remote = "https://github.com/google/googletest",
+    tag = "v1.17.0",
+)
+
+git_repository(
+    name = "glog",
+    remote = "https://github.com/google/glog",
+    tag = "v0.7.1",
+)
+
+git_repository(
+    name = "com_google_absl",
+    remote = "https://github.com/abseil/abseil-cpp",
+    tag = "20250814.1",
+)
+
+git_repository(
+    name = "com_google_benchmark",
+    remote = "https://github.com/google/benchmark",
+    tag = "v1.9.4",
+)
+
+new_local_repository(
+    name = "usr_local",
+    build_file = "third_party/usr_local.BUILD",
+    path = "/usr/local",
+)
+
+new_local_repository(
+    name = "zlib",
+    build_file = "third_party/zlib.BUILD",
+    path = "/usr/local/opt/zlib",
+)
+
+git_repository(
+    name = "com_github_gflags_gflags",
+    remote = "https://github.com/gflags/gflags",
+    tag = "v2.2.2",
+)
+
+# mdspan // TODO: Remove when C++23 mdspan supports.
+git_repository(
+    name = "mdspan",
+    remote = "https://github.com/kokkos/mdspan",
+    tag = "mdspan-0.6.0",
+    build_file_content =
+"""
+cc_library(
+    name = "mdspan",
+    hdrs = glob(["include/**/*"]),
+    srcs = [],
+    includes = ["include/"],
+    defines = ["MDSPAN_USE_BRACKET_OPERATOR=0"], # NOTE: For C++20 compatibility
+    visibility = ["//visibility:public"],
+)
+"""
+)
+
+# Eigen
+http_archive(
+    name = "eigen",
+    sha256 = "bdca0ec740fb83be21fe038699923f4c589ead9ab904f4058a9c97752e60d50b",
+    strip_prefix = "eigen-5.0.0",
+    urls = ["https://gitlab.com/libeigen/eigen/-/archive/5.0.0/eigen-5.0.0.tar.bz2"],
+    build_file_content =
+"""
+cc_library(
+    name = "eigen",
+    hdrs = glob(["Eigen/**/*"]),
+    srcs = [],
+    includes = ["."], 
+    visibility = ["//visibility:public"],
+)
+"""
+)

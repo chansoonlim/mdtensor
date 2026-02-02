@@ -1,0 +1,21 @@
+cc_library(
+    name = "mdtensor",
+    hdrs = glob(["mdtensor/**/*.hpp"]),
+    deps = [
+        "@mdspan",
+        # "@eigen",
+    ],
+    copts = [
+        "-O3",
+        "-funroll-loops",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-Wall",
+        "-march=native",
+    ],
+    defines = [
+        # "MDTENSOR_USE_EIGEN",
+        # "MDTENSOR_USE_AUTOFLAT",
+    ],
+    visibility = ["//visibility:public"],
+)

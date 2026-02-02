@@ -1,0 +1,14 @@
+FROM ubuntu:22.04
+
+# Install necessary packages
+RUN apt-get update && \
+    apt-get install -y \
+    build-essential gdb git curl
+
+# Install Bazelisk
+RUN curl -L https://github.com/bazelbuild/bazelisk/releases/download/v1.27.0/bazelisk-linux-amd64 \
+    -o /usr/local/bin/bazel && \
+    chmod +x /usr/local/bin/bazel
+
+# Go back to the workspace
+WORKDIR /workspaces
