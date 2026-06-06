@@ -162,8 +162,8 @@ linspace(start_t &&start, stop_t &&stop, const exts_t &exts = exts_t{},
 
     using value_t = std::conditional_t<
         !std::is_void_v<dtype>, dtype,
-        core::common_type_t<typename start_mds_t::value_type,
-                            typename stop_mds_t::value_type>>;
+        core::data_common_type_t<typename start_mds_t::value_type,
+                                 typename stop_mds_t::value_type>>;
 
     constexpr size_t out_rank = start_mds_t::rank() + 1;
     constexpr size_t axis = static_cast<size_t>(
