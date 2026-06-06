@@ -6,4 +6,27 @@
         "editor.formatOnSave": true,
         "editor.defaultFormatter": "ms-vscode.cpptools",
     },
+    "github.copilot.chat.commitMessageGeneration.instructions": [
+    {
+        "text": "항상 한국어로 커밋 메시지를 작성하세요."
+    },
+    {
+        "text": "Conventional Commits 규칙을 따르되(feat, fix, chore, docs, refactor, test, perf, style 등), 설명은 자연스러운 한국어로 작성합니다."
+    },
+    {
+        "text": "출력 형식: [타입]: <한글 요약> -> [1줄 공백] -> [3~5줄 불릿 목록] -> [(선택) Refs/BREAKING CHANGE]"
+    },
+    {
+        "text": "제목은 72자 이내의 명령형 문장으로 작성하고 마침표를 사용하지 않습니다. 고유명/기술명(API, Controller 등)은 영문 그대로 유지합니다."
+    },
+    {
+        "text": "본문은 핵심만 간결하게 요약하며, 불필요하게 긴 설명이나 세부 구현 코드는 제외합니다."
+    },
+    {
+        "text": "Diff가 너무 작거나 불분명하면 간결한 한국어로 이유를 설명하고 적절한 커밋 단위를 제안하세요."
+    },
+    {
+        "text": "결과에는 커밋 메시지 텍스트만 출력하세요 (설명, 서문, 코드블록 기호 사용 금지)."
+    }
+  ]
 }
