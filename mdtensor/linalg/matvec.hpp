@@ -83,7 +83,7 @@ inline constexpr void matvec_impl(in1_t &&in1, in2_t &&in2,
                   core::eigen::eigen_mappable_mdspan_c<out_t>) {
         if (!std::is_constant_evaluated() && 8 <= out.extent(0) + out.extent(1))
             [[likely]] {
-            using value_t = std::common_type_t<
+            using value_t = core::data_common_type_t<
                 typename std::remove_cvref_t<in1_t>::value_type,
                 typename std::remove_cvref_t<in2_t>::value_type>;
 
@@ -167,10 +167,10 @@ template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in1_t,
 
     const auto uin1_exts = core::slice_from_right<2>(in1_mds.extents());
     const auto uin2_exts = core::slice_from_right<2>(in2_mds.extents());
-    const auto uout_exts =
-        extents<std::common_type_t<typename decltype(uin1_exts)::index_type,
+    const auto uout_exts = extents<
+        core::extent_common_type_t<typename decltype(uin1_exts)::index_type,
                                    typename decltype(uin2_exts)::index_type>,
-                decltype(uin1_exts)::static_extent(0)>{uin1_exts.extent(0)};
+        decltype(uin1_exts)::static_extent(0)>{uin1_exts.extent(0)};
 
     return core::batch_out<mpmode, dtype>(
         [](auto &&...elems) {

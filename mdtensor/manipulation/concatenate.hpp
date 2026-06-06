@@ -40,8 +40,8 @@ concatenate_extents(const in1_t &in1 = in1_t{}, const in2_t &in2 = in2_t{},
     constexpr size_t axis = static_cast<size_t>(
         ((Axis % static_cast<int64_t>(rank)) + (rank)) % rank);
 
-    using index_t = std::common_type_t<typename in1_t::index_type,
-                                       typename in2_t::index_type>;
+    using index_t = core::extent_common_type_t<typename in1_t::index_type,
+                                               typename in2_t::index_type>;
 
     const auto exts = [&]<typename E1, typename E2>(const E1 &e1,
                                                     const E2 &e2) {
@@ -152,7 +152,7 @@ template <int64_t Axis, typename... ins_t>
 
     // generate out
     using dtype = decltype([]<size_t... Is>(std::index_sequence<Is...>) {
-        return std::common_type_t<
+        return core::data_common_type_t<
             core::value_type_t<std::tuple_element_t<Is, ins_mds_t>>...>{};
     }(std::make_index_sequence<num_ins>{}));
     auto out = empty<dtype>(out_extents);

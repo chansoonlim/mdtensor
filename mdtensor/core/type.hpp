@@ -244,6 +244,57 @@ using value_type_t = typename detail::value_type_t_impl<T>::type;
 
 namespace detail {
 
+template <typename... Ts> struct extent_common_type_impl;
+
+template <typename T1, typename T2> struct extent_common_type_impl<T1, T2> {
+    static_assert(std::integral<T1>);
+    static_assert(std::integral<T2>);
+
+    static constexpr bool invalid_mix =
+        (std::same_as<std::remove_cv_t<T1>, int64_t> &&
+         std::same_as<std::remove_cv_t<T2>, uint64_t>) ||
+        (std::same_as<std::remove_cv_t<T1>, uint64_t> &&
+         std::same_as<std::remove_cv_t<T2>, int64_t>);
+
+    static_assert(!invalid_mix, "ctmd::extent_common_type_impl: "
+                                "cannot combine int64_t and uint64_t");
+
+  private:
+    static constexpr auto size = sizeof(T1) > sizeof(T2) ? sizeof(T1)
+                                                         : sizeof(T2);
+
+    static constexpr bool signed_required =
+        std::is_signed_v<T1> || std::is_signed_v<T2>;
+
+  public:
+    using type = std::conditional_t<
+        signed_required,
+        std::conditional_t<
+            size <= sizeof(int8_t), int8_t,
+            std::conditional_t<
+                size <= sizeof(int16_t), int16_t,
+                std::conditional_t<size <= sizeof(int32_t), int32_t, int64_t>>>,
+        std::conditional_t<
+            size <= sizeof(uint8_t), uint8_t,
+            std::conditional_t<size <= sizeof(uint16_t), uint16_t,
+                               std::conditional_t<size <= sizeof(uint32_t),
+                                                  uint32_t, uint64_t>>>>;
+};
+
+template <typename T1, typename T2, typename... Ts>
+struct extent_common_type_impl<T1, T2, Ts...> {
+    using type = typename extent_common_type_impl<
+        typename extent_common_type_impl<T1, T2>::type, Ts...>::type;
+};
+
+} // namespace detail
+
+template <typename... Ts>
+using extent_common_type_t =
+    typename detail::extent_common_type_impl<Ts...>::type;
+
+namespace detail {
+
 template <typename... Ts> struct filter_nullopt;
 
 template <> struct filter_nullopt<> {
@@ -261,16 +312,17 @@ template <typename T, typename... Ts> struct filter_nullopt<T, Ts...> {
                                 std::declval<Tail>()))>;
 };
 
-template <typename Tuple> struct common_type_impl;
+template <typename Tuple> struct data_common_type_impl;
 
-template <typename... Ts> struct common_type_impl<std::tuple<Ts...>> {
+template <typename... Ts> struct data_common_type_impl<std::tuple<Ts...>> {
+    // TODO: check std::common_type is best possible way
     using type = std::common_type_t<Ts...>;
 };
 
 } // namespace detail
 
 template <typename... Ts>
-using common_type_t = typename detail::common_type_impl<
+using data_common_type_t = typename detail::data_common_type_impl<
     typename detail::filter_nullopt<Ts...>::type>::type;
 
 } // namespace core

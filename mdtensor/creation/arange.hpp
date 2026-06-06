@@ -40,8 +40,9 @@ template <typename data_t = void, arithmetic_c start_t, arithmetic_c stop_t,
           arithmetic_c step_t = double>
 [[nodiscard]] inline constexpr auto arange(start_t &&start, stop_t &&stop,
                                            step_t &&step = (step_t)1) noexcept {
-    using value_t = std::conditional_t<!std::is_void_v<data_t>, data_t,
-                                       core::common_type_t<start_t, stop_t>>;
+    using value_t =
+        std::conditional_t<!std::is_void_v<data_t>, data_t,
+                           core::data_common_type_t<start_t, stop_t>>;
 
     const size_t num = std::ceil((stop - start) / step);
     const value_t step_actual =
