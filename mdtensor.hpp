@@ -332,6 +332,57 @@ using value_type_t = typename detail::value_type_t_impl<T>::type;
 
 namespace detail {
 
+template <typename... Ts> struct extent_common_type_impl;
+
+template <typename T1, typename T2> struct extent_common_type_impl<T1, T2> {
+    static_assert(std::integral<T1>);
+    static_assert(std::integral<T2>);
+
+    static constexpr bool invalid_mix =
+        (std::same_as<std::remove_cv_t<T1>, int64_t> &&
+         std::same_as<std::remove_cv_t<T2>, uint64_t>) ||
+        (std::same_as<std::remove_cv_t<T1>, uint64_t> &&
+         std::same_as<std::remove_cv_t<T2>, int64_t>);
+
+    static_assert(!invalid_mix, "ctmd::extent_common_type_impl: "
+                                "cannot combine int64_t and uint64_t");
+
+  private:
+    static constexpr auto size = sizeof(T1) > sizeof(T2) ? sizeof(T1)
+                                                         : sizeof(T2);
+
+    static constexpr bool signed_required =
+        std::is_signed_v<T1> || std::is_signed_v<T2>;
+
+  public:
+    using type = std::conditional_t<
+        signed_required,
+        std::conditional_t<
+            size <= sizeof(int8_t), int8_t,
+            std::conditional_t<
+                size <= sizeof(int16_t), int16_t,
+                std::conditional_t<size <= sizeof(int32_t), int32_t, int64_t>>>,
+        std::conditional_t<
+            size <= sizeof(uint8_t), uint8_t,
+            std::conditional_t<size <= sizeof(uint16_t), uint16_t,
+                               std::conditional_t<size <= sizeof(uint32_t),
+                                                  uint32_t, uint64_t>>>>;
+};
+
+template <typename T1, typename T2, typename... Ts>
+struct extent_common_type_impl<T1, T2, Ts...> {
+    using type = typename extent_common_type_impl<
+        typename extent_common_type_impl<T1, T2>::type, Ts...>::type;
+};
+
+} // namespace detail
+
+template <typename... Ts>
+using extent_common_type_t =
+    typename detail::extent_common_type_impl<Ts...>::type;
+
+namespace detail {
+
 template <typename... Ts> struct filter_nullopt;
 
 template <> struct filter_nullopt<> {
@@ -349,16 +400,17 @@ template <typename T, typename... Ts> struct filter_nullopt<T, Ts...> {
                                 std::declval<Tail>()))>;
 };
 
-template <typename Tuple> struct common_type_impl;
+template <typename Tuple> struct data_common_type_impl;
 
-template <typename... Ts> struct common_type_impl<std::tuple<Ts...>> {
+template <typename... Ts> struct data_common_type_impl<std::tuple<Ts...>> {
+    // TODO: check std::common_type is best possible way
     using type = std::common_type_t<Ts...>;
 };
 
 } // namespace detail
 
 template <typename... Ts>
-using common_type_t = typename detail::common_type_impl<
+using data_common_type_t = typename detail::data_common_type_impl<
     typename detail::filter_nullopt<Ts...>::type>::type;
 
 } // namespace core
@@ -580,8 +632,8 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
                                                 ins_t &&...ins) noexcept {
     using in1_base_t = std::remove_cvref_t<in1_t>;
     using in2_base_t = std::remove_cvref_t<in2_t>;
-    using index_t = std::common_type_t<typename in1_base_t::index_type,
-                                       typename in2_base_t::index_type>;
+    using index_t = extent_common_type_t<typename in1_base_t::index_type,
+                                         typename in2_base_t::index_type>;
 
     const auto cexts =
         [&]<size_t... Is, size_t... Js>(std::index_sequence<Is...>,
@@ -633,8 +685,8 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
                                               ins_t &&...ins) noexcept {
     using in1_base_t = std::remove_cvref_t<in1_t>;
     using in2_base_t = std::remove_cvref_t<in2_t>;
-    using index_t = std::common_type_t<typename in1_base_t::index_type,
-                                       typename in2_base_t::index_type>;
+    using index_t = extent_common_type_t<typename in1_base_t::index_type,
+                                         typename in2_base_t::index_type>;
 
     constexpr size_t brank = std::max(in1_base_t::rank(), in2_base_t::rank());
 
@@ -705,8 +757,8 @@ broadcast_to(in_t &&in = in_t{},
 
     } else {
         using index_type =
-            std::common_type_t<typename in_base_t::index_type,
-                               typename new_bexts_base_t::index_type>;
+            extent_common_type_t<typename in_base_t::index_type,
+                                 typename new_bexts_base_t::index_type>;
 
         auto new_strides =
             std::array<index_type, urank + new_bexts_base_t::rank()>{};
@@ -853,7 +905,7 @@ create_out(std::index_sequence<offsets...>, std::index_sequence<uranks...>,
 
     using value_t =
         std::conditional_t<std::is_void_v<dtype>,
-                           common_type_t<value_type_t<ins_t>...>, dtype>;
+                           data_common_type_t<value_type_t<ins_t>...>, dtype>;
 
     constexpr auto ofst = std::array{offsets...};
     constexpr auto ur = std::array{uranks...};
@@ -918,7 +970,7 @@ create_outs(std::index_sequence<offsets...>, std::index_sequence<uranks...>,
 
     using value_t =
         std::conditional_t<std::is_void_v<dtype>,
-                           common_type_t<value_type_t<ins_t>...>, dtype>;
+                           data_common_type_t<value_type_t<ins_t>...>, dtype>;
 
     constexpr auto ofst = std::array{offsets...};
     constexpr auto ur = std::array{uranks...};
@@ -1466,8 +1518,9 @@ template <typename data_t = void, arithmetic_c start_t, arithmetic_c stop_t,
           arithmetic_c step_t = double>
 [[nodiscard]] inline constexpr auto arange(start_t &&start, stop_t &&stop,
                                            step_t &&step = (step_t)1) noexcept {
-    using value_t = std::conditional_t<!std::is_void_v<data_t>, data_t,
-                                       core::common_type_t<start_t, stop_t>>;
+    using value_t =
+        std::conditional_t<!std::is_void_v<data_t>, data_t,
+                           core::data_common_type_t<start_t, stop_t>>;
 
     const size_t num = std::ceil((stop - start) / step);
     const value_t step_actual =
@@ -2069,8 +2122,8 @@ linspace(start_t &&start, stop_t &&stop, const exts_t &exts = exts_t{},
 
     using value_t = std::conditional_t<
         !std::is_void_v<dtype>, dtype,
-        core::common_type_t<typename start_mds_t::value_type,
-                            typename stop_mds_t::value_type>>;
+        core::data_common_type_t<typename start_mds_t::value_type,
+                                 typename stop_mds_t::value_type>>;
 
     constexpr size_t out_rank = start_mds_t::rank() + 1;
     constexpr size_t axis = static_cast<size_t>(
@@ -2536,7 +2589,7 @@ inline constexpr void matmul_impl(in1_t &&in1, in2_t &&in2,
                   core::eigen::eigen_mappable_mdspan_c<out_t>) {
         if (!std::is_constant_evaluated() && 8 <= out.extent(0) + out.extent(1))
             [[likely]] {
-            using value_t = std::common_type_t<
+            using value_t = core::data_common_type_t<
                 typename std::remove_cvref_t<in1_t>::value_type,
                 typename std::remove_cvref_t<in2_t>::value_type>;
 
@@ -2618,12 +2671,12 @@ template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in1_t,
 
     const auto uin1_exts = core::slice_from_right<2>(in1_mds.extents());
     const auto uin2_exts = core::slice_from_right<2>(in2_mds.extents());
-    const auto uout_exts =
-        extents<std::common_type_t<typename decltype(uin1_exts)::index_type,
+    const auto uout_exts = extents<
+        core::extent_common_type_t<typename decltype(uin1_exts)::index_type,
                                    typename decltype(uin2_exts)::index_type>,
-                decltype(uin1_exts)::static_extent(0),
-                decltype(uin2_exts)::static_extent(1)>{uin1_exts.extent(0),
-                                                       uin2_exts.extent(1)};
+        decltype(uin1_exts)::static_extent(0),
+        decltype(uin2_exts)::static_extent(1)>{uin1_exts.extent(0),
+                                               uin2_exts.extent(1)};
 
     return core::batch_out<mpmode, dtype>(
         [](auto &&...elems) {
@@ -2728,7 +2781,7 @@ inline constexpr void matvec_impl(in1_t &&in1, in2_t &&in2,
                   core::eigen::eigen_mappable_mdspan_c<out_t>) {
         if (!std::is_constant_evaluated() && 8 <= out.extent(0) + out.extent(1))
             [[likely]] {
-            using value_t = std::common_type_t<
+            using value_t = core::data_common_type_t<
                 typename std::remove_cvref_t<in1_t>::value_type,
                 typename std::remove_cvref_t<in2_t>::value_type>;
 
@@ -2812,10 +2865,10 @@ template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in1_t,
 
     const auto uin1_exts = core::slice_from_right<2>(in1_mds.extents());
     const auto uin2_exts = core::slice_from_right<2>(in2_mds.extents());
-    const auto uout_exts =
-        extents<std::common_type_t<typename decltype(uin1_exts)::index_type,
+    const auto uout_exts = extents<
+        core::extent_common_type_t<typename decltype(uin1_exts)::index_type,
                                    typename decltype(uin2_exts)::index_type>,
-                decltype(uin1_exts)::static_extent(0)>{uin1_exts.extent(0)};
+        decltype(uin1_exts)::static_extent(0)>{uin1_exts.extent(0)};
 
     return core::batch_out<mpmode, dtype>(
         [](auto &&...elems) {
@@ -2958,7 +3011,7 @@ inline constexpr void sqrt_impl(in_t &&in, out_t &&out) {
     out() = std::sqrt(in());
 
 #else
-    using value_t = std::common_type_t<decltype(in()), float>;
+    using value_t = core::data_common_type_t<decltype(in()), float>;
 
     out() = (in() >= 0 && in() < std::numeric_limits<value_t>::infinity())
                 ? sqrt_newton_raphson(static_cast<value_t>(in()),
@@ -3364,7 +3417,7 @@ inline constexpr void vecmat_impl(in1_t &&in1, in2_t &&in2,
                   core::eigen::eigen_mappable_mdspan_c<out_t>) {
         if (!std::is_constant_evaluated() && 8 <= out.extent(0) + out.extent(1))
             [[likely]] {
-            using value_t = std::common_type_t<
+            using value_t = core::data_common_type_t<
                 typename std::remove_cvref_t<in1_t>::value_type,
                 typename std::remove_cvref_t<in2_t>::value_type>;
 
@@ -3447,10 +3500,10 @@ template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in1_t,
 
     const auto uin1_exts = core::slice_from_right<2>(in1_mds.extents());
     const auto uin2_exts = core::slice_from_right<2>(in2_mds.extents());
-    const auto uout_exts =
-        extents<std::common_type_t<typename decltype(uin1_exts)::index_type,
-                                   typename decltype(uin2_exts)::index_type>,
-                decltype(uin2_exts)::static_extent(1)>{uin2_exts.extent(1)};
+    const auto uout_exts = extents<
+        core::data_common_type_t<typename decltype(uin1_exts)::index_type,
+                                 typename decltype(uin2_exts)::index_type>,
+        decltype(uin2_exts)::static_extent(1)>{uin2_exts.extent(1)};
 
     return core::batch_out<mpmode, dtype>(
         [](auto &&...elems) {
@@ -4737,8 +4790,8 @@ concatenate_extents(const in1_t &in1 = in1_t{}, const in2_t &in2 = in2_t{},
     constexpr size_t axis = static_cast<size_t>(
         ((Axis % static_cast<int64_t>(rank)) + (rank)) % rank);
 
-    using index_t = std::common_type_t<typename in1_t::index_type,
-                                       typename in2_t::index_type>;
+    using index_t = core::extent_common_type_t<typename in1_t::index_type,
+                                               typename in2_t::index_type>;
 
     const auto exts = [&]<typename E1, typename E2>(const E1 &e1,
                                                     const E2 &e2) {
@@ -4849,7 +4902,7 @@ template <int64_t Axis, typename... ins_t>
 
     // generate out
     using dtype = decltype([]<size_t... Is>(std::index_sequence<Is...>) {
-        return std::common_type_t<
+        return core::data_common_type_t<
             core::value_type_t<std::tuple_element_t<Is, ins_mds_t>>...>{};
     }(std::make_index_sequence<num_ins>{}));
     auto out = empty<dtype>(out_extents);
@@ -4908,8 +4961,8 @@ namespace detail {
 
 template <typename in1_t, typename in2_t, typename out_t>
 inline constexpr void atan2_impl(in1_t &&in1, in2_t &&in2, out_t &&out) {
-    using value_t =
-        std::common_type_t<decltype(in1()), decltype(in2()), decltype(out())>;
+    using value_t = core::data_common_type_t<decltype(in1()), decltype(in2()),
+                                             decltype(out())>;
 
     out() =
         std::atan2(static_cast<value_t>(in1()), static_cast<value_t>(in2()));
@@ -4997,8 +5050,8 @@ inline constexpr void clip_impl(in_t &&in, min_t &&min, max_t &&max,
     if constexpr (!std::is_same_v<std::remove_cvref_t<decltype(min())>,
                                   std::nullopt_t>) {
         using value_t =
-            std::common_type_t<std::remove_cvref_t<decltype(out())>,
-                               std::remove_cvref_t<decltype(min())>>;
+            core::data_common_type_t<std::remove_cvref_t<decltype(out())>,
+                                     std::remove_cvref_t<decltype(min())>>;
 
         out() =
             std::max(static_cast<value_t>(out()), static_cast<value_t>(min()));
@@ -5007,8 +5060,8 @@ inline constexpr void clip_impl(in_t &&in, min_t &&min, max_t &&max,
     if constexpr (!std::is_same_v<std::remove_cvref_t<decltype(max())>,
                                   std::nullopt_t>) {
         using value_t =
-            std::common_type_t<std::remove_cvref_t<decltype(out())>,
-                               std::remove_cvref_t<decltype(max())>>;
+            core::data_common_type_t<std::remove_cvref_t<decltype(out())>,
+                                     std::remove_cvref_t<decltype(max())>>;
 
         out() =
             std::min(static_cast<value_t>(out()), static_cast<value_t>(max()));
@@ -5182,9 +5235,10 @@ namespace mdtensor {
  */
 template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
 inline constexpr void deg2rad_to(in_t &&in, out_t &&out) {
-    using value_t = std::common_type_t<typename decltype(core::to_mdspan(
-                                           std::forward<in_t>(in)))::value_type,
-                                       float>;
+    using value_t =
+        core::data_common_type_t<typename decltype(core::to_mdspan(
+                                     std::forward<in_t>(in)))::value_type,
+                                 float>;
 
     constexpr value_t D2R = std::numbers::pi_v<value_t> / value_t(180);
 
@@ -5211,9 +5265,10 @@ inline constexpr void deg2rad_to(in_t &&in, out_t &&out) {
  */
 template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in_t>
 [[nodiscard]] inline constexpr auto deg2rad(in_t &&in) {
-    using value_t = std::common_type_t<typename decltype(core::to_mdspan(
-                                           std::forward<in_t>(in)))::value_type,
-                                       float>;
+    using value_t =
+        core::data_common_type_t<typename decltype(core::to_mdspan(
+                                     std::forward<in_t>(in)))::value_type,
+                                 float>;
 
     constexpr value_t D2R = std::numbers::pi_v<value_t> / value_t(180);
 
@@ -5885,9 +5940,10 @@ namespace mdtensor {
  */
 template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
 inline constexpr void rad2deg_to(in_t &&in, out_t &&out) {
-    using value_t = std::common_type_t<typename decltype(core::to_mdspan(
-                                           std::forward<in_t>(in)))::value_type,
-                                       float>;
+    using value_t =
+        core::data_common_type_t<typename decltype(core::to_mdspan(
+                                     std::forward<in_t>(in)))::value_type,
+                                 float>;
 
     constexpr value_t R2D = std::numbers::inv_pi_v<value_t> * value_t(180);
 
@@ -5914,9 +5970,10 @@ inline constexpr void rad2deg_to(in_t &&in, out_t &&out) {
  */
 template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in_t>
 [[nodiscard]] inline constexpr auto rad2deg(in_t &&in) {
-    using value_t = std::common_type_t<typename decltype(core::to_mdspan(
-                                           std::forward<in_t>(in)))::value_type,
-                                       float>;
+    using value_t =
+        core::data_common_type_t<typename decltype(core::to_mdspan(
+                                     std::forward<in_t>(in)))::value_type,
+                                 float>;
 
     constexpr value_t R2D = std::numbers::inv_pi_v<value_t> * value_t(180);
 
