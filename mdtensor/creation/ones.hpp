@@ -51,7 +51,7 @@ template <typename dtype, extents_c exts_t = extents<size_t>,
  */
 template <typename dtype, MPMode mpmode = MPMode::NONE>
 [[nodiscard]] inline constexpr auto ones(const size_t len) {
-    return full<dtype, dims<1>, mpmode>(1, dims<1>{len});
+    return full<dtype, mdtensor::dims<1>, mpmode>(1, mdtensor::dims<1>{len});
 }
 
 } // namespace mdtensor

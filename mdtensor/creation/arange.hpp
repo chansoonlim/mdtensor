@@ -48,7 +48,7 @@ template <typename data_t = void, arithmetic_c start_t, arithmetic_c stop_t,
     const value_t step_actual =
         static_cast<value_t>(start + step) - static_cast<value_t>(start);
 
-    auto out = mdarray<value_t, dims<1>>{dims<1>{num}};
+    auto out = mdarray<value_t, mdtensor::dims<1>>{mdtensor::dims<1>{num}};
 
     out(0) = start;
     for (size_t i = 1; i < num; i++) {
