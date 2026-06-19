@@ -1,7 +1,4 @@
-module(
-    name = "mdtensor",
-    version = "1.0.0",
-)
+module(name = "mdtensor")
 
 bazel_dep(name = "platforms", version = "0.0.11")
 bazel_dep(name = "rules_cc", version = "0.2.14")
