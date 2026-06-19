@@ -6,27 +6,54 @@
         "editor.formatOnSave": true,
         "editor.defaultFormatter": "ms-vscode.cpptools",
     },
-    "github.copilot.chat.commitMessageGeneration.instructions": [
+"github.copilot.chat.commitMessageGeneration.instructions": [
     {
-        "text": "항상 한국어로 커밋 메시지를 작성하세요."
+        "text": "Always write commit messages in English."
     },
     {
-        "text": "Conventional Commits 규칙을 따르되(feat, fix, chore, docs, refactor, test, perf, style 등), 설명은 자연스러운 한국어로 작성합니다."
+        "text": "Follow the Conventional Commits format: type(optional-scope): summary. Use an appropriate type such as feat, fix, perf, refactor, test, docs, build, ci, chore, or style."
     },
     {
-        "text": "출력 형식: [타입]: <한글 요약> -> [1줄 공백] -> [3~5줄 불릿 목록] -> [(선택) Refs/BREAKING CHANGE]"
+        "text": "Use scopes relevant to this C++ library when appropriate, such as tensor, view, layout, indexing, iterator, algorithm, simd, api, cmake, test, benchmark, docs, or ci."
     },
     {
-        "text": "제목은 72자 이내의 명령형 문장으로 작성하고 마침표를 사용하지 않습니다. 고유명/기술명(API, Controller 등)은 영문 그대로 유지합니다."
+        "text": "Use the following output structure: title, one blank line, and 3 to 5 concise bullet points. Add Refs or BREAKING CHANGE only when applicable."
     },
     {
-        "text": "본문은 핵심만 간결하게 요약하며, 불필요하게 긴 설명이나 세부 구현 코드는 제외합니다."
+        "text": "Keep the title within 72 characters, use the imperative mood, and do not end it with a period."
     },
     {
-        "text": "Diff가 너무 작거나 불분명하면 간결한 한국어로 이유를 설명하고 적절한 커밋 단위를 제안하세요."
+        "text": "Describe observable changes and their impact without guessing the author's intent. Do not include implementation details that are not evident from the diff."
     },
     {
-        "text": "결과에는 커밋 메시지 텍스트만 출력하세요 (설명, 서문, 코드블록 기호 사용 금지)."
+        "text": "Preserve established technical terms and identifiers exactly, including C++, API, ABI, SIMD, constexpr, concepts, mdspan, CMake, class names, function names, and template parameters."
+    },
+    {
+        "text": "Clearly identify changes affecting public APIs, ABI compatibility, template constraints, compile-time behavior, memory layout, numerical correctness, or runtime performance."
+    },
+    {
+        "text": "Use perf for measurable performance improvements, refactor for behavior-preserving structural changes, and fix for correctness, safety, undefined behavior, or compatibility issues."
+    },
+    {
+        "text": "Mention added or updated tests, benchmarks, documentation, and supported compiler or language-standard changes when they are relevant."
+    },
+    {
+        "text": "Use BREAKING CHANGE when a public API, supported behavior, source compatibility, ABI, required compiler version, or minimum C++ standard changes incompatibly."
+    },
+    {
+        "text": "Keep the body concise and focused on the motivation, externally visible behavior, correctness, compatibility, and performance implications. Exclude lengthy explanations and code excerpts."
+    },
+    {
+        "text": "For formatting-only or mechanical changes, use style or chore and avoid implying behavioral changes."
+    },
+    {
+        "text": "When the diff is very small or ambiguous, generate the most specific concise message supported by the diff. Never invent features, bug causes, performance claims, or issue references."
+    },
+    {
+        "text": "If the diff contains multiple unrelated changes, describe only the coherent staged change and avoid combining unrelated concerns into a misleading title."
+    },
+    {
+        "text": "Output only the commit message text. Do not include explanations, introductory text, quotation marks, or Markdown code fences."
     }
-  ]
+    ]
 }
