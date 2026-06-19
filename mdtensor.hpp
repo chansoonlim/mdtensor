@@ -3453,7 +3453,10 @@ inline constexpr void norm_impl(in_t &&in, out_t &&out) noexcept {
     for (index_t i = 0; i < in.extent(0); i++) {
         out() += in(i)*in(i);
     }
-    out() = sqrt(out());
+
+    if (out() > 0) {
+        out() = sqrt(out());
+    }
 }
 
 } // namespace detail
