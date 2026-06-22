@@ -44,8 +44,8 @@ inline constexpr void sign_to(in_t &&in, out_t &&out) {
 /**
  * @brief Compute sign element-wise (out-of-place).
  *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
  * @tparam dtype (optional) Data type of the result. Default is int8_t.
+ * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
  *
  * @param in Input mdspan, mdarray, scalar, etc.
  *
@@ -55,9 +55,9 @@ inline constexpr void sign_to(in_t &&in, out_t &&out) {
  *
  * @see mdtensor::sign_to for the in-place version that writes into an output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = int8_t, typename in_t>
+template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto sign(in_t &&in) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::sign_impl(std::forward<decltype(elems)>(elems)...);
         },

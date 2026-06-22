@@ -147,11 +147,11 @@ inline constexpr void inv_to(in_t &&in, out_t &&out, valid_t &&valid) noexcept {
  * @see mdtensor::linalg::inv_to for the in-place version that writes into an
  * output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in_t>
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto inv(in_t &&in) noexcept {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
 
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::inv_impl(std::forward<decltype(elems)>(elems)...);
         },

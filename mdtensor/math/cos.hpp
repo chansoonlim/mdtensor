@@ -58,9 +58,9 @@ inline constexpr void cos_to(in_t &&in, out_t &&out) {
  *
  * @see mdtensor::cos_to for the in-place version that writes into an output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in_t>
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto cos(in_t &&in) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::cos_impl(std::forward<decltype(elems)>(elems)...);
         },

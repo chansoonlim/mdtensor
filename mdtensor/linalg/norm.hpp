@@ -86,7 +86,7 @@ inline constexpr void norm_to(in_t &&in, out_t &&out) noexcept {
  * @see mdtensor::linalg::norm_to for the in-place version that writes into an
  * output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in_t>
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto norm(in_t &&in) noexcept {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
 

@@ -59,7 +59,7 @@ inline constexpr void deg2rad_to(in_t &&in, out_t &&out) {
  * @see mdtensor::deg2rad_to for the in-place version that writes into an
  *      output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in_t>
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto deg2rad(in_t &&in) {
     using value_t =
         core::data_common_type_t<typename decltype(core::to_mdspan(
@@ -68,7 +68,7 @@ template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in_t>
 
     constexpr value_t D2R = std::numbers::pi_v<value_t> / value_t(180);
 
-    return multiply<mpmode, dtype>(std::forward<in_t>(in), D2R);
+    return multiply<dtype, mpmode>(std::forward<in_t>(in), D2R);
 }
 
 } // namespace mdtensor

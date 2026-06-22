@@ -451,161 +451,6 @@ create_outs(uout_exts_tuple_t &&uout_exts_tuple, ins_t &&...ins) noexcept {
     }(std::make_index_sequence<sizeof...(ins_t)>{});
 }
 
-// TODO: remove under code
-// template <typename Func, size_t... offsets, size_t... uranks, mdspan_c...
-// ins_t>
-//     requires(sizeof...(offsets) == sizeof...(ins_t) &&
-//              sizeof...(uranks) == sizeof...(ins_t))
-// inline constexpr void batch(Func &&func, std::index_sequence<offsets...>,
-//                             std::index_sequence<uranks...>,
-//                             const MPMode mpmode,
-//                             const ins_t &...ins) noexcept {
-//     constexpr auto ofst = std::array{offsets...};
-//     constexpr auto ur = std::array{uranks...};
-//     constexpr auto br = [&]<size_t... Is>(std::index_sequence<Is...>) {
-//         return std::array{
-//             (std::tuple_element_t<Is, std::tuple<ins_t...>>::rank() -
-//             ofst[Is] -
-//              ur[Is])...};
-//     }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-//     constexpr bool no_branks = [&]<size_t... Is>(std::index_sequence<Is...>)
-//     {
-//         return ((br[Is] == 0) && ...);
-//     }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-//     constexpr bool all_same_static_bexts =
-//         [&]<size_t... Is>(std::index_sequence<Is...>) {
-//             return same(slice_with_offset<ofst[Is], br[Is]>(
-//                 typename std::tuple_element_t<
-//                     Is, std::tuple<ins_t...>>::extents_type{})...);
-//         }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-//     if constexpr (no_branks) {
-//         // case 1: directly pass to unit function
-//         std::forward<Func>(func)(ins...);
-//         return;
-
-//     } else if constexpr (all_same_static_bexts) {
-//         // case 2: if static bexts are all same
-//         constexpr bool is_flattable = [&]<size_t... Is>(
-//                                           std::index_sequence<Is...>) {
-//             return ((std::tuple_element_t<
-//                          Is, std::tuple<ins_t...>>::rank_dynamic() == 0 &&
-//                      is_always_reshapable<
-//                          std::tuple_element_t<Is, std::tuple<ins_t...>>>())
-//                          &&
-//                     ...);
-//         }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-//         if constexpr (is_flattable) {
-//             // case 2-1: batch with flattening
-//             constexpr size_t static_bsize =
-//                 static_size(slice_with_offset<ofst[0], br[0]>(
-//                     typename std::tuple_element_t<
-//                         0, std::tuple<ins_t...>>::extents_type{}));
-
-//             auto ins_tuple = std::forward_as_tuple(ins...);
-
-//             [&]<size_t... Is>(std::index_sequence<Is...>) {
-//                 detail::batch_impl<1>(
-//                     std::forward<Func>(func),
-//                     std::index_sequence<offsets...>{}, mpmode,
-//                     static_reshape(
-//                         std::get<Is>(ins_tuple),
-//                         concatenate(
-//                             slice_from_left<ofst[Is]>(
-//                                 std::get<Is>(ins_tuple).extents()),
-//                             extents<size_t, static_bsize>{static_bsize},
-//                             slice_from_right<ur[Is]>(
-//                                 std::get<Is>(ins_tuple).extents())))...);
-//             }(std::make_index_sequence<sizeof...(ins_t)>{});
-//             return;
-
-//         } else {
-//             // case 2-2: batch without flattening
-//             detail::batch_impl<br[0]>(std::forward<Func>(func),
-//                                       std::index_sequence<offsets...>{},
-//                                       mpmode, ins...);
-//             return;
-//         }
-
-//     } else {
-//         // case 3: if dynamic bexts are all same
-//         auto ins_tuple = std::forward_as_tuple(ins...);
-
-//         constexpr bool possibly_same_bexts =
-//             [&]<size_t... Is>(std::index_sequence<Is...>) {
-//                 return ((br[Is] == br[0]) && ...);
-//             }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-//         if constexpr (possibly_same_bexts) {
-//             const auto same_bexts =
-//                 [&]<size_t... Is>(std::index_sequence<Is...>) {
-//                     return same(slice_with_offset<ofst[Is], br[Is]>(
-//                         std::get<Is>(ins_tuple).extents())...);
-//                 }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-//             if (same_bexts) [[likely]] {
-//                 // If all bexts are same, broadcasting is not required.
-
-//                 const bool is_flattable =
-//                     [&]<size_t... Is>(std::index_sequence<Is...>) {
-//                         return (is_reshapable(std::get<Is>(ins_tuple))
-//                         &&
-//                                 ...);
-//                     }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-//                 if (is_flattable) [[likely]] {
-//                     // case 3-1: batch with flattening
-//                     const auto bexts = slice_with_offset<ofst[0], br[0]>(
-//                         std::get<0>(ins_tuple).extents());
-
-//                     constexpr size_t static_bsize = static_size(bexts);
-//                     const size_t bsize = size(bexts);
-
-//                     [&]<size_t... Is>(std::index_sequence<Is...>) {
-//                         detail::batch_impl<1>(
-//                             std::forward<Func>(func),
-//                             std::index_sequence<offsets...>{}, mpmode,
-//                             reshape(
-//                                 std::get<Is>(ins_tuple),
-//                                 concatenate(
-//                                     slice_from_left<ofst[Is]>(
-//                                         std::get<Is>(ins_tuple).extents()),
-//                                     extents<size_t, static_bsize>{bsize},
-//                                     slice_from_right<ur[Is]>(
-//                                         std::get<Is>(ins_tuple)
-//                                             .extents())))...);
-//                     }(std::make_index_sequence<sizeof...(ins_t)>{});
-//                     return;
-
-//                 } else {
-//                     // case 3-2: batch without flattening
-//                     detail::batch_impl<br[0]>(std::forward<Func>(func),
-//                                               std::index_sequence<offsets...>{},
-//                                               mpmode, ins...);
-//                     return;
-//                 }
-//             }
-//         }
-
-//         // case 4: batch with broadcasting
-//         const auto bexts = [&]<size_t... Is>(std::index_sequence<Is...>) {
-//             return broadcast(slice_with_offset<ofst[Is], br[Is]>(
-//                 std::get<Is>(ins_tuple).extents())...);
-//         }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-//         [&]<size_t... Is>(std::index_sequence<Is...>) {
-//             detail::batch_impl<bexts.rank()>(
-//                 std::forward<Func>(func), std::index_sequence<offsets...>{},
-//                 mpmode,
-//                 broadcast_to<ofst[Is], br[Is]>(std::get<Is>(ins_tuple),
-//                                                bexts)...);
-//         }(std::make_index_sequence<sizeof...(ins_t)>{});
-//     }
-// }
-
 template <MPMode mpmode, typename func_t, size_t... offsets, size_t... uranks,
           mdspan_c... ins_t>
 inline constexpr void batch(func_t &&func, std::index_sequence<offsets...>,
@@ -720,7 +565,7 @@ inline constexpr void batch(func_t &&func, ins_t &&...ins) {
     }(std::make_index_sequence<sizeof...(ins_t)>{});
 }
 
-template <MPMode mpmode, typename dtype, typename func_t, size_t... offsets,
+template <typename dtype, MPMode mpmode, typename func_t, size_t... offsets,
           size_t... uranks, extents_c uout_exts_t, mdspan_c... ins_t>
 [[nodiscard]] inline constexpr auto
 batch_out(func_t &&func, std::index_sequence<offsets...>,
@@ -740,7 +585,7 @@ batch_out(func_t &&func, std::index_sequence<offsets...>,
     return out;
 }
 
-template <MPMode mpmode, typename dtype, typename func_t, size_t... offsets,
+template <typename dtype, MPMode mpmode, typename func_t, size_t... offsets,
           size_t... uranks, extents_tuple_c uout_exts_tuple_t,
           mdspan_c... ins_t>
 [[nodiscard]] inline constexpr auto
@@ -771,7 +616,7 @@ batch_out(func_t &&func, std::index_sequence<offsets...>,
     return outs;
 }
 
-template <MPMode mpmode, typename dtype, typename func_t, size_t... uranks,
+template <typename dtype, MPMode mpmode, typename func_t, size_t... uranks,
           extents_info_c uout_info_t, mdspan_c... ins_t>
 [[nodiscard]] inline constexpr auto
 batch_out(func_t &&func, std::index_sequence<uranks...>,
@@ -788,19 +633,19 @@ batch_out(func_t &&func, std::index_sequence<uranks...>,
     }();
 
     return [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return batch_out<mpmode, dtype>(
+        return batch_out<dtype, mpmode>(
             std::forward<func_t>(func), std::index_sequence<((void)Is, 0)...>{},
             std::index_sequence<uranks...>{},
             std::forward<uout_info_t>(uout_info), std::forward<ins_t>(ins)...);
     }(std::make_index_sequence<sizeof...(ins_t) + uout_len>{});
 }
 
-template <MPMode mpmode, typename dtype, typename func_t,
+template <typename dtype, MPMode mpmode, typename func_t,
           extents_info_c uout_info_t, mdspan_c... ins_t>
 [[nodiscard]] inline constexpr auto
 batch_out(func_t &&func, uout_info_t &&uout_info, ins_t &&...ins) {
     return [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return batch_out<mpmode, dtype>(
+        return batch_out<dtype, mpmode>(
             std::forward<func_t>(func), std::index_sequence<((void)Is, 0)...>{},
             std::forward<uout_info_t>(uout_info), std::forward<ins_t>(ins)...);
     }(std::make_index_sequence<sizeof...(ins_t)>{});

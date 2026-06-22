@@ -82,9 +82,9 @@ inline constexpr void sqrt_to(in_t &&in, out_t &&out) {
  *
  * @see mdtensor::sqrt_to for the in-place version that writes into an output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in_t>
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto sqrt(in_t &&in) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::sqrt_impl(std::forward<decltype(elems)>(elems)...);
         },

@@ -68,10 +68,10 @@ inline constexpr void atan2_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
  *
  * @see mdtensor::atan2_to for the in-place version that writes into an output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in1_t,
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto atan2(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::atan2_impl(std::forward<decltype(elems)>(elems)...);
         },

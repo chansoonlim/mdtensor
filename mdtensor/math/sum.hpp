@@ -93,7 +93,7 @@ template <int64_t Axis, MPMode mpmode = MPMode::NONE, typename dtype = void,
         static_cast<size_t>(
             ((Axis % static_cast<int64_t>(in_rank)) + (in_rank)) % in_rank);
 
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::sum_impl(std::forward<decltype(elems)>(elems)...);
         },

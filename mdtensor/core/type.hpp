@@ -340,38 +340,6 @@ using extent_common_type_t =
 
 // ----------------------------------------------------------------------
 
-// namespace detail {
-
-// template <typename... Ts> struct filter_nullopt;
-
-// template <> struct filter_nullopt<> {
-//     using type = std::tuple<>;
-// };
-
-// template <typename T, typename... Ts> struct filter_nullopt<T, Ts...> {
-//   private:
-//     using Tail = typename filter_nullopt<Ts...>::type;
-
-//   public:
-//     using type = std::conditional_t<
-//         std::is_same_v<std::remove_cvref_t<T>, std::nullopt_t>, Tail,
-//         decltype(std::tuple_cat(std::declval<std::tuple<T>>(),
-//                                 std::declval<Tail>()))>;
-// };
-
-// template <typename Tuple> struct data_common_type_impl;
-
-// template <typename... Ts> struct data_common_type_impl<std::tuple<Ts...>> {
-//     // TODO: check std::common_type is best possible way
-//     using type = std::common_type_t<Ts...>;
-// };
-
-// } // namespace detail
-
-// template <typename... Ts>
-// using data_common_type_t = typename detail::data_common_type_impl<
-//     typename detail::filter_nullopt<Ts...>::type>::type;
-
 namespace detail {
 
 template <typename T> struct unwrap_optional {
