@@ -5,7 +5,7 @@
 namespace md = mdtensor;
 
 template <typename... Ts>
-using test_t = typename md::core::data_common_type_t<Ts...>;
+using test_t = typename md::core::common_data_type_t<Ts...>;
 
 template <typename... Ts>
 constexpr bool assigned = requires { typename test_t<Ts...>; };

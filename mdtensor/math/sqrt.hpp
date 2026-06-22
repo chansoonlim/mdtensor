@@ -32,7 +32,7 @@ inline constexpr void sqrt_impl(in_t &&in, out_t &&out) {
     out() = std::sqrt(in());
 
 #else
-    using value_t = core::data_common_type_t<decltype(in()), float>;
+    using value_t = core::common_data_type_t<decltype(in()), float>;
 
     out() = (in() >= 0 && in() < std::numeric_limits<value_t>::infinity())
                 ? sqrt_newton_raphson(static_cast<value_t>(in()),

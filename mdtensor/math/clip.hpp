@@ -23,7 +23,7 @@ inline constexpr void clip_impl(in_t &&in, min_t &&min, max_t &&max,
     if constexpr (!std::is_same_v<std::remove_cvref_t<decltype(min())>,
                                   std::nullopt_t>) {
         using value_t =
-            core::data_common_type_t<std::remove_cvref_t<decltype(out())>,
+            core::common_data_type_t<std::remove_cvref_t<decltype(out())>,
                                      std::remove_cvref_t<decltype(min())>>;
 
         out() =
@@ -33,7 +33,7 @@ inline constexpr void clip_impl(in_t &&in, min_t &&min, max_t &&max,
     if constexpr (!std::is_same_v<std::remove_cvref_t<decltype(max())>,
                                   std::nullopt_t>) {
         using value_t =
-            core::data_common_type_t<std::remove_cvref_t<decltype(out())>,
+            core::common_data_type_t<std::remove_cvref_t<decltype(out())>,
                                      std::remove_cvref_t<decltype(max())>>;
 
         out() =
