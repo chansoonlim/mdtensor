@@ -366,13 +366,13 @@ inline constexpr bool valid_extent_index_v =
      sizeof(std::remove_cvref_t<T>) == 4 ||
      sizeof(std::remove_cvref_t<T>) == 8);
 
-template <typename... Ts> struct extent_common_type_impl {
+template <typename... Ts> struct common_index_type_impl {
     // no type
 };
 
 template <typename T>
     requires valid_extent_index_v<T>
-struct extent_common_type_impl<T> {
+struct common_index_type_impl<T> {
     using type = std::remove_cvref_t<T>;
 };
 
@@ -380,7 +380,7 @@ template <typename T1, typename T2>
     requires(valid_extent_index_v<T1> && valid_extent_index_v<T2> &&
              (std::is_signed_v<std::remove_cvref_t<T1>> ==
               std::is_signed_v<std::remove_cvref_t<T2>>))
-struct extent_common_type_impl<T1, T2> {
+struct common_index_type_impl<T1, T2> {
     using type =
         std::conditional_t<(sizeof(std::remove_cvref_t<T1>) >=
                             sizeof(std::remove_cvref_t<T2>)),
@@ -392,7 +392,7 @@ template <typename S, typename U>
              std::is_signed_v<std::remove_cvref_t<S>> &&
              std::is_unsigned_v<std::remove_cvref_t<U>> &&
              (sizeof(std::remove_cvref_t<U>) < 8))
-struct extent_common_type_impl<S, U> {
+struct common_index_type_impl<S, U> {
   private:
     static constexpr std::size_t size =
         (sizeof(std::remove_cvref_t<S>) > sizeof(std::remove_cvref_t<U>))
@@ -408,23 +408,22 @@ template <typename U, typename S>
              std::is_unsigned_v<std::remove_cvref_t<U>> &&
              std::is_signed_v<std::remove_cvref_t<S>> &&
              (sizeof(std::remove_cvref_t<U>) < 8))
-struct extent_common_type_impl<U, S>
-    : extent_common_type_impl<std::remove_cvref_t<S>, std::remove_cvref_t<U>> {
-};
+struct common_index_type_impl<U, S>
+    : common_index_type_impl<std::remove_cvref_t<S>, std::remove_cvref_t<U>> {};
 
 template <typename T1, typename T2, typename... Ts>
-    requires requires { typename extent_common_type_impl<T1, T2>::type; }
-struct extent_common_type_impl<T1, T2, Ts...> {
+    requires requires { typename common_index_type_impl<T1, T2>::type; }
+struct common_index_type_impl<T1, T2, Ts...> {
   public:
-    using type = typename extent_common_type_impl<
-        typename extent_common_type_impl<T1, T2>::type, Ts...>::type;
+    using type = typename common_index_type_impl<
+        typename common_index_type_impl<T1, T2>::type, Ts...>::type;
 };
 
 } // namespace detail
 
 template <typename... Ts>
-using extent_common_type_t =
-    typename detail::extent_common_type_impl<Ts...>::type;
+using common_index_type_t =
+    typename detail::common_index_type_impl<Ts...>::type;
 
 // ----------------------------------------------------------------------
 
@@ -474,28 +473,28 @@ template <typename T>
 inline constexpr bool data_scalar_v =
     data_bool_v<T> || data_integer_v<T> || data_fpoint_v<T>;
 
-template <typename T1, typename T2> struct data_common_pair_impl {
+template <typename T1, typename T2> struct common_data_pair_impl {
     // no type
 };
 
 // bool + bool -> bool
 template <typename T1, typename T2>
     requires(data_bool_v<T1> && data_bool_v<T2>)
-struct data_common_pair_impl<T1, T2> {
+struct common_data_pair_impl<T1, T2> {
     using type = bool;
 };
 
 // bool + T -> T
 template <typename B, typename T>
     requires(data_bool_v<B> && !data_bool_v<T> && data_scalar_v<T>)
-struct data_common_pair_impl<B, T> {
+struct common_data_pair_impl<B, T> {
     using type = std::remove_cvref_t<T>;
 };
 
 // T + bool -> T
 template <typename T, typename B>
     requires(!data_bool_v<T> && data_scalar_v<T> && data_bool_v<B>)
-struct data_common_pair_impl<T, B> {
+struct common_data_pair_impl<T, B> {
     using type = std::remove_cvref_t<T>;
 };
 
@@ -503,7 +502,7 @@ struct data_common_pair_impl<T, B> {
 template <typename T1, typename T2>
     requires(!data_bool_v<T1> && !data_bool_v<T2> && data_scalar_v<T1> &&
              data_scalar_v<T2> && (data_fpoint_v<T1> || data_fpoint_v<T2>))
-struct data_common_pair_impl<T1, T2> {
+struct common_data_pair_impl<T1, T2> {
   private:
     using lhs_t = std::remove_cvref_t<T1>;
     using rhs_t = std::remove_cvref_t<T2>;
@@ -515,16 +514,16 @@ struct data_common_pair_impl<T1, T2> {
         std::conditional_t<data_fpoint_v<T1>, lhs_t, rhs_t>>;
 };
 
-// integer + integer -> extent_common_type_t
+// integer + integer -> common_index_type_t
 template <typename T1, typename T2>
     requires(data_integer_v<T1> && data_integer_v<T2> &&
              requires {
-                 typename extent_common_type_t<std::remove_cvref_t<T1>,
-                                               std::remove_cvref_t<T2>>;
+                 typename common_index_type_t<std::remove_cvref_t<T1>,
+                                              std::remove_cvref_t<T2>>;
              })
-struct data_common_pair_impl<T1, T2> {
+struct common_data_pair_impl<T1, T2> {
     using type =
-        extent_common_type_t<std::remove_cvref_t<T1>, std::remove_cvref_t<T2>>;
+        common_index_type_t<std::remove_cvref_t<T1>, std::remove_cvref_t<T2>>;
 };
 
 template <typename... Ts> struct data_promote_impl {
@@ -539,33 +538,33 @@ struct data_promote_impl<T> {
 
 template <typename T1, typename T2>
 struct data_promote_impl<T1, T2>
-    : data_common_pair_impl<std::remove_cvref_t<T1>, std::remove_cvref_t<T2>> {
+    : common_data_pair_impl<std::remove_cvref_t<T1>, std::remove_cvref_t<T2>> {
 };
 
 template <typename T1, typename T2, typename... Ts>
     requires requires {
-        typename data_common_pair_impl<std::remove_cvref_t<T1>,
+        typename common_data_pair_impl<std::remove_cvref_t<T1>,
                                        std::remove_cvref_t<T2>>::type;
     }
 struct data_promote_impl<T1, T2, Ts...> {
   public:
     using type = typename data_promote_impl<
-        typename data_common_pair_impl<std::remove_cvref_t<T1>,
+        typename common_data_pair_impl<std::remove_cvref_t<T1>,
                                        std::remove_cvref_t<T2>>::type,
         Ts...>::type;
 };
 
-template <typename Tuple> struct data_common_type_impl {
+template <typename Tuple> struct common_data_type_impl {
     // no type
 };
 
 template <typename... Ts>
-struct data_common_type_impl<std::tuple<Ts...>> : data_promote_impl<Ts...> {};
+struct common_data_type_impl<std::tuple<Ts...>> : data_promote_impl<Ts...> {};
 
 } // namespace detail
 
 template <typename... Ts>
-using data_common_type_t = typename detail::data_common_type_impl<
+using common_data_type_t = typename detail::common_data_type_impl<
     typename detail::filter_nullopt<Ts...>::type>::type;
 
 // ----------------------------------------------------------------------
@@ -789,8 +788,8 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
                                                 ins_t &&...ins) noexcept {
     using in1_base_t = std::remove_cvref_t<in1_t>;
     using in2_base_t = std::remove_cvref_t<in2_t>;
-    using index_t = extent_common_type_t<typename in1_base_t::index_type,
-                                         typename in2_base_t::index_type>;
+    using index_t = common_index_type_t<typename in1_base_t::index_type,
+                                        typename in2_base_t::index_type>;
 
     const auto cexts =
         [&]<size_t... Is, size_t... Js>(std::index_sequence<Is...>,
@@ -842,8 +841,8 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
                                               ins_t &&...ins) noexcept {
     using in1_base_t = std::remove_cvref_t<in1_t>;
     using in2_base_t = std::remove_cvref_t<in2_t>;
-    using index_t = extent_common_type_t<typename in1_base_t::index_type,
-                                         typename in2_base_t::index_type>;
+    using index_t = common_index_type_t<typename in1_base_t::index_type,
+                                        typename in2_base_t::index_type>;
 
     constexpr size_t brank = std::max(in1_base_t::rank(), in2_base_t::rank());
 
@@ -914,8 +913,8 @@ broadcast_to(in_t &&in = in_t{},
 
     } else {
         using index_type =
-            extent_common_type_t<typename in_base_t::index_type,
-                                 typename new_bexts_base_t::index_type>;
+            common_index_type_t<typename in_base_t::index_type,
+                                typename new_bexts_base_t::index_type>;
 
         auto new_strides =
             std::array<index_type, urank + new_bexts_base_t::rank()>{};
@@ -1062,7 +1061,7 @@ create_out(std::index_sequence<offsets...>, std::index_sequence<uranks...>,
 
     using value_t =
         std::conditional_t<std::is_void_v<dtype>,
-                           data_common_type_t<value_type_t<ins_t>...>, dtype>;
+                           common_data_type_t<value_type_t<ins_t>...>, dtype>;
 
     constexpr auto ofst = std::array{offsets...};
     constexpr auto ur = std::array{uranks...};
@@ -1127,7 +1126,7 @@ create_outs(std::index_sequence<offsets...>, std::index_sequence<uranks...>,
 
     using value_t =
         std::conditional_t<std::is_void_v<dtype>,
-                           data_common_type_t<value_type_t<ins_t>...>, dtype>;
+                           common_data_type_t<value_type_t<ins_t>...>, dtype>;
 
     constexpr auto ofst = std::array{offsets...};
     constexpr auto ur = std::array{uranks...};
@@ -1522,7 +1521,7 @@ template <typename data_t = void, arithmetic_c start_t, arithmetic_c stop_t,
                                            step_t &&step = (step_t)1) noexcept {
     using value_t =
         std::conditional_t<!std::is_void_v<data_t>, data_t,
-                           core::data_common_type_t<start_t, stop_t>>;
+                           core::common_data_type_t<start_t, stop_t>>;
 
     const size_t num = std::ceil((stop - start) / step);
     const value_t step_actual =
@@ -2124,7 +2123,7 @@ linspace(start_t &&start, stop_t &&stop, const exts_t &exts = exts_t{},
 
     using value_t = std::conditional_t<
         !std::is_void_v<dtype>, dtype,
-        core::data_common_type_t<typename start_mds_t::value_type,
+        core::common_data_type_t<typename start_mds_t::value_type,
                                  typename stop_mds_t::value_type>>;
 
     constexpr size_t out_rank = start_mds_t::rank() + 1;
@@ -2591,7 +2590,7 @@ inline constexpr void matmul_impl(in1_t &&in1, in2_t &&in2,
                   core::eigen::eigen_mappable_mdspan_c<out_t>) {
         if (!std::is_constant_evaluated() && 8 <= out.extent(0) + out.extent(1))
             [[likely]] {
-            using value_t = core::data_common_type_t<
+            using value_t = core::common_data_type_t<
                 typename std::remove_cvref_t<in1_t>::value_type,
                 typename std::remove_cvref_t<in2_t>::value_type>;
 
@@ -2674,8 +2673,8 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
     const auto uin1_exts = core::slice_from_right<2>(in1_mds.extents());
     const auto uin2_exts = core::slice_from_right<2>(in2_mds.extents());
     const auto uout_exts = extents<
-        core::extent_common_type_t<typename decltype(uin1_exts)::index_type,
-                                   typename decltype(uin2_exts)::index_type>,
+        core::common_index_type_t<typename decltype(uin1_exts)::index_type,
+                                  typename decltype(uin2_exts)::index_type>,
         decltype(uin1_exts)::static_extent(0),
         decltype(uin2_exts)::static_extent(1)>{uin1_exts.extent(0),
                                                uin2_exts.extent(1)};
@@ -2783,7 +2782,7 @@ inline constexpr void matvec_impl(in1_t &&in1, in2_t &&in2,
                   core::eigen::eigen_mappable_mdspan_c<out_t>) {
         if (!std::is_constant_evaluated() && 8 <= out.extent(0) + out.extent(1))
             [[likely]] {
-            using value_t = core::data_common_type_t<
+            using value_t = core::common_data_type_t<
                 typename std::remove_cvref_t<in1_t>::value_type,
                 typename std::remove_cvref_t<in2_t>::value_type>;
 
@@ -2868,8 +2867,8 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
     const auto uin1_exts = core::slice_from_right<2>(in1_mds.extents());
     const auto uin2_exts = core::slice_from_right<2>(in2_mds.extents());
     const auto uout_exts = extents<
-        core::extent_common_type_t<typename decltype(uin1_exts)::index_type,
-                                   typename decltype(uin2_exts)::index_type>,
+        core::common_index_type_t<typename decltype(uin1_exts)::index_type,
+                                  typename decltype(uin2_exts)::index_type>,
         decltype(uin1_exts)::static_extent(0)>{uin1_exts.extent(0)};
 
     return core::batch_out<dtype, mpmode>(
@@ -3013,7 +3012,7 @@ inline constexpr void sqrt_impl(in_t &&in, out_t &&out) {
     out() = std::sqrt(in());
 
 #else
-    using value_t = core::data_common_type_t<decltype(in()), float>;
+    using value_t = core::common_data_type_t<decltype(in()), float>;
 
     out() = (in() >= 0 && in() < std::numeric_limits<value_t>::infinity())
                 ? sqrt_newton_raphson(static_cast<value_t>(in()),
@@ -3422,7 +3421,7 @@ inline constexpr void vecmat_impl(in1_t &&in1, in2_t &&in2,
                   core::eigen::eigen_mappable_mdspan_c<out_t>) {
         if (!std::is_constant_evaluated() && 8 <= out.extent(0) + out.extent(1))
             [[likely]] {
-            using value_t = core::data_common_type_t<
+            using value_t = core::common_data_type_t<
                 typename std::remove_cvref_t<in1_t>::value_type,
                 typename std::remove_cvref_t<in2_t>::value_type>;
 
@@ -3506,7 +3505,7 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
     const auto uin1_exts = core::slice_from_right<2>(in1_mds.extents());
     const auto uin2_exts = core::slice_from_right<2>(in2_mds.extents());
     const auto uout_exts = extents<
-        core::data_common_type_t<typename decltype(uin1_exts)::index_type,
+        core::common_data_type_t<typename decltype(uin1_exts)::index_type,
                                  typename decltype(uin2_exts)::index_type>,
         decltype(uin2_exts)::static_extent(1)>{uin2_exts.extent(1)};
 
@@ -4795,8 +4794,8 @@ concatenate_extents(const in1_t &in1 = in1_t{}, const in2_t &in2 = in2_t{},
     constexpr size_t axis = static_cast<size_t>(
         ((Axis % static_cast<int64_t>(rank)) + (rank)) % rank);
 
-    using index_t = core::extent_common_type_t<typename in1_t::index_type,
-                                               typename in2_t::index_type>;
+    using index_t = core::common_index_type_t<typename in1_t::index_type,
+                                              typename in2_t::index_type>;
 
     const auto exts = [&]<typename E1, typename E2>(const E1 &e1,
                                                     const E2 &e2) {
@@ -4907,7 +4906,7 @@ template <int64_t Axis, typename... ins_t>
 
     // generate out
     using dtype = decltype([]<size_t... Is>(std::index_sequence<Is...>) {
-        return core::data_common_type_t<
+        return core::common_data_type_t<
             core::value_type_t<std::tuple_element_t<Is, ins_mds_t>>...>{};
     }(std::make_index_sequence<num_ins>{}));
     auto out = empty<dtype>(out_extents);
@@ -4966,7 +4965,7 @@ namespace detail {
 
 template <typename in1_t, typename in2_t, typename out_t>
 inline constexpr void atan2_impl(in1_t &&in1, in2_t &&in2, out_t &&out) {
-    using value_t = core::data_common_type_t<decltype(in1()), decltype(in2()),
+    using value_t = core::common_data_type_t<decltype(in1()), decltype(in2()),
                                              decltype(out())>;
 
     out() =
@@ -5055,7 +5054,7 @@ inline constexpr void clip_impl(in_t &&in, min_t &&min, max_t &&max,
     if constexpr (!std::is_same_v<std::remove_cvref_t<decltype(min())>,
                                   std::nullopt_t>) {
         using value_t =
-            core::data_common_type_t<std::remove_cvref_t<decltype(out())>,
+            core::common_data_type_t<std::remove_cvref_t<decltype(out())>,
                                      std::remove_cvref_t<decltype(min())>>;
 
         out() =
@@ -5065,7 +5064,7 @@ inline constexpr void clip_impl(in_t &&in, min_t &&min, max_t &&max,
     if constexpr (!std::is_same_v<std::remove_cvref_t<decltype(max())>,
                                   std::nullopt_t>) {
         using value_t =
-            core::data_common_type_t<std::remove_cvref_t<decltype(out())>,
+            core::common_data_type_t<std::remove_cvref_t<decltype(out())>,
                                      std::remove_cvref_t<decltype(max())>>;
 
         out() =
@@ -5241,7 +5240,7 @@ namespace mdtensor {
 template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
 inline constexpr void deg2rad_to(in_t &&in, out_t &&out) {
     using value_t =
-        core::data_common_type_t<typename decltype(core::to_mdspan(
+        core::common_data_type_t<typename decltype(core::to_mdspan(
                                      std::forward<in_t>(in)))::value_type,
                                  float>;
 
@@ -5271,7 +5270,7 @@ inline constexpr void deg2rad_to(in_t &&in, out_t &&out) {
 template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto deg2rad(in_t &&in) {
     using value_t =
-        core::data_common_type_t<typename decltype(core::to_mdspan(
+        core::common_data_type_t<typename decltype(core::to_mdspan(
                                      std::forward<in_t>(in)))::value_type,
                                  float>;
 
@@ -5946,7 +5945,7 @@ namespace mdtensor {
 template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
 inline constexpr void rad2deg_to(in_t &&in, out_t &&out) {
     using value_t =
-        core::data_common_type_t<typename decltype(core::to_mdspan(
+        core::common_data_type_t<typename decltype(core::to_mdspan(
                                      std::forward<in_t>(in)))::value_type,
                                  float>;
 
@@ -5976,7 +5975,7 @@ inline constexpr void rad2deg_to(in_t &&in, out_t &&out) {
 template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto rad2deg(in_t &&in) {
     using value_t =
-        core::data_common_type_t<typename decltype(core::to_mdspan(
+        core::common_data_type_t<typename decltype(core::to_mdspan(
                                      std::forward<in_t>(in)))::value_type,
                                  float>;
 
