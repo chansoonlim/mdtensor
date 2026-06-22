@@ -38,7 +38,7 @@ namespace mdtensor {
  */
 template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t>
 [[nodiscard]] inline constexpr bool array_equiv(in1_t &&in1, in2_t &&in2) {
-    return all(equal<mpmode, int8_t>(std::forward<in1_t>(in1),
+    return all(equal<int8_t, mpmode>(std::forward<in1_t>(in1),
                                      std::forward<in2_t>(in2)));
 }
 

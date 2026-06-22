@@ -49,9 +49,9 @@ inline constexpr void less_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
 /**
  * @brief Compare two inputs element-wise for less-than (out-of-place).
  *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
  * @tparam dtype (optional) Data type of the result. Default is int8_t.
  *         If an integral type is used, results represent boolean values (0/1).
+ * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
  *
  * @param in1 First input mdspan, mdarray, scalar, etc.
  * @param in2 Second input mdspan, mdarray, scalar, etc.
@@ -62,10 +62,10 @@ inline constexpr void less_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
  *
  * @see mdtensor::less_to for the in-place version that writes into an output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = int8_t, typename in1_t,
+template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto less(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::less_impl(std::forward<decltype(elems)>(elems)...);
         },

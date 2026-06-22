@@ -107,7 +107,7 @@ template <int64_t Axis, typename dtype = int8_t, MPMode mpmode = MPMode::NONE,
         static_cast<size_t>(
             ((Axis % static_cast<int64_t>(in_rank)) + (in_rank)) % in_rank);
 
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::all_impl(std::forward<decltype(elems)>(elems)...);
         },

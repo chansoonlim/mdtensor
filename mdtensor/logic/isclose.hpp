@@ -78,12 +78,12 @@ inline constexpr void isclose_to(in1_t &&in1, in2_t &&in2, out_t &&out,
  * output.
  * @see mdtensor::allclose for full-tensor reduction using isclose.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = int8_t, typename in1_t,
+template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto isclose(in1_t &&in1, in2_t &&in2,
                                             const double &rtol = 1e-05,
                                             const double &atol = 1e-08) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [&](auto &&...elems) {
             detail::isclose_impl(std::forward<decltype(elems)>(elems)..., rtol,
                                  atol);

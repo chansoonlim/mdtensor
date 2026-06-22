@@ -159,7 +159,7 @@ inline constexpr void matvec_to(in1_t &&in1, in2_t &&in2,
  * @see mdtensor::linalg::matvec_to for the in-place version that writes into an
  * output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in1_t,
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto matvec(in1_t &&in1, in2_t &&in2) noexcept {
     const auto in1_mds = core::to_const_mdspan(std::forward<in1_t>(in1));
@@ -172,7 +172,7 @@ template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in1_t,
                                    typename decltype(uin2_exts)::index_type>,
         decltype(uin1_exts)::static_extent(0)>{uin1_exts.extent(0)};
 
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::matvec_impl(std::forward<decltype(elems)>(elems)...);
         },
