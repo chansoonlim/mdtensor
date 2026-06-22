@@ -428,38 +428,6 @@ using extent_common_type_t =
 
 // ----------------------------------------------------------------------
 
-// namespace detail {
-
-// template <typename... Ts> struct filter_nullopt;
-
-// template <> struct filter_nullopt<> {
-//     using type = std::tuple<>;
-// };
-
-// template <typename T, typename... Ts> struct filter_nullopt<T, Ts...> {
-//   private:
-//     using Tail = typename filter_nullopt<Ts...>::type;
-
-//   public:
-//     using type = std::conditional_t<
-//         std::is_same_v<std::remove_cvref_t<T>, std::nullopt_t>, Tail,
-//         decltype(std::tuple_cat(std::declval<std::tuple<T>>(),
-//                                 std::declval<Tail>()))>;
-// };
-
-// template <typename Tuple> struct data_common_type_impl;
-
-// template <typename... Ts> struct data_common_type_impl<std::tuple<Ts...>> {
-//     // TODO: check std::common_type is best possible way
-//     using type = std::common_type_t<Ts...>;
-// };
-
-// } // namespace detail
-
-// template <typename... Ts>
-// using data_common_type_t = typename detail::data_common_type_impl<
-//     typename detail::filter_nullopt<Ts...>::type>::type;
-
 namespace detail {
 
 template <typename T> struct unwrap_optional {
@@ -1218,161 +1186,6 @@ create_outs(uout_exts_tuple_t &&uout_exts_tuple, ins_t &&...ins) noexcept {
     }(std::make_index_sequence<sizeof...(ins_t)>{});
 }
 
-// TODO: remove under code
-// template <typename Func, size_t... offsets, size_t... uranks, mdspan_c...
-// ins_t>
-//     requires(sizeof...(offsets) == sizeof...(ins_t) &&
-//              sizeof...(uranks) == sizeof...(ins_t))
-// inline constexpr void batch(Func &&func, std::index_sequence<offsets...>,
-//                             std::index_sequence<uranks...>,
-//                             const MPMode mpmode,
-//                             const ins_t &...ins) noexcept {
-//     constexpr auto ofst = std::array{offsets...};
-//     constexpr auto ur = std::array{uranks...};
-//     constexpr auto br = [&]<size_t... Is>(std::index_sequence<Is...>) {
-//         return std::array{
-//             (std::tuple_element_t<Is, std::tuple<ins_t...>>::rank() -
-//             ofst[Is] -
-//              ur[Is])...};
-//     }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-//     constexpr bool no_branks = [&]<size_t... Is>(std::index_sequence<Is...>)
-//     {
-//         return ((br[Is] == 0) && ...);
-//     }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-//     constexpr bool all_same_static_bexts =
-//         [&]<size_t... Is>(std::index_sequence<Is...>) {
-//             return same(slice_with_offset<ofst[Is], br[Is]>(
-//                 typename std::tuple_element_t<
-//                     Is, std::tuple<ins_t...>>::extents_type{})...);
-//         }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-//     if constexpr (no_branks) {
-//         // case 1: directly pass to unit function
-//         std::forward<Func>(func)(ins...);
-//         return;
-
-//     } else if constexpr (all_same_static_bexts) {
-//         // case 2: if static bexts are all same
-//         constexpr bool is_flattable = [&]<size_t... Is>(
-//                                           std::index_sequence<Is...>) {
-//             return ((std::tuple_element_t<
-//                          Is, std::tuple<ins_t...>>::rank_dynamic() == 0 &&
-//                      is_always_reshapable<
-//                          std::tuple_element_t<Is, std::tuple<ins_t...>>>())
-//                          &&
-//                     ...);
-//         }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-//         if constexpr (is_flattable) {
-//             // case 2-1: batch with flattening
-//             constexpr size_t static_bsize =
-//                 static_size(slice_with_offset<ofst[0], br[0]>(
-//                     typename std::tuple_element_t<
-//                         0, std::tuple<ins_t...>>::extents_type{}));
-
-//             auto ins_tuple = std::forward_as_tuple(ins...);
-
-//             [&]<size_t... Is>(std::index_sequence<Is...>) {
-//                 detail::batch_impl<1>(
-//                     std::forward<Func>(func),
-//                     std::index_sequence<offsets...>{}, mpmode,
-//                     static_reshape(
-//                         std::get<Is>(ins_tuple),
-//                         concatenate(
-//                             slice_from_left<ofst[Is]>(
-//                                 std::get<Is>(ins_tuple).extents()),
-//                             extents<size_t, static_bsize>{static_bsize},
-//                             slice_from_right<ur[Is]>(
-//                                 std::get<Is>(ins_tuple).extents())))...);
-//             }(std::make_index_sequence<sizeof...(ins_t)>{});
-//             return;
-
-//         } else {
-//             // case 2-2: batch without flattening
-//             detail::batch_impl<br[0]>(std::forward<Func>(func),
-//                                       std::index_sequence<offsets...>{},
-//                                       mpmode, ins...);
-//             return;
-//         }
-
-//     } else {
-//         // case 3: if dynamic bexts are all same
-//         auto ins_tuple = std::forward_as_tuple(ins...);
-
-//         constexpr bool possibly_same_bexts =
-//             [&]<size_t... Is>(std::index_sequence<Is...>) {
-//                 return ((br[Is] == br[0]) && ...);
-//             }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-//         if constexpr (possibly_same_bexts) {
-//             const auto same_bexts =
-//                 [&]<size_t... Is>(std::index_sequence<Is...>) {
-//                     return same(slice_with_offset<ofst[Is], br[Is]>(
-//                         std::get<Is>(ins_tuple).extents())...);
-//                 }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-//             if (same_bexts) [[likely]] {
-//                 // If all bexts are same, broadcasting is not required.
-
-//                 const bool is_flattable =
-//                     [&]<size_t... Is>(std::index_sequence<Is...>) {
-//                         return (is_reshapable(std::get<Is>(ins_tuple))
-//                         &&
-//                                 ...);
-//                     }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-//                 if (is_flattable) [[likely]] {
-//                     // case 3-1: batch with flattening
-//                     const auto bexts = slice_with_offset<ofst[0], br[0]>(
-//                         std::get<0>(ins_tuple).extents());
-
-//                     constexpr size_t static_bsize = static_size(bexts);
-//                     const size_t bsize = size(bexts);
-
-//                     [&]<size_t... Is>(std::index_sequence<Is...>) {
-//                         detail::batch_impl<1>(
-//                             std::forward<Func>(func),
-//                             std::index_sequence<offsets...>{}, mpmode,
-//                             reshape(
-//                                 std::get<Is>(ins_tuple),
-//                                 concatenate(
-//                                     slice_from_left<ofst[Is]>(
-//                                         std::get<Is>(ins_tuple).extents()),
-//                                     extents<size_t, static_bsize>{bsize},
-//                                     slice_from_right<ur[Is]>(
-//                                         std::get<Is>(ins_tuple)
-//                                             .extents())))...);
-//                     }(std::make_index_sequence<sizeof...(ins_t)>{});
-//                     return;
-
-//                 } else {
-//                     // case 3-2: batch without flattening
-//                     detail::batch_impl<br[0]>(std::forward<Func>(func),
-//                                               std::index_sequence<offsets...>{},
-//                                               mpmode, ins...);
-//                     return;
-//                 }
-//             }
-//         }
-
-//         // case 4: batch with broadcasting
-//         const auto bexts = [&]<size_t... Is>(std::index_sequence<Is...>) {
-//             return broadcast(slice_with_offset<ofst[Is], br[Is]>(
-//                 std::get<Is>(ins_tuple).extents())...);
-//         }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-//         [&]<size_t... Is>(std::index_sequence<Is...>) {
-//             detail::batch_impl<bexts.rank()>(
-//                 std::forward<Func>(func), std::index_sequence<offsets...>{},
-//                 mpmode,
-//                 broadcast_to<ofst[Is], br[Is]>(std::get<Is>(ins_tuple),
-//                                                bexts)...);
-//         }(std::make_index_sequence<sizeof...(ins_t)>{});
-//     }
-// }
-
 template <MPMode mpmode, typename func_t, size_t... offsets, size_t... uranks,
           mdspan_c... ins_t>
 inline constexpr void batch(func_t &&func, std::index_sequence<offsets...>,
@@ -1487,7 +1300,7 @@ inline constexpr void batch(func_t &&func, ins_t &&...ins) {
     }(std::make_index_sequence<sizeof...(ins_t)>{});
 }
 
-template <MPMode mpmode, typename dtype, typename func_t, size_t... offsets,
+template <typename dtype, MPMode mpmode, typename func_t, size_t... offsets,
           size_t... uranks, extents_c uout_exts_t, mdspan_c... ins_t>
 [[nodiscard]] inline constexpr auto
 batch_out(func_t &&func, std::index_sequence<offsets...>,
@@ -1507,7 +1320,7 @@ batch_out(func_t &&func, std::index_sequence<offsets...>,
     return out;
 }
 
-template <MPMode mpmode, typename dtype, typename func_t, size_t... offsets,
+template <typename dtype, MPMode mpmode, typename func_t, size_t... offsets,
           size_t... uranks, extents_tuple_c uout_exts_tuple_t,
           mdspan_c... ins_t>
 [[nodiscard]] inline constexpr auto
@@ -1538,7 +1351,7 @@ batch_out(func_t &&func, std::index_sequence<offsets...>,
     return outs;
 }
 
-template <MPMode mpmode, typename dtype, typename func_t, size_t... uranks,
+template <typename dtype, MPMode mpmode, typename func_t, size_t... uranks,
           extents_info_c uout_info_t, mdspan_c... ins_t>
 [[nodiscard]] inline constexpr auto
 batch_out(func_t &&func, std::index_sequence<uranks...>,
@@ -1555,19 +1368,19 @@ batch_out(func_t &&func, std::index_sequence<uranks...>,
     }();
 
     return [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return batch_out<mpmode, dtype>(
+        return batch_out<dtype, mpmode>(
             std::forward<func_t>(func), std::index_sequence<((void)Is, 0)...>{},
             std::index_sequence<uranks...>{},
             std::forward<uout_info_t>(uout_info), std::forward<ins_t>(ins)...);
     }(std::make_index_sequence<sizeof...(ins_t) + uout_len>{});
 }
 
-template <MPMode mpmode, typename dtype, typename func_t,
+template <typename dtype, MPMode mpmode, typename func_t,
           extents_info_c uout_info_t, mdspan_c... ins_t>
 [[nodiscard]] inline constexpr auto
 batch_out(func_t &&func, uout_info_t &&uout_info, ins_t &&...ins) {
     return [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return batch_out<mpmode, dtype>(
+        return batch_out<dtype, mpmode>(
             std::forward<func_t>(func), std::index_sequence<((void)Is, 0)...>{},
             std::forward<uout_info_t>(uout_info), std::forward<ins_t>(ins)...);
     }(std::make_index_sequence<sizeof...(ins_t)>{});
@@ -1803,9 +1616,9 @@ inline constexpr void copy_to(in_t &&in, out_t &&out) {
  *
  * @see mdtensor::copy_to for the in-place version that writes into an output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in_t>
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto copy(in_t &&in) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::copy_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -2676,11 +2489,11 @@ inline constexpr void inv_to(in_t &&in, out_t &&out, valid_t &&valid) noexcept {
  * @see mdtensor::linalg::inv_to for the in-place version that writes into an
  * output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in_t>
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto inv(in_t &&in) noexcept {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
 
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::inv_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -2852,7 +2665,7 @@ inline constexpr void matmul_to(in1_t &&in1, in2_t &&in2,
  * @see mdtensor::linalg::matmul_to for the in-place version that writes into an
  * output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in1_t,
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto matmul(in1_t &&in1, in2_t &&in2) noexcept {
     const auto in1_mds = core::to_const_mdspan(std::forward<in1_t>(in1));
@@ -2867,7 +2680,7 @@ template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in1_t,
         decltype(uin2_exts)::static_extent(1)>{uin1_exts.extent(0),
                                                uin2_exts.extent(1)};
 
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::matmul_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -3046,7 +2859,7 @@ inline constexpr void matvec_to(in1_t &&in1, in2_t &&in2,
  * @see mdtensor::linalg::matvec_to for the in-place version that writes into an
  * output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in1_t,
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto matvec(in1_t &&in1, in2_t &&in2) noexcept {
     const auto in1_mds = core::to_const_mdspan(std::forward<in1_t>(in1));
@@ -3059,7 +2872,7 @@ template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in1_t,
                                    typename decltype(uin2_exts)::index_type>,
         decltype(uin1_exts)::static_extent(0)>{uin1_exts.extent(0)};
 
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::matvec_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -3154,10 +2967,10 @@ inline constexpr void multiply_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
  * @see mdtensor::multiply_to for the in-place version that writes into an
  *      output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in1_t,
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto multiply(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::multiply_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -3250,9 +3063,9 @@ inline constexpr void sqrt_to(in_t &&in, out_t &&out) {
  *
  * @see mdtensor::sqrt_to for the in-place version that writes into an output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in_t>
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto sqrt(in_t &&in) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::sqrt_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -3333,10 +3146,10 @@ inline constexpr void add_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
  *
  * @see mdtensor::add_to for the in-place version that modifies the output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in1_t,
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto add(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::add_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -3427,7 +3240,7 @@ template <int64_t Axis, MPMode mpmode = MPMode::NONE, typename dtype = void,
         static_cast<size_t>(
             ((Axis % static_cast<int64_t>(in_rank)) + (in_rank)) % in_rank);
 
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::sum_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -3511,7 +3324,7 @@ inline constexpr void norm_to(in_t &&in, out_t &&out) noexcept {
  * @see mdtensor::linalg::norm_to for the in-place version that writes into an
  * output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in_t>
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto norm(in_t &&in) noexcept {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
 
@@ -3684,7 +3497,7 @@ inline constexpr void vecmat_to(in1_t &&in1, in2_t &&in2,
  * @see mdtensor::linalg::vecmat_to for the in-place version that writes into an
  * output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in1_t,
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto vecmat(in1_t &&in1, in2_t &&in2) noexcept {
     const auto in1_mds = core::to_const_mdspan(std::forward<in1_t>(in1));
@@ -3697,7 +3510,7 @@ template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in1_t,
                                  typename decltype(uin2_exts)::index_type>,
         decltype(uin2_exts)::static_extent(1)>{uin2_exts.extent(1)};
 
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::vecmat_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -3837,7 +3650,7 @@ template <int64_t Axis, typename dtype = int8_t, MPMode mpmode = MPMode::NONE,
         static_cast<size_t>(
             ((Axis % static_cast<int64_t>(in_rank)) + (in_rank)) % in_rank);
 
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::all_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -3967,9 +3780,9 @@ inline constexpr void absolute_to(in_t &&in, out_t &&out) {
  * @see mdtensor::absolute_to for the in-place version that writes into an
  *      output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in_t>
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto absolute(in_t &&in) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::absolute_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -4046,12 +3859,12 @@ inline constexpr void isclose_to(in1_t &&in1, in2_t &&in2, out_t &&out,
  * output.
  * @see mdtensor::allclose for full-tensor reduction using isclose.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = int8_t, typename in1_t,
+template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto isclose(in1_t &&in1, in2_t &&in2,
                                             const double &rtol = 1e-05,
                                             const double &atol = 1e-08) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [&](auto &&...elems) {
             detail::isclose_impl(std::forward<decltype(elems)>(elems)..., rtol,
                                  atol);
@@ -4090,7 +3903,7 @@ template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t>
 [[nodiscard]] inline constexpr bool allclose(in1_t &&in1, in2_t &&in2,
                                              const double &rtol = 1e-05,
                                              const double &atol = 1e-08) {
-    return all(isclose<mpmode, int8_t>(std::forward<in1_t>(in1),
+    return all(isclose<int8_t, mpmode>(std::forward<in1_t>(in1),
                                        std::forward<in2_t>(in2), rtol, atol));
 }
 
@@ -4205,7 +4018,7 @@ template <int64_t Axis, MPMode mpmode = MPMode::NONE, typename dtype = int8_t,
         static_cast<size_t>(
             ((Axis % static_cast<int64_t>(in_rank)) + (in_rank)) % in_rank);
 
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::any_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -4374,9 +4187,9 @@ inline constexpr void equal_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
 /**
  * @brief Compare two inputs element-wise for equality (out-of-place).
  *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
  * @tparam dtype (optional) Data type of the result. Default is int8_t.
  *         If an integral type is used, results represent boolean values (0/1).
+ * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
  *
  * @param in1 First input mdspan, mdarray, scalar, etc.
  * @param in2 Second input mdspan, mdarray, scalar, etc.
@@ -4389,10 +4202,10 @@ inline constexpr void equal_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
  * @see mdtensor::array_equiv for full-tensor reduction with broadcasting.
  * @see mdtensor::array_equal for exact equality without broadcasting.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = int8_t, typename in1_t,
+template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto equal(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::equal_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -4429,7 +4242,7 @@ namespace mdtensor {
  */
 template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t>
 [[nodiscard]] inline constexpr bool array_equiv(in1_t &&in1, in2_t &&in2) {
-    return all(equal<mpmode, int8_t>(std::forward<in1_t>(in1),
+    return all(equal<int8_t, mpmode>(std::forward<in1_t>(in1),
                                      std::forward<in2_t>(in2)));
 }
 
@@ -4485,9 +4298,9 @@ inline constexpr void greater_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
 /**
  * @brief Compare two inputs element-wise for greater-than (out-of-place).
  *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
  * @tparam dtype (optional) Data type of the result. Default is int8_t.
  *         If an integral type is used, results represent boolean values (0/1).
+ * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
  *
  * @param in1 First input mdspan, mdarray, scalar, etc.
  * @param in2 Second input mdspan, mdarray, scalar, etc.
@@ -4499,10 +4312,10 @@ inline constexpr void greater_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
  * @see mdtensor::greater_to for the in-place version that writes into an
  *      output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = int8_t, typename in1_t,
+template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto greater(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::greater_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -4564,9 +4377,9 @@ inline constexpr void greater_equal_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
 /**
  * @brief Compare two inputs element-wise for greater-or-equal (out-of-place).
  *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
  * @tparam dtype (optional) Data type of the result. Default is int8_t.
  *         If an integral type is used, results represent boolean values (0/1).
+ * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
  *
  * @param in1 First input mdspan, mdarray, scalar, etc.
  * @param in2 Second input mdspan, mdarray, scalar, etc.
@@ -4578,10 +4391,10 @@ inline constexpr void greater_equal_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
  * @see mdtensor::greater_equal_to for the in-place version that writes into an
  *      output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = int8_t, typename in1_t,
+template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto greater_equal(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::greater_equal_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -4641,9 +4454,9 @@ inline constexpr void less_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
 /**
  * @brief Compare two inputs element-wise for less-than (out-of-place).
  *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
  * @tparam dtype (optional) Data type of the result. Default is int8_t.
  *         If an integral type is used, results represent boolean values (0/1).
+ * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
  *
  * @param in1 First input mdspan, mdarray, scalar, etc.
  * @param in2 Second input mdspan, mdarray, scalar, etc.
@@ -4654,10 +4467,10 @@ inline constexpr void less_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
  *
  * @see mdtensor::less_to for the in-place version that writes into an output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = int8_t, typename in1_t,
+template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto less(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::less_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -4718,9 +4531,9 @@ inline constexpr void less_equal_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
 /**
  * @brief Compare two inputs element-wise for less-or-equal (out-of-place).
  *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
  * @tparam dtype (optional) Data type of the result. Default is int8_t.
  *         If an integral type is used, results represent boolean values (0/1).
+ * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
  *
  * @param in1 First input mdspan, mdarray, scalar, etc.
  * @param in2 Second input mdspan, mdarray, scalar, etc.
@@ -4732,10 +4545,10 @@ inline constexpr void less_equal_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
  * @see mdtensor::less_equal_to for the in-place version that writes into an
  * output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = int8_t, typename in1_t,
+template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto less_equal(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::less_equal_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -4796,9 +4609,9 @@ inline constexpr void not_equal_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
 /**
  * @brief Compare two inputs element-wise for inequality (out-of-place).
  *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
  * @tparam dtype (optional) Data type of the result. Default is int8_t.
  *         If an integral type is used, results represent boolean values (0/1).
+ * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
  *
  * @param in1 First input mdspan, mdarray, scalar, etc.
  * @param in2 Second input mdspan, mdarray, scalar, etc.
@@ -4810,10 +4623,10 @@ inline constexpr void not_equal_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
  * @see mdtensor::not_equal_to for the in-place version that writes into an
  * output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = int8_t, typename in1_t,
+template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto not_equal(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::not_equal_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -5205,10 +5018,10 @@ inline constexpr void atan2_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
  *
  * @see mdtensor::atan2_to for the in-place version that writes into an output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in1_t,
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto atan2(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::atan2_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -5311,10 +5124,10 @@ inline constexpr void clip_to(in_t &&in, min_t &&min, max_t &&max,
  *
  * @see mdtensor::clip_to for the in-place version that writes into an output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in_t,
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t,
           typename min_t, typename max_t>
 [[nodiscard]] inline constexpr auto clip(in_t &&in, min_t &&min, max_t &&max) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::clip_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -5384,9 +5197,9 @@ inline constexpr void cos_to(in_t &&in, out_t &&out) {
  *
  * @see mdtensor::cos_to for the in-place version that writes into an output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in_t>
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto cos(in_t &&in) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::cos_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -5455,7 +5268,7 @@ inline constexpr void deg2rad_to(in_t &&in, out_t &&out) {
  * @see mdtensor::deg2rad_to for the in-place version that writes into an
  *      output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in_t>
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto deg2rad(in_t &&in) {
     using value_t =
         core::data_common_type_t<typename decltype(core::to_mdspan(
@@ -5464,7 +5277,7 @@ template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in_t>
 
     constexpr value_t D2R = std::numbers::pi_v<value_t> / value_t(180);
 
-    return multiply<mpmode, dtype>(std::forward<in_t>(in), D2R);
+    return multiply<dtype, mpmode>(std::forward<in_t>(in), D2R);
 }
 
 } // namespace mdtensor
@@ -5532,10 +5345,10 @@ inline constexpr void divide_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
  *
  * @see mdtensor::divide_to for the in-place version that writes into an output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in1_t,
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto divide(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::divide_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -5674,7 +5487,7 @@ template <int64_t Axis, MPMode mpmode = MPMode::NONE, typename dtype = void,
         static_cast<size_t>(
             ((Axis % static_cast<int64_t>(in_rank)) + (in_rank)) % in_rank);
 
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::max_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -5774,10 +5587,10 @@ inline constexpr void maximum_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
  * @see mdtensor::maximum_to for the in-place version that writes into an
  *      output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in1_t,
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto maximum(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::maximum_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -5916,7 +5729,7 @@ template <int64_t Axis, MPMode mpmode = MPMode::NONE, typename dtype = void,
         static_cast<size_t>(
             ((Axis % static_cast<int64_t>(in_rank)) + (in_rank)) % in_rank);
 
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::min_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -6016,10 +5829,10 @@ inline constexpr void minimum_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
  * @see mdtensor::minimum_to for the in-place version that writes into an
  *      output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in1_t,
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto minimum(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::minimum_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -6089,9 +5902,9 @@ inline constexpr void negative_to(in_t &&in, out_t &&out) {
  * @see mdtensor::negative_to for the in-place version that writes into an
  *      output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in_t>
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto negative(in_t &&in) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::negative_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -6160,7 +5973,7 @@ inline constexpr void rad2deg_to(in_t &&in, out_t &&out) {
  * @see mdtensor::rad2deg_to for the in-place version that writes into an
  *      output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in_t>
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto rad2deg(in_t &&in) {
     using value_t =
         core::data_common_type_t<typename decltype(core::to_mdspan(
@@ -6169,7 +5982,7 @@ template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in_t>
 
     constexpr value_t R2D = std::numbers::inv_pi_v<value_t> * value_t(180);
 
-    return multiply<mpmode, dtype>(std::forward<in_t>(in), R2D);
+    return multiply<dtype, mpmode>(std::forward<in_t>(in), R2D);
 }
 
 } // namespace mdtensor
@@ -6219,8 +6032,8 @@ inline constexpr void sign_to(in_t &&in, out_t &&out) {
 /**
  * @brief Compute sign element-wise (out-of-place).
  *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
  * @tparam dtype (optional) Data type of the result. Default is int8_t.
+ * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
  *
  * @param in Input mdspan, mdarray, scalar, etc.
  *
@@ -6230,9 +6043,9 @@ inline constexpr void sign_to(in_t &&in, out_t &&out) {
  *
  * @see mdtensor::sign_to for the in-place version that writes into an output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = int8_t, typename in_t>
+template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto sign(in_t &&in) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::sign_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -6300,9 +6113,9 @@ inline constexpr void sin_to(in_t &&in, out_t &&out) {
  *
  * @see mdtensor::sin_to for the in-place version that writes into an output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in_t>
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto sin(in_t &&in) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::sin_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -6375,10 +6188,10 @@ inline constexpr void subtract_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
  * @see mdtensor::subtract_to for the in-place version that writes into an
  *      output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in1_t,
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto subtract(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::subtract_impl(std::forward<decltype(elems)>(elems)...);
         },
@@ -6447,9 +6260,9 @@ inline constexpr void tan_to(in_t &&in, out_t &&out) {
  *
  * @see mdtensor::tan_to for the in-place version that writes into an output.
  */
-template <MPMode mpmode = MPMode::NONE, typename dtype = void, typename in_t>
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto tan(in_t &&in) {
-    return core::batch_out<mpmode, dtype>(
+    return core::batch_out<dtype, mpmode>(
         [](auto &&...elems) {
             detail::tan_impl(std::forward<decltype(elems)>(elems)...);
         },
