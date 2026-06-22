@@ -42,7 +42,7 @@ template <typename data_t = void, arithmetic_c start_t, arithmetic_c stop_t,
                                            step_t &&step = (step_t)1) noexcept {
     using value_t =
         std::conditional_t<!std::is_void_v<data_t>, data_t,
-                           core::data_common_type_t<start_t, stop_t>>;
+                           core::common_data_type_t<start_t, stop_t>>;
 
     const size_t num = std::ceil((stop - start) / step);
     const value_t step_actual =

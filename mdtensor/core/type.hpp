@@ -278,13 +278,13 @@ inline constexpr bool valid_extent_index_v =
      sizeof(std::remove_cvref_t<T>) == 4 ||
      sizeof(std::remove_cvref_t<T>) == 8);
 
-template <typename... Ts> struct extent_common_type_impl {
+template <typename... Ts> struct common_index_type_impl {
     // no type
 };
 
 template <typename T>
     requires valid_extent_index_v<T>
-struct extent_common_type_impl<T> {
+struct common_index_type_impl<T> {
     using type = std::remove_cvref_t<T>;
 };
 
@@ -292,7 +292,7 @@ template <typename T1, typename T2>
     requires(valid_extent_index_v<T1> && valid_extent_index_v<T2> &&
              (std::is_signed_v<std::remove_cvref_t<T1>> ==
               std::is_signed_v<std::remove_cvref_t<T2>>))
-struct extent_common_type_impl<T1, T2> {
+struct common_index_type_impl<T1, T2> {
     using type =
         std::conditional_t<(sizeof(std::remove_cvref_t<T1>) >=
                             sizeof(std::remove_cvref_t<T2>)),
@@ -304,7 +304,7 @@ template <typename S, typename U>
              std::is_signed_v<std::remove_cvref_t<S>> &&
              std::is_unsigned_v<std::remove_cvref_t<U>> &&
              (sizeof(std::remove_cvref_t<U>) < 8))
-struct extent_common_type_impl<S, U> {
+struct common_index_type_impl<S, U> {
   private:
     static constexpr std::size_t size =
         (sizeof(std::remove_cvref_t<S>) > sizeof(std::remove_cvref_t<U>))
@@ -320,23 +320,22 @@ template <typename U, typename S>
              std::is_unsigned_v<std::remove_cvref_t<U>> &&
              std::is_signed_v<std::remove_cvref_t<S>> &&
              (sizeof(std::remove_cvref_t<U>) < 8))
-struct extent_common_type_impl<U, S>
-    : extent_common_type_impl<std::remove_cvref_t<S>, std::remove_cvref_t<U>> {
-};
+struct common_index_type_impl<U, S>
+    : common_index_type_impl<std::remove_cvref_t<S>, std::remove_cvref_t<U>> {};
 
 template <typename T1, typename T2, typename... Ts>
-    requires requires { typename extent_common_type_impl<T1, T2>::type; }
-struct extent_common_type_impl<T1, T2, Ts...> {
+    requires requires { typename common_index_type_impl<T1, T2>::type; }
+struct common_index_type_impl<T1, T2, Ts...> {
   public:
-    using type = typename extent_common_type_impl<
-        typename extent_common_type_impl<T1, T2>::type, Ts...>::type;
+    using type = typename common_index_type_impl<
+        typename common_index_type_impl<T1, T2>::type, Ts...>::type;
 };
 
 } // namespace detail
 
 template <typename... Ts>
-using extent_common_type_t =
-    typename detail::extent_common_type_impl<Ts...>::type;
+using common_index_type_t =
+    typename detail::common_index_type_impl<Ts...>::type;
 
 // ----------------------------------------------------------------------
 
@@ -386,28 +385,28 @@ template <typename T>
 inline constexpr bool data_scalar_v =
     data_bool_v<T> || data_integer_v<T> || data_fpoint_v<T>;
 
-template <typename T1, typename T2> struct data_common_pair_impl {
+template <typename T1, typename T2> struct common_data_pair_impl {
     // no type
 };
 
 // bool + bool -> bool
 template <typename T1, typename T2>
     requires(data_bool_v<T1> && data_bool_v<T2>)
-struct data_common_pair_impl<T1, T2> {
+struct common_data_pair_impl<T1, T2> {
     using type = bool;
 };
 
 // bool + T -> T
 template <typename B, typename T>
     requires(data_bool_v<B> && !data_bool_v<T> && data_scalar_v<T>)
-struct data_common_pair_impl<B, T> {
+struct common_data_pair_impl<B, T> {
     using type = std::remove_cvref_t<T>;
 };
 
 // T + bool -> T
 template <typename T, typename B>
     requires(!data_bool_v<T> && data_scalar_v<T> && data_bool_v<B>)
-struct data_common_pair_impl<T, B> {
+struct common_data_pair_impl<T, B> {
     using type = std::remove_cvref_t<T>;
 };
 
@@ -415,7 +414,7 @@ struct data_common_pair_impl<T, B> {
 template <typename T1, typename T2>
     requires(!data_bool_v<T1> && !data_bool_v<T2> && data_scalar_v<T1> &&
              data_scalar_v<T2> && (data_fpoint_v<T1> || data_fpoint_v<T2>))
-struct data_common_pair_impl<T1, T2> {
+struct common_data_pair_impl<T1, T2> {
   private:
     using lhs_t = std::remove_cvref_t<T1>;
     using rhs_t = std::remove_cvref_t<T2>;
@@ -427,16 +426,16 @@ struct data_common_pair_impl<T1, T2> {
         std::conditional_t<data_fpoint_v<T1>, lhs_t, rhs_t>>;
 };
 
-// integer + integer -> extent_common_type_t
+// integer + integer -> common_index_type_t
 template <typename T1, typename T2>
     requires(data_integer_v<T1> && data_integer_v<T2> &&
              requires {
-                 typename extent_common_type_t<std::remove_cvref_t<T1>,
-                                               std::remove_cvref_t<T2>>;
+                 typename common_index_type_t<std::remove_cvref_t<T1>,
+                                              std::remove_cvref_t<T2>>;
              })
-struct data_common_pair_impl<T1, T2> {
+struct common_data_pair_impl<T1, T2> {
     using type =
-        extent_common_type_t<std::remove_cvref_t<T1>, std::remove_cvref_t<T2>>;
+        common_index_type_t<std::remove_cvref_t<T1>, std::remove_cvref_t<T2>>;
 };
 
 template <typename... Ts> struct data_promote_impl {
@@ -451,33 +450,33 @@ struct data_promote_impl<T> {
 
 template <typename T1, typename T2>
 struct data_promote_impl<T1, T2>
-    : data_common_pair_impl<std::remove_cvref_t<T1>, std::remove_cvref_t<T2>> {
+    : common_data_pair_impl<std::remove_cvref_t<T1>, std::remove_cvref_t<T2>> {
 };
 
 template <typename T1, typename T2, typename... Ts>
     requires requires {
-        typename data_common_pair_impl<std::remove_cvref_t<T1>,
+        typename common_data_pair_impl<std::remove_cvref_t<T1>,
                                        std::remove_cvref_t<T2>>::type;
     }
 struct data_promote_impl<T1, T2, Ts...> {
   public:
     using type = typename data_promote_impl<
-        typename data_common_pair_impl<std::remove_cvref_t<T1>,
+        typename common_data_pair_impl<std::remove_cvref_t<T1>,
                                        std::remove_cvref_t<T2>>::type,
         Ts...>::type;
 };
 
-template <typename Tuple> struct data_common_type_impl {
+template <typename Tuple> struct common_data_type_impl {
     // no type
 };
 
 template <typename... Ts>
-struct data_common_type_impl<std::tuple<Ts...>> : data_promote_impl<Ts...> {};
+struct common_data_type_impl<std::tuple<Ts...>> : data_promote_impl<Ts...> {};
 
 } // namespace detail
 
 template <typename... Ts>
-using data_common_type_t = typename detail::data_common_type_impl<
+using common_data_type_t = typename detail::common_data_type_impl<
     typename detail::filter_nullopt<Ts...>::type>::type;
 
 // ----------------------------------------------------------------------

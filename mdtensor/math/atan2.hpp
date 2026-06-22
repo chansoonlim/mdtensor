@@ -16,7 +16,7 @@ namespace detail {
 
 template <typename in1_t, typename in2_t, typename out_t>
 inline constexpr void atan2_impl(in1_t &&in1, in2_t &&in2, out_t &&out) {
-    using value_t = core::data_common_type_t<decltype(in1()), decltype(in2()),
+    using value_t = core::common_data_type_t<decltype(in1()), decltype(in2()),
                                              decltype(out())>;
 
     out() =

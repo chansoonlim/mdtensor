@@ -54,8 +54,8 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
                                                 ins_t &&...ins) noexcept {
     using in1_base_t = std::remove_cvref_t<in1_t>;
     using in2_base_t = std::remove_cvref_t<in2_t>;
-    using index_t = extent_common_type_t<typename in1_base_t::index_type,
-                                         typename in2_base_t::index_type>;
+    using index_t = common_index_type_t<typename in1_base_t::index_type,
+                                        typename in2_base_t::index_type>;
 
     const auto cexts =
         [&]<size_t... Is, size_t... Js>(std::index_sequence<Is...>,
@@ -107,8 +107,8 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
                                               ins_t &&...ins) noexcept {
     using in1_base_t = std::remove_cvref_t<in1_t>;
     using in2_base_t = std::remove_cvref_t<in2_t>;
-    using index_t = extent_common_type_t<typename in1_base_t::index_type,
-                                         typename in2_base_t::index_type>;
+    using index_t = common_index_type_t<typename in1_base_t::index_type,
+                                        typename in2_base_t::index_type>;
 
     constexpr size_t brank = std::max(in1_base_t::rank(), in2_base_t::rank());
 
@@ -179,8 +179,8 @@ broadcast_to(in_t &&in = in_t{},
 
     } else {
         using index_type =
-            extent_common_type_t<typename in_base_t::index_type,
-                                 typename new_bexts_base_t::index_type>;
+            common_index_type_t<typename in_base_t::index_type,
+                                typename new_bexts_base_t::index_type>;
 
         auto new_strides =
             std::array<index_type, urank + new_bexts_base_t::rank()>{};
@@ -327,7 +327,7 @@ create_out(std::index_sequence<offsets...>, std::index_sequence<uranks...>,
 
     using value_t =
         std::conditional_t<std::is_void_v<dtype>,
-                           data_common_type_t<value_type_t<ins_t>...>, dtype>;
+                           common_data_type_t<value_type_t<ins_t>...>, dtype>;
 
     constexpr auto ofst = std::array{offsets...};
     constexpr auto ur = std::array{uranks...};
@@ -392,7 +392,7 @@ create_outs(std::index_sequence<offsets...>, std::index_sequence<uranks...>,
 
     using value_t =
         std::conditional_t<std::is_void_v<dtype>,
-                           data_common_type_t<value_type_t<ins_t>...>, dtype>;
+                           common_data_type_t<value_type_t<ins_t>...>, dtype>;
 
     constexpr auto ofst = std::array{offsets...};
     constexpr auto ur = std::array{uranks...};
