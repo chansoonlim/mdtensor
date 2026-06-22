@@ -6,7 +6,8 @@
         "editor.formatOnSave": true,
         "editor.defaultFormatter": "ms-vscode.cpptools",
     },
-"github.copilot.chat.commitMessageGeneration.instructions": [
+    "todo-tree.ripgrep.ripgrep": "/usr/bin/rg",
+    "github.copilot.chat.commitMessageGeneration.instructions": [
     {
         "text": "Always write commit messages in English."
     },
