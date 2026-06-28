@@ -3291,7 +3291,7 @@ inline constexpr void norm_to(in_t &&in, out_t &&out) noexcept {
     const auto out_mds = core::to_mdspan(std::forward<out_t>(out));
 
     if constexpr (mpmode == MPMode::SIMD) [[unlikely]] {
-        sum_to<-1, mpmode>(multiply<mpmode>(in_mds, in_mds), out_mds);
+        sum_to<-1, mpmode>(multiply<void, mpmode>(in_mds, in_mds), out_mds);
         sqrt_to<mpmode>(out_mds, out_mds);
 
     } else {
@@ -6481,8 +6481,8 @@ inline constexpr void uniform_to(in_t &&in, const double &low = 0,
     random::rand_to(in_mds);
 
     if constexpr (mpmode == MPMode::SIMD) {
-        multiply_to(in_mds, static_cast<const T>(high - low), in_mds);
-        add_to(in_mds, static_cast<const T>(low), in_mds);
+        multiply_to<mpmode>(in_mds, static_cast<const T>(high - low), in_mds);
+        add_to<mpmode>(in_mds, static_cast<const T>(low), in_mds);
         return;
 
     } else {
