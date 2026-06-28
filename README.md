@@ -9,8 +9,8 @@ It is built on modern C++ standard facilities including:
 - Upcoming C++26 [std::mdarray](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1684r2.html) and [std::submdspan](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2630r4.html).
 
 Try it on Godbolt:
-  - [Matrix Addition example](https://godbolt.org/z/vvEE3crfq).
-  - [Zero-cost Abstraction test](https://godbolt.org/z/5qYPYo9Pa).
+  - [Matrix Addition example](https://godbolt.org/z/s6x5hc51r).
+  - [Zero-cost Abstraction test](https://godbolt.org/z/e68xzoE1Y).
 
 ## Key Features
 
