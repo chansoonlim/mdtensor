@@ -130,11 +130,6 @@ concept arithmetic_c = std::is_arithmetic_v<std::remove_cvref_t<T>>;
 
 // ----------------------------------------------------------------------
 
-template <typename T>
-concept floating_point_c = std::is_floating_point_v<std::remove_cvref_t<T>>;
-
-// ----------------------------------------------------------------------
-
 namespace detail {
 
 template <typename T> struct is_extents_impl : std::false_type {};
@@ -1667,7 +1662,7 @@ namespace mdtensor {
  *
  * @tparam dtype Element type of the created tensor.
  * @tparam exts_t (optional) Extents type describing the tensor shape.
- *         Default is extents<size_t>.
+ *         Default is extents<uint8_t>.
  *
  * @param exts Tensor extents (shape). If omitted, creates a scalar-like tensor.
  *
@@ -1680,7 +1675,7 @@ namespace mdtensor {
  * @see mdtensor::empty_like for creating an uninitialized tensor matching the
  * shape of an existing tensor.
  */
-template <typename dtype, extents_c exts_t = extents<size_t>>
+template <typename dtype, extents_c exts_t = extents<uint8_t>>
 [[nodiscard]] inline constexpr auto empty(exts_t &&exts = exts_t{}) noexcept {
     return core::create_data<dtype>(std::forward<exts_t>(exts));
 }
@@ -1807,8 +1802,9 @@ inline constexpr void eye_to(in_t &&in) {
  * @brief Create an identity matrix (out-of-place).
  *
  * @tparam dtype Element type of the created matrix.
- * @tparam exts_t Extents type describing the matrix shape.
  * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
+ * @tparam exts_t (optional) Extents type describing the matrix shape. Default
+ * is extents<uint8_t>.
  *
  * @param exts Output matrix extents (shape). Rank must be greater than or equal
  * to 2.
@@ -1820,7 +1816,8 @@ inline constexpr void eye_to(in_t &&in) {
  *
  * @see mdtensor::eye_to for the in-place version that fills an existing output.
  */
-template <typename dtype, extents_c exts_t, MPMode mpmode = MPMode::NONE>
+template <typename dtype, MPMode mpmode = MPMode::NONE,
+          extents_c exts_t = extents<uint8_t>>
 [[nodiscard]] inline constexpr auto eye(exts_t &&exts = exts_t{}) {
     auto out = empty<dtype>(std::forward<exts_t>(exts));
     eye_to<mpmode>(out);
@@ -1890,9 +1887,9 @@ namespace mdtensor {
  * @brief Create a new tensor filled with a scalar value (out-of-place).
  *
  * @tparam dtype Element type of the result tensor.
- * @tparam exts_t (optional) Extents type. Default is extents<size_t>.
  * @tparam mpmode (optional) Parallel execution mode used for filling. Default
  * is MPMode::NONE.
+ * @tparam exts_t (optional) Extents type. Default is extents<uint8_t>.
  *
  * @param val Fill value.
  * @param exts Output extents.
@@ -1905,8 +1902,8 @@ namespace mdtensor {
  * @see mdtensor::empty
  * @see mdtensor::fill
  */
-template <typename dtype, extents_c exts_t = extents<size_t>,
-          MPMode mpmode = MPMode::NONE>
+template <typename dtype, MPMode mpmode = MPMode::NONE,
+          extents_c exts_t = extents<uint8_t>>
 [[nodiscard]] inline constexpr auto full(dtype &&val,
                                          exts_t &&exts = exts_t{}) {
     auto out = empty<dtype>(std::forward<exts_t>(exts));
@@ -2160,9 +2157,9 @@ namespace mdtensor {
  * @brief Create a tensor filled with ones (general extents overload).
  *
  * @tparam dtype Output value type.
- * @tparam exts_t (optional) Extents type specifying the tensor shape.
- * Default is `extents<size_t>`.
  * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
+ * @tparam exts_t (optional) Extents type specifying the tensor shape.
+ * Default is `extents<uint8_t>`.
  *
  * @param exts Extents describing the output shape.
  *
@@ -2172,10 +2169,10 @@ namespace mdtensor {
  *
  * @see mdtensor::full for the general fill-value version.
  */
-template <typename dtype, extents_c exts_t = extents<size_t>,
-          MPMode mpmode = MPMode::NONE>
+template <typename dtype, MPMode mpmode = MPMode::NONE,
+          extents_c exts_t = extents<uint8_t>>
 [[nodiscard]] inline constexpr auto ones(exts_t &&exts = exts_t{}) {
-    return full<dtype, exts_t, mpmode>(1, std::forward<exts_t>(exts));
+    return full<dtype, mpmode, exts_t>(1, std::forward<exts_t>(exts));
 }
 
 /**
@@ -2193,8 +2190,8 @@ template <typename dtype, extents_c exts_t = extents<size_t>,
  * @see mdtensor::ones(extents) for the general extents version.
  */
 template <typename dtype, MPMode mpmode = MPMode::NONE>
-[[nodiscard]] inline constexpr auto ones(const size_t len) {
-    return full<dtype, mdtensor::dims<1>, mpmode>(1, mdtensor::dims<1>{len});
+[[nodiscard]] inline constexpr auto ones(const size_t &len) {
+    return full<dtype, mpmode>(1, mdtensor::dims<1>{len});
 }
 
 } // namespace mdtensor
@@ -2253,9 +2250,9 @@ namespace mdtensor {
  * @brief Create a tensor filled with zeros (general extents overload).
  *
  * @tparam dtype Output value type.
- * @tparam exts_t (optional) Extents type specifying the tensor shape.
- * Default is `extents<size_t>`.
  * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
+ * @tparam exts_t (optional) Extents type specifying the tensor shape.
+ * Default is `extents<uint8_t>`.
  *
  * @param exts Extents describing the output shape.
  *
@@ -2265,10 +2262,10 @@ namespace mdtensor {
  *
  * @see mdtensor::full for the general fill-value version.
  */
-template <typename dtype, extents_c exts_t = extents<size_t>,
-          MPMode mpmode = MPMode::NONE>
+template <typename dtype, MPMode mpmode = MPMode::NONE,
+          extents_c exts_t = extents<uint8_t>>
 [[nodiscard]] inline constexpr auto zeros(exts_t &&exts = exts_t{}) {
-    return full<dtype, exts_t, mpmode>(0, std::forward<exts_t>(exts));
+    return full<dtype, mpmode, exts_t>(0, std::forward<exts_t>(exts));
 }
 
 /**
@@ -2286,8 +2283,8 @@ template <typename dtype, extents_c exts_t = extents<size_t>,
  * @see mdtensor::zeros(extents) for the general extents version.
  */
 template <typename dtype, MPMode mpmode = MPMode::NONE>
-[[nodiscard]] inline constexpr auto zeros(const size_t len) {
-    return full<dtype, mdtensor::dims<1>, mpmode>(0, mdtensor::dims<1>{len});
+[[nodiscard]] inline constexpr auto zeros(const size_t &len) {
+    return full<dtype, mpmode>(0, mdtensor::dims<1>{len});
 }
 
 } // namespace mdtensor
@@ -2996,7 +2993,7 @@ namespace detail {
 
 #ifndef REAL_GCC
 
-template <floating_point_c dtype>
+template <std::floating_point dtype>
 [[nodiscard]] inline constexpr dtype
 sqrt_newton_raphson(dtype &&x, dtype &&curr, dtype &&prev) {
     return (curr == prev)
@@ -6345,8 +6342,9 @@ template <typename T, std::size_t sz>
 }
 
 template <md_c in_t>
-    requires(std::remove_cvref_t<in_t>::rank() == 0 &&
-             floating_point_c<typename std::remove_cvref_t<in_t>::value_type>)
+    requires(
+        std::remove_cvref_t<in_t>::rank() == 0 &&
+        std::floating_point<typename std::remove_cvref_t<in_t>::value_type>)
 inline void rand_impl(in_t &&in) noexcept {
     using dist_t = std::uniform_real_distribution<
         typename std::remove_cvref_t<in_t>::value_type>;
@@ -6417,9 +6415,9 @@ inline constexpr void rand_to(in_t &&in) noexcept {
 /**
  * @brief Create an array of uniform random values in [0, 1).
  *
- * @tparam T (optional) Floating-point element type. Default is float.
- * @tparam exts_t (optional) Extents type. Default is extents<uint8_t>.
+ * @tparam dtype (optional) Floating-point element type. Default is float.
  * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
+ * @tparam exts_t (optional) Extents type. Default is extents<uint8_t>.
  *
  * @param exts Output extents.
  *
@@ -6428,10 +6426,10 @@ inline constexpr void rand_to(in_t &&in) noexcept {
  * @see mdtensor::random::rand_to for the in-place version that fills an
  *      existing output.
  */
-template <floating_point_c T = float, extents_c exts_t = extents<uint8_t>,
-          MPMode mpmode = MPMode::NONE>
+template <std::floating_point dtype = float, MPMode mpmode = MPMode::NONE,
+          extents_c exts_t = extents<uint8_t>>
 [[nodiscard]] inline constexpr auto rand(exts_t &&exts = exts_t{}) noexcept {
-    auto out = empty<T>(std::forward<exts_t>(exts));
+    auto out = empty<dtype>(std::forward<exts_t>(exts));
     rand_to<mpmode>(out);
     return out;
 }
@@ -6501,9 +6499,9 @@ inline constexpr void uniform_to(in_t &&in, const double &low = 0,
  * @brief Create an array of uniform random values in [low, high)
  *        (out-of-place).
  *
- * @tparam T (optional) Floating-point element type. Default is float.
- * @tparam exts_t (optional) Extents type. Default is extents<uint8_t>.
+ * @tparam dtype (optional) Floating-point element type. Default is float.
  * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
+ * @tparam exts_t (optional) Extents type. Default is extents<uint8_t>.
  *
  * @param exts Output extents.
  * @param low Lower bound of the uniform distribution (inclusive).
@@ -6515,12 +6513,12 @@ inline constexpr void uniform_to(in_t &&in, const double &low = 0,
  * @see mdtensor::random::uniform_to for the in-place version that fills an
  *      existing output.
  */
-template <floating_point_c T = float, extents_c exts_t = extents<uint8_t>,
-          MPMode mpmode = MPMode::NONE>
+template <std::floating_point dtype = float, MPMode mpmode = MPMode::NONE,
+          extents_c exts_t = extents<uint8_t>>
 [[nodiscard]] inline constexpr auto uniform(exts_t &&exts = exts_t{},
                                             const double &low = 0,
                                             const double &high = 1) noexcept {
-    auto out = empty<T>(std::forward<exts_t>(exts));
+    auto out = empty<dtype>(std::forward<exts_t>(exts));
     uniform_to<mpmode>(out, low, high);
     return out;
 }
