@@ -6,8 +6,8 @@
 namespace md = mdtensor;
 
 TEST(stack, 1) {
-    constexpr auto a = md::mdarray<uint8_t, md::extents<uint8_t, 2, 1, 2>>{
-        std::array<uint8_t, 4>{1, 1, 1, 1}};
+    constexpr auto a =
+        md::mdarray<uint8_t, md::extents<uint8_t, 2, 1, 2>>{{1, 1, 1, 1}};
 
     constexpr bool b = md::all(a);
     constexpr bool b_expect = true;
@@ -16,8 +16,8 @@ TEST(stack, 1) {
 }
 
 TEST(stack, 2) {
-    constexpr auto a = md::mdarray<uint8_t, md::extents<uint8_t, 2, 1, 2>>{
-        std::array<uint8_t, 4>{1, 0, 1, 1}};
+    constexpr auto a =
+        md::mdarray<uint8_t, md::extents<uint8_t, 2, 1, 2>>{{1, 0, 1, 1}};
 
     constexpr bool b = md::all(a);
     constexpr bool b_expect = false;
@@ -26,8 +26,8 @@ TEST(stack, 2) {
 }
 
 TEST(heap, 1) {
-    const auto a = md::mdarray<uint8_t, md::dims<3>>{
-        std::vector<uint8_t>{1, 1, 1, 1}, md::dims<3>{2, 1, 2}};
+    const auto a =
+        md::mdarray<uint8_t, md::dims<3>>{{1, 1, 1, 1}, md::dims<3>{2, 1, 2}};
 
     const bool b = md::all(a);
     const bool b_expect = true;
@@ -36,8 +36,8 @@ TEST(heap, 1) {
 }
 
 TEST(heap, 2) {
-    const auto a = md::mdarray<uint8_t, md::dims<3>>{
-        std::vector<uint8_t>{1, 0, 1, 1}, md::dims<3>{2, 1, 2}};
+    const auto a =
+        md::mdarray<uint8_t, md::dims<3>>{{1, 0, 1, 1}, md::dims<3>{2, 1, 2}};
 
     const bool b = md::all(a);
     const bool b_expect = false;
@@ -48,17 +48,15 @@ TEST(heap, 2) {
 TEST(test, 1) {
     static_assert(
         md::array_equal(md::all(md::mdarray<int8_t, md::extents<uint8_t, 2, 2>>{
-                            std::array<int8_t, 4>{true, false, true, true}}),
+                            {true, false, true, true}}),
                         false));
 
     static_assert(md::array_equal(
         md::all<0>(md::mdarray<int8_t, md::extents<uint8_t, 2, 2>>{
-            std::array<int8_t, 4>{true, false, true, true}}),
-        md::mdarray<int8_t, md::extents<uint8_t, 2>>{
-            std::array<int8_t, 2>{true, false}}));
+            {true, false, true, true}}),
+        md::mdarray<int8_t, md::extents<uint8_t, 2>>{{true, false}}));
 
-    static_assert(
-        md::array_equal(md::all(md::mdarray<int8_t, md::extents<uint8_t, 3>>{
-                            std::array<int8_t, 3>{-1, 4, 5}}),
-                        true));
+    static_assert(md::array_equal(
+        md::all(md::mdarray<int8_t, md::extents<uint8_t, 3>>{{-1, 4, 5}}),
+        true));
 }

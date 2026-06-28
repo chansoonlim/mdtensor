@@ -42,11 +42,6 @@ concept arithmetic_c = std::is_arithmetic_v<std::remove_cvref_t<T>>;
 
 // ----------------------------------------------------------------------
 
-template <typename T>
-concept floating_point_c = std::is_floating_point_v<std::remove_cvref_t<T>>;
-
-// ----------------------------------------------------------------------
-
 namespace detail {
 
 template <typename T> struct is_extents_impl : std::false_type {};

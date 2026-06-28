@@ -63,8 +63,9 @@ template <typename T, std::size_t sz>
 }
 
 template <md_c in_t>
-    requires(std::remove_cvref_t<in_t>::rank() == 0 &&
-             floating_point_c<typename std::remove_cvref_t<in_t>::value_type>)
+    requires(
+        std::remove_cvref_t<in_t>::rank() == 0 &&
+        std::floating_point<typename std::remove_cvref_t<in_t>::value_type>)
 inline void rand_impl(in_t &&in) noexcept {
     using dist_t = std::uniform_real_distribution<
         typename std::remove_cvref_t<in_t>::value_type>;
@@ -135,9 +136,9 @@ inline constexpr void rand_to(in_t &&in) noexcept {
 /**
  * @brief Create an array of uniform random values in [0, 1).
  *
- * @tparam T (optional) Floating-point element type. Default is float.
- * @tparam exts_t (optional) Extents type. Default is extents<uint8_t>.
+ * @tparam dtype (optional) Floating-point element type. Default is float.
  * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
+ * @tparam exts_t (optional) Extents type. Default is extents<uint8_t>.
  *
  * @param exts Output extents.
  *
@@ -146,10 +147,10 @@ inline constexpr void rand_to(in_t &&in) noexcept {
  * @see mdtensor::random::rand_to for the in-place version that fills an
  *      existing output.
  */
-template <floating_point_c T = float, extents_c exts_t = extents<uint8_t>,
-          MPMode mpmode = MPMode::NONE>
+template <std::floating_point dtype = float, MPMode mpmode = MPMode::NONE,
+          extents_c exts_t = extents<uint8_t>>
 [[nodiscard]] inline constexpr auto rand(exts_t &&exts = exts_t{}) noexcept {
-    auto out = empty<T>(std::forward<exts_t>(exts));
+    auto out = empty<dtype>(std::forward<exts_t>(exts));
     rand_to<mpmode>(out);
     return out;
 }

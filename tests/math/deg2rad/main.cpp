@@ -23,12 +23,11 @@ TEST(single, deg2rad) {
 TEST(stack, deg2rad) {
     using T = double;
 
-    constexpr auto a =
-        md::mdarray<T, md::extents<size_t, 3>>{std::array<T, 3>{0, 90, 180}};
+    constexpr auto a = md::mdarray<T, md::extents<size_t, 3>>{{0, 90, 180}};
     constexpr auto b = md::deg2rad(a);
 
     constexpr auto b_expect = md::mdarray<T, md::extents<size_t, 3>>{
-        std::array<T, 3>{0, std::numbers::pi_v<T> / 2., std::numbers::pi_v<T>}};
+        {0, std::numbers::pi_v<T> / 2., std::numbers::pi_v<T>}};
 
     constexpr bool allclose = md::allclose(b, b_expect);
 
@@ -38,13 +37,11 @@ TEST(stack, deg2rad) {
 TEST(heap, deg2rad) {
     using T = double;
 
-    const auto a =
-        md::mdarray<T, md::dims<1>>{std::vector<T>{0, 90, 180}, md::dims<1>{3}};
+    const auto a = md::mdarray<T, md::dims<1>>{{0, 90, 180}, md::dims<1>{3}};
     const auto b = md::deg2rad(a);
 
     const auto b_expect = md::mdarray<T, md::dims<1>>{
-        std::vector<T>{0, std::numbers::pi_v<T> / 2., std::numbers::pi_v<T>},
-        md::dims<1>{3}};
+        {0, std::numbers::pi_v<T> / 2., std::numbers::pi_v<T>}, md::dims<1>{3}};
 
     const bool allclose = md::allclose(b, b_expect);
 

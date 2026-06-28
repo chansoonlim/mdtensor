@@ -12,7 +12,7 @@ constexpr size_t RANGE_MULTIPLIER = 10;
 template <typename T> inline void test(benchmark::State &state) {
     const size_t set_num = state.range(0);
 
-    const auto in = md::random::rand<T, md::dims<1>>(md::dims<1>{set_num});
+    const auto in = md::random::rand<T>(md::dims<1>{set_num});
     auto out = md::empty<T>(md::dims<1>{set_num});
 
     for (auto _ : state) {

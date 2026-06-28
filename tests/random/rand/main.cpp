@@ -9,7 +9,7 @@ namespace md = mdtensor;
 TEST(stack, 1) {
     using T = double;
 
-    constexpr auto out = md::random::rand<T, md::extents<size_t, 2, 2>>();
+    constexpr auto out = md::random::rand<T>(md::extents<size_t, 2, 2>{});
 
     std::cout << md::to_string(out) << std::endl;
 
@@ -29,7 +29,7 @@ TEST(stack, 2) {
 TEST(heap, 1) {
     using T = double;
 
-    const auto out = md::random::rand<T, md::dims<2>>(md::dims<2>{2, 2});
+    const auto out = md::random::rand<T>(md::dims<2>{2, 2});
 
     std::cout << md::to_string(out) << std::endl;
 

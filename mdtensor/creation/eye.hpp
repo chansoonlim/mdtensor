@@ -53,8 +53,9 @@ inline constexpr void eye_to(in_t &&in) {
  * @brief Create an identity matrix (out-of-place).
  *
  * @tparam dtype Element type of the created matrix.
- * @tparam exts_t Extents type describing the matrix shape.
  * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
+ * @tparam exts_t (optional) Extents type describing the matrix shape. Default
+ * is extents<uint8_t>.
  *
  * @param exts Output matrix extents (shape). Rank must be greater than or equal
  * to 2.
@@ -66,7 +67,8 @@ inline constexpr void eye_to(in_t &&in) {
  *
  * @see mdtensor::eye_to for the in-place version that fills an existing output.
  */
-template <typename dtype, extents_c exts_t, MPMode mpmode = MPMode::NONE>
+template <typename dtype, MPMode mpmode = MPMode::NONE,
+          extents_c exts_t = extents<uint8_t>>
 [[nodiscard]] inline constexpr auto eye(exts_t &&exts = exts_t{}) {
     auto out = empty<dtype>(std::forward<exts_t>(exts));
     eye_to<mpmode>(out);
