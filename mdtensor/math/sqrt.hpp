@@ -16,7 +16,7 @@ namespace detail {
 
 #ifndef REAL_GCC
 
-template <floating_point_c dtype>
+template <std::floating_point dtype>
 [[nodiscard]] inline constexpr dtype
 sqrt_newton_raphson(dtype &&x, dtype &&curr, dtype &&prev) {
     return (curr == prev)

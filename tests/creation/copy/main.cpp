@@ -9,7 +9,7 @@ namespace md = mdtensor;
 TEST(stack, copy) {
     using T = double;
 
-    constexpr auto a = md::random::rand<T, md::extents<size_t, 2, 2>>();
+    constexpr auto a = md::random::rand<T>(md::extents<size_t, 2, 2>{});
     constexpr auto b = md::copy(a);
     constexpr bool array_equal = md::array_equal(a, b);
 
@@ -19,7 +19,7 @@ TEST(stack, copy) {
 TEST(heap, copy) {
     using T = double;
 
-    const auto a = md::random::rand<T, md::dims<2>>(md::dims<2>{2, 2});
+    const auto a = md::random::rand<T>(md::dims<2>{2, 2});
     const auto b = md::copy(a);
     const bool array_equal = md::array_equal(a, b);
 

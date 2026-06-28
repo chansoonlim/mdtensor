@@ -63,9 +63,9 @@ inline constexpr void uniform_to(in_t &&in, const double &low = 0,
  * @brief Create an array of uniform random values in [low, high)
  *        (out-of-place).
  *
- * @tparam T (optional) Floating-point element type. Default is float.
- * @tparam exts_t (optional) Extents type. Default is extents<uint8_t>.
+ * @tparam dtype (optional) Floating-point element type. Default is float.
  * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
+ * @tparam exts_t (optional) Extents type. Default is extents<uint8_t>.
  *
  * @param exts Output extents.
  * @param low Lower bound of the uniform distribution (inclusive).
@@ -77,12 +77,12 @@ inline constexpr void uniform_to(in_t &&in, const double &low = 0,
  * @see mdtensor::random::uniform_to for the in-place version that fills an
  *      existing output.
  */
-template <floating_point_c T = float, extents_c exts_t = extents<uint8_t>,
-          MPMode mpmode = MPMode::NONE>
+template <std::floating_point dtype = float, MPMode mpmode = MPMode::NONE,
+          extents_c exts_t = extents<uint8_t>>
 [[nodiscard]] inline constexpr auto uniform(exts_t &&exts = exts_t{},
                                             const double &low = 0,
                                             const double &high = 1) noexcept {
-    auto out = empty<T>(std::forward<exts_t>(exts));
+    auto out = empty<dtype>(std::forward<exts_t>(exts));
     uniform_to<mpmode>(out, low, high);
     return out;
 }

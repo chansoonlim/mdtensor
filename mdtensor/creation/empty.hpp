@@ -18,7 +18,7 @@ namespace mdtensor {
  *
  * @tparam dtype Element type of the created tensor.
  * @tparam exts_t (optional) Extents type describing the tensor shape.
- *         Default is extents<size_t>.
+ *         Default is extents<uint8_t>.
  *
  * @param exts Tensor extents (shape). If omitted, creates a scalar-like tensor.
  *
@@ -31,7 +31,7 @@ namespace mdtensor {
  * @see mdtensor::empty_like for creating an uninitialized tensor matching the
  * shape of an existing tensor.
  */
-template <typename dtype, extents_c exts_t = extents<size_t>>
+template <typename dtype, extents_c exts_t = extents<uint8_t>>
 [[nodiscard]] inline constexpr auto empty(exts_t &&exts = exts_t{}) noexcept {
     return core::create_data<dtype>(std::forward<exts_t>(exts));
 }

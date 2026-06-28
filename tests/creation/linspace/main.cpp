@@ -11,13 +11,11 @@ TEST(stack, 1) {
 
     static_assert(md::array_equal(
         md::linspace((T)2, (T)3, md::extents<uint8_t, 5>{}, true),
-        md::mdarray<T, md::extents<size_t, 5>>{
-            std::array<T, 5>{2, 2.25, 2.5, 2.75, 3}}));
+        md::mdarray<T, md::extents<size_t, 5>>{{2, 2.25, 2.5, 2.75, 3}}));
 
     static_assert(md::array_equal(
         md::linspace((T)2, (T)3, md::extents<uint8_t, 5>{}, false),
-        md::mdarray<T, md::extents<size_t, 5>>{
-            std::array<T, 5>{2, 2.2, 2.4, 2.6, 2.8}}));
+        md::mdarray<T, md::extents<size_t, 5>>{{2, 2.2, 2.4, 2.6, 2.8}}));
 }
 
 TEST(stack, 2) {

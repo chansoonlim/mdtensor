@@ -71,11 +71,11 @@ mdtensor is a header-only library, so you can start using it by simply including
 
   namespace md = mdtensor;
 
-  constexpr auto a = md::full<int, md::extents<size_t, 3, 1, 2>>(1);
-  constexpr auto b = md::full<int, md::extents<size_t, 2, 1>>(2);
+  constexpr auto a = md::full<int>(1, md::extents<size_t, 3, 1, 2>{});
+  constexpr auto b = md::full<int>(2, md::extents<size_t, 2, 1>{});
   constexpr auto c = md::add(a, b);
 
-  constexpr auto c_expect = md::full<int, md::extents<size_t, 3, 2, 2>>(3);
+  constexpr auto c_expect = md::full<int>(3, md::extents<size_t, 3, 2, 2>{});
 
   constexpr bool is_allclose = md::allclose(c, c_expect);
 
