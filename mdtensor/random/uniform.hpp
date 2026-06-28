@@ -45,8 +45,8 @@ inline constexpr void uniform_to(in_t &&in, const double &low = 0,
     random::rand_to(in_mds);
 
     if constexpr (mpmode == MPMode::SIMD) {
-        multiply_to(in_mds, static_cast<const T>(high - low), in_mds);
-        add_to(in_mds, static_cast<const T>(low), in_mds);
+        multiply_to<mpmode>(in_mds, static_cast<const T>(high - low), in_mds);
+        add_to<mpmode>(in_mds, static_cast<const T>(low), in_mds);
         return;
 
     } else {
