@@ -17,55 +17,59 @@ namespace linalg {
 namespace detail {
 
 template <md_c in1_t, md_c in2_t, md_c out_t>
+inline constexpr void vecmat_naive_noalias(in1_t &&in1, in2_t &&in2,
+                                           out_t &&out) noexcept {
+    using out_index_t = typename std::remove_cvref_t<out_t>::index_type;
+    using in1_index_t = typename std::remove_cvref_t<in1_t>::index_type;
+
+    for (out_index_t i = 0; i < out.extent(0); i++) {
+        out(i) = 0;
+
+        for (in1_index_t j = 0; j < in1.extent(0); j++) {
+            out(i) += in1(j) * in2(j, i);
+        }
+    }
+}
+
+template <md_c in1_t, md_c in2_t, md_c out_t>
 inline constexpr void vecmat_naive(in1_t &&in1, in2_t &&in2,
                                    out_t &&out) noexcept {
-    static_assert(std::remove_cvref_t<in1_t>::rank() == 1);
-    static_assert(std::remove_cvref_t<in2_t>::rank() == 2);
-    static_assert(std::remove_cvref_t<out_t>::rank() == 1);
+    const auto in1_mds = core::to_const_mdspan(std::forward<in1_t>(in1));
+    const auto in2_mds = core::to_const_mdspan(std::forward<in2_t>(in2));
+    auto out_mds = core::to_mdspan(std::forward<out_t>(out));
+
+    if (std::is_constant_evaluated()) {
+        auto out_tmp = empty_like(out_mds);
+        vecmat_naive_noalias(in1_mds, in2_mds, out_tmp.to_mdspan());
+        copy_to(out_tmp, out_mds);
+        return;
+    }
 
     bool need_copy = false;
 
     if constexpr (requires {
-                      core::to_const_mdspan(std::forward<in1_t>(in1))
-                              .data_handle() ==
-                          core::to_const_mdspan(std::forward<out_t>(out))
-                              .data_handle();
+                      in1_mds.data_handle() == out_mds.data_handle();
                   }) {
-        if (core::to_const_mdspan(std::forward<in1_t>(in1)).data_handle() ==
-            core::to_const_mdspan(std::forward<out_t>(out)).data_handle())
-            [[unlikely]] {
+        if (in1_mds.data_handle() == out_mds.data_handle()) [[unlikely]] {
             need_copy = true;
         }
     }
 
     if constexpr (requires {
-                      core::to_const_mdspan(std::forward<in2_t>(in2))
-                              .data_handle() ==
-                          core::to_const_mdspan(std::forward<out_t>(out))
-                              .data_handle();
+                      in2_mds.data_handle() == out_mds.data_handle();
                   }) {
-        if (core::to_const_mdspan(std::forward<in2_t>(in2)).data_handle() ==
-            core::to_const_mdspan(std::forward<out_t>(out)).data_handle())
-            [[unlikely]] {
+        if (in2_mds.data_handle() == out_mds.data_handle()) [[unlikely]] {
             need_copy = true;
         }
     }
 
     if (!need_copy) [[likely]] {
-        using out_index_t = typename std::remove_cvref_t<out_t>::index_type;
-        using in1_index_t = typename std::remove_cvref_t<in1_t>::index_type;
-
-        for (out_index_t i = 0; i < out.extent(0); i++) {
-            out(i) = 0;
-            for (in1_index_t j = 0; j < in1.extent(0); j++) {
-                out(i) += in1(j) * in2(j, i);
-            }
-        }
+        vecmat_naive_noalias(in1_mds, in2_mds, out_mds);
 
     } else [[unlikely]] {
-        auto out_tmp = empty_like(std::forward<out_t>(out));
-        vecmat_naive(in1, in2, out_tmp.to_mdspan());
-        copy_to(out_tmp, out);
+        auto out_tmp = empty_like(out_mds);
+        vecmat_naive_noalias(in1_mds, in2_mds, out_tmp.to_mdspan());
+        copy_to(out_tmp, out_mds);
     }
 }
 
