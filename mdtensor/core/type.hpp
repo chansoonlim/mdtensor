@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include <concepts>
+
 #ifndef MDSPAN_SINGLE_HEADER_INCLUDE_GUARD_ // NOTE: for godbolt test
 #include <experimental/mdarray>
 #include <experimental/mdspan> // TODO: Remove when C++23 std::mdspan supports
