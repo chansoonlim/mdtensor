@@ -12,3 +12,4 @@
 #include "concatenate.hpp"
 #include "expand_dims.hpp"
 #include "reshape.hpp"
+#include "transpose.hpp"

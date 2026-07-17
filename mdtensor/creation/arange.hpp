@@ -75,4 +75,7 @@ template <typename data_t = void, arithmetic_c stop_t>
     return arange<data_t>(0, std::forward<stop_t>(stop));
 }
 
+// TODO: Develop arange that works in compile-time contexts (e.g., constexpr
+// mdarray) and/or with static extents.
+
 } // namespace mdtensor
