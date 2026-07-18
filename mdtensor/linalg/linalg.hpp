@@ -10,6 +10,7 @@
 #pragma once
 
 #include "inv.hpp"
+#include "lu.hpp"
 #include "matmul.hpp"
 #include "matvec.hpp"
 #include "norm.hpp"
