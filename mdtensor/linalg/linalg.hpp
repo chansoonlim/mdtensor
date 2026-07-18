@@ -10,7 +10,9 @@
 #pragma once
 
 #include "inv.hpp"
+#include "lu.hpp"
 #include "matmul.hpp"
 #include "matvec.hpp"
 #include "norm.hpp"
+#include "solve.hpp"
 #include "vecmat.hpp"

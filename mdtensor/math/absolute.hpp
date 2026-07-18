@@ -21,7 +21,12 @@ inline constexpr void absolute_impl(in_t &&in, out_t &&out) {
 
 #else
     // NOTE: std::abs is not constexpr in clang 16.
-    out() = in() >= 0 ? in() : -in();
+    if constexpr (std::is_signed_v<std::remove_cvref_t<decltype(in())>>) {
+        out() = in() < 0 ? -in() : in();
+
+    } else {
+        out() = in();
+    }
 
 #endif
 }
