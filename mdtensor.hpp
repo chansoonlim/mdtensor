@@ -2353,67 +2353,172 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
  */
 
 
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/absolute.hpp
+/**
+ * @file
+ * @brief Element-wise absolute value utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor {
+namespace detail {
+
+template <typename in_t, typename out_t>
+inline constexpr void absolute_impl(in_t &&in, out_t &&out) {
+#ifdef REAL_GCC
+    out() = std::abs(in());
+
+#else
+    // NOTE: std::abs is not constexpr in clang 16.
+    if constexpr (std::is_signed_v<std::remove_cvref_t<decltype(in())>>) {
+        out() = in() < 0 ? -in() : in();
+
+    } else {
+        out() = in();
+    }
+
+#endif
+}
+
+} // namespace detail
+
+/**
+ * @brief Compute absolute value element-wise (in-place).
+ *
+ * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
+ *
+ * @param in Input mdspan, mdarray, scalar, etc.
+ * @param out Output mdspan, mdarray, scalar, etc.
+ *
+ * @note Equivalent to out = std::abs(in) in terms of array broadcasting.
+ *
+ * @see mdtensor::absolute for the out-of-place version that returns the result.
+ */
+template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
+inline constexpr void absolute_to(in_t &&in, out_t &&out) {
+    core::batch<mpmode>(
+        [](auto &&...elems) {
+            detail::absolute_impl(std::forward<decltype(elems)>(elems)...);
+        },
+        core::to_const_mdspan(std::forward<in_t>(in)),
+        core::to_mdspan(std::forward<out_t>(out)));
+}
+
+/**
+ * @brief Compute absolute value element-wise (out-of-place).
+ *
+ * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
+ * @tparam dtype (optional) Data type of the result. If void, deduced from
+ *         input.
+ *
+ * @param in Input mdspan, mdarray, scalar, etc.
+ *
+ * @return mdarray or scalar.
+ *
+ * @note Equivalent to out = std::abs(in) in terms of array broadcasting.
+ *
+ * @see mdtensor::absolute_to for the in-place version that writes into an
+ *      output.
+ */
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
+[[nodiscard]] inline constexpr auto absolute(in_t &&in) {
+    return core::batch_out<dtype, mpmode>(
+        [](auto &&...elems) {
+            detail::absolute_impl(std::forward<decltype(elems)>(elems)...);
+        },
+        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in_t>(in)));
+}
+
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/absolute.hpp
 
 namespace mdtensor {
 namespace linalg {
 namespace detail {
 
-template <md_c in_t, md_c out_t, md_c valid_t>
-inline constexpr void inv_naive(in_t &&in, out_t &&out,
-                                valid_t &&valid) noexcept {
-    static_assert(std::remove_cvref_t<in_t>::rank() == 2);
-    static_assert(std::remove_cvref_t<out_t>::rank() == 2);
-    static_assert(std::remove_cvref_t<valid_t>::rank() == 0);
+template <md_c in_t, md_c out_t>
+[[nodiscard]] inline constexpr bool inv_naive(in_t &&in, out_t &&out) {
+    auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+    auto out_mds = core::to_mdspan(std::forward<out_t>(out));
 
-    using index_t = typename std::remove_cvref_t<in_t>::index_type;
+    static_assert(decltype(in_mds)::rank() == 2);
+    static_assert(decltype(out_mds)::rank() == 2);
 
-    const index_t n = in.extent(0);
+    using index_t = typename decltype(in_mds)::index_type;
 
-    auto in_copy = copy(in);
+    const index_t n = in_mds.extent(0);
 
-    for (index_t i = 0; i < n; i++) {
-        for (index_t j = 0; j < n; j++) {
-            out(i, j) = (i == j) ? 1 : 0;
-        }
+    if (in_mds.extent(0) != in_mds.extent(1) ||
+        in_mds.extent(0) != out_mds.extent(0) ||
+        in_mds.extent(0) != out_mds.extent(1)) {
+        return false;
     }
 
+    auto in_copy = copy(in_mds);
+    eye_to(out_mds);
+
     for (index_t i = 0; i < n; i++) {
+        index_t pivot_row = i;
+        auto max_abs = absolute(in_copy(i, i));
+
+        for (index_t row = i + 1; row < n; row++) {
+            const auto candidate = absolute(in_copy(row, i));
+
+            if (candidate > max_abs) {
+                max_abs = candidate;
+                pivot_row = row;
+            }
+        }
+
+        if (max_abs == 0) {
+            // Handle error: singular matrix (no inverse)
+            return false;
+        }
+
+        if (pivot_row != i) {
+            for (index_t j = 0; j < n; j++) {
+                std::swap(in_copy(i, j), in_copy(pivot_row, j));
+                std::swap(out_mds(i, j), out_mds(pivot_row, j));
+            }
+        }
+
         const auto pivot = in_copy(i, i);
 
-        if (pivot == 0) {
-            // Handle error: singular matrix (no inverse)
-            valid() = false;
-            return;
-        }
-
-        // Normalize the pivot row
         for (index_t j = 0; j < n; j++) {
             in_copy(i, j) /= pivot;
-            out(i, j) /= pivot;
+            out_mds(i, j) /= pivot;
         }
 
-        // Eliminate other rows
         for (index_t j = 0; j < n; j++) {
-            if (i == j)
+            if (i == j) {
                 continue;
+            }
 
             const auto factor = in_copy(j, i);
+
+            if (factor == 0) {
+                continue;
+            }
+
             for (index_t k = 0; k < n; k++) {
                 in_copy(j, k) -= factor * in_copy(i, k);
-                out(j, k) -= factor * out(i, k);
+                out_mds(j, k) -= factor * out_mds(i, k);
             }
         }
     }
 
-    valid() = true;
+    return true;
 }
 
-template <md_c in_t, md_c out_t, md_c valid_t>
-inline constexpr void inv_impl(in_t &&in, out_t &&out,
-                               valid_t &&valid) noexcept {
+template <md_c in_t, md_c out_t>
+[[nodiscard]] inline constexpr bool inv_impl(in_t &&in, out_t &&out) {
     static_assert(std::remove_cvref_t<in_t>::rank() == 2);
     static_assert(std::remove_cvref_t<out_t>::rank() == 2);
-    static_assert(std::remove_cvref_t<valid_t>::rank() == 0);
 
 #ifdef MDTENSOR_USE_EIGEN
 #if __cplusplus >= 202302L // TODO: Impliement for C++20
@@ -2424,9 +2529,8 @@ inline constexpr void inv_impl(in_t &&in, out_t &&out,
             auto eout = core::eigen::to_eigen(out);
 
             eout = ein.inverse();
-            valid() = true; // TODO: Check for invertibility
 
-            return;
+            return true;
         }
     }
 
@@ -2436,7 +2540,7 @@ inline constexpr void inv_impl(in_t &&in, out_t &&out,
 #endif
 #endif
 
-    inv_naive(in, out, valid);
+    return inv_naive(in, out);
 }
 
 } // namespace detail
@@ -2459,10 +2563,11 @@ inline constexpr void inv_impl(in_t &&in, out_t &&out,
  */
 template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t,
           typename valid_t>
-inline constexpr void inv_to(in_t &&in, out_t &&out, valid_t &&valid) noexcept {
+inline constexpr void inv_to(in_t &&in, out_t &&out, valid_t &&valid) {
     core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::inv_impl(std::forward<decltype(elems)>(elems)...);
+        [](auto &&in, auto &&out, auto &&valid) {
+            valid() = detail::inv_impl(std::forward<decltype(in)>(in),
+                                       std::forward<decltype(out)>(out));
         },
         std::index_sequence<2, 2, 0>{},
         core::to_const_mdspan(std::forward<in_t>(in)),
@@ -2473,9 +2578,9 @@ inline constexpr void inv_to(in_t &&in, out_t &&out, valid_t &&valid) noexcept {
 /**
  * @brief Compute matrix inverse (out-of-place).
  *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
  * @tparam dtype (optional) Data type of the result. If void, deduced from
  * input.
+ * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
  *
  * @param in Input matrix (mdspan, mdarray, etc.) (... x N x N).
  *
@@ -2484,29 +2589,409 @@ inline constexpr void inv_to(in_t &&in, out_t &&out, valid_t &&valid) noexcept {
  *         - validity flag (mdarray or scalar) (...), indicating if the inverse
  *        was successfully computed for each matrix instance.
  *
- * @note The output layout is determined by the `batch_out` extents tuple passed
- *       to core::batch_out.
- *
  * @see mdtensor::linalg::inv_to for the in-place version that writes into an
  * output.
  */
 template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto inv(in_t &&in) noexcept {
+[[nodiscard]] inline constexpr auto inv(in_t &&in) {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
 
-    return core::batch_out<dtype, mpmode>(
-        [](auto &&...elems) {
-            detail::inv_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<2>{},
-        std::make_tuple(core::slice_from_right<2>(in_mds.extents()),
-                        extents<uint8_t>{}),
+    auto out = core::create_out<dtype>(
+        std::index_sequence<2>{}, core::slice_from_right<2>(in_mds.extents()),
         in_mds);
+    auto valid = core::create_out<uint8_t>(std::index_sequence<2>{},
+                                           extents<uint8_t>{}, in_mds);
+
+    inv_to<mpmode>(in_mds, out, valid);
+
+    return std::pair{out, valid};
 }
 
 } // namespace linalg
 } // namespace mdtensor
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/inv.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/lu.hpp
+/**
+ * @file
+ * @brief SciPy-like LU decomposition utilities for mdtensor (linalg).
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor {
+namespace linalg {
+namespace detail {
+
+template <md_c in_t, md_c p_indices_t, md_c l_t, md_c u_t>
+inline constexpr void lu_p_indices_impl(in_t &&in, p_indices_t &&p_indices,
+                                        l_t &&l, u_t &&u) {
+    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+    const auto p_indices_mds =
+        core::to_mdspan(std::forward<p_indices_t>(p_indices));
+    const auto l_mds = core::to_mdspan(std::forward<l_t>(l));
+    const auto u_mds = core::to_mdspan(std::forward<u_t>(u));
+
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
+    using p_indices_mds_t = std::remove_cvref_t<decltype(p_indices_mds)>;
+    using l_mds_t = std::remove_cvref_t<decltype(l_mds)>;
+    using u_mds_t = std::remove_cvref_t<decltype(u_mds)>;
+
+    static_assert(in_mds_t::rank() == 2);
+    static_assert(p_indices_mds_t::rank() == 1);
+    static_assert(l_mds_t::rank() == 2);
+    static_assert(u_mds_t::rank() == 2);
+
+    using index_t = typename in_mds_t::index_type;
+
+    constexpr size_t m_s = in_mds_t::static_extent(0);
+
+    const index_t m = in_mds.extent(0);
+    const index_t n = in_mds.extent(1);
+    const index_t k = m < n ? m : n;
+
+    assert(p_indices_mds.extent(0) == m);
+    assert(l_mds.extent(0) == m);
+    assert(l_mds.extent(1) == k);
+    assert(u_mds.extent(0) == k);
+    assert(u_mds.extent(1) == n);
+
+    // initialize
+    auto in_copy = copy(in_mds);
+    auto row_order = core::create_data<index_t>(extents<index_t, m_s>{m});
+    for (index_t i = 0; i < m; i++) {
+        row_order(i) = i;
+    }
+
+    // Compute LU decomposition with partial pivoting
+    for (index_t i = 0; i < k; i++) {
+        // find maximum element in the current column
+        index_t pivot_row = i;
+        auto max_abs = absolute(in_copy(i, i));
+
+        for (index_t j = i + 1; j < m; j++) {
+            const auto candidate = absolute(in_copy(j, i));
+            if (candidate > max_abs) {
+                max_abs = candidate;
+                pivot_row = j;
+            }
+        }
+
+        // swap row if necessary
+        if (pivot_row != i) {
+            for (index_t j = 0; j < n; j++) {
+                std::swap(in_copy(i, j), in_copy(pivot_row, j));
+            }
+            std::swap(row_order(i), row_order(pivot_row));
+        }
+
+        // no multiplier can be formed
+        if (max_abs == 0) {
+            continue;
+        }
+
+        // compute the multipliers and update the U matrix
+        for (index_t j = i + 1; j < m; j++) {
+            in_copy(j, i) /= in_copy(i, i);
+
+            const auto factor = in_copy(j, i);
+
+            for (index_t k = i + 1; k < n; k++) {
+                in_copy(j, k) -= factor * in_copy(i, k);
+            }
+        }
+    }
+
+    // Generate P
+    for (index_t i = 0; i < m; i++) {
+        p_indices_mds(row_order(i)) =
+            static_cast<typename p_indices_mds_t::value_type>(i);
+    }
+
+    // Generate L
+    for (index_t i = 0; i < m; i++) {
+        for (index_t j = 0; j < k; j++) {
+            if (i > j) {
+                l_mds(i, j) = in_copy(i, j);
+
+            } else if (i == j) {
+                l_mds(i, j) = 1;
+
+            } else {
+                l_mds(i, j) = 0;
+            }
+        }
+    }
+
+    // Generate U
+    for (index_t i = 0; i < k; i++) {
+        for (index_t j = 0; j < n; j++) {
+            if (i <= j) {
+                u_mds(i, j) = in_copy(i, j);
+
+            } else {
+                u_mds(i, j) = 0;
+            }
+        }
+    }
+}
+
+template <md_c in_t, md_c p_t, md_c l_t, md_c u_t>
+inline constexpr void lu_full_impl(in_t &&in, p_t &&p, l_t &&l, u_t &&u) {
+    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+    const auto p_mds = core::to_mdspan(std::forward<p_t>(p));
+    const auto l_mds = core::to_mdspan(std::forward<l_t>(l));
+    const auto u_mds = core::to_mdspan(std::forward<u_t>(u));
+
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
+    using p_mds_t = std::remove_cvref_t<decltype(p_mds)>;
+    using l_mds_t = std::remove_cvref_t<decltype(l_mds)>;
+    using u_mds_t = std::remove_cvref_t<decltype(u_mds)>;
+
+    static_assert(in_mds_t::rank() == 2);
+    static_assert(p_mds_t::rank() == 2);
+    static_assert(l_mds_t::rank() == 2);
+    static_assert(u_mds_t::rank() == 2);
+
+    using index_t = typename p_mds_t::index_type;
+
+    constexpr size_t m_s = in_mds_t::static_extent(0);
+
+    const index_t m = in_mds.extent(0);
+    const index_t n = in_mds.extent(1);
+
+    auto p_indices = core::create_data<index_t>(extents<index_t, m_s>{m});
+
+    lu_p_indices_impl(in_mds, p_indices, l_mds, u_mds);
+
+    for (index_t i = 0; i < m; i++) {
+        for (index_t j = 0; j < m; j++) {
+            p_mds(i, j) = (j == p_indices(i) ? 1 : 0);
+        }
+    }
+}
+
+template <md_c in_t, md_c pl_t, md_c u_t>
+inline constexpr void lu_permute_l_impl(in_t &&in, pl_t &&pl, u_t &&u) {
+    auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+    auto pl_mds = core::to_mdspan(std::forward<pl_t>(pl));
+    auto u_mds = core::to_mdspan(std::forward<u_t>(u));
+
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
+    using pl_mds_t = std::remove_cvref_t<decltype(pl_mds)>;
+    using u_mds_t = std::remove_cvref_t<decltype(u_mds)>;
+
+    static_assert(in_mds_t::rank() == 2);
+    static_assert(pl_mds_t::rank() == 2);
+    static_assert(u_mds_t::rank() == 2);
+
+    using index_t = typename in_mds_t::index_type;
+    using value_t = typename pl_mds_t::value_type;
+
+    constexpr size_t m_s = in_mds_t::static_extent(0);
+    constexpr size_t n_s = in_mds_t::static_extent(1);
+    constexpr size_t k_s = [] {
+        if constexpr (m_s == dyn || n_s == dyn) {
+            return dyn;
+
+        } else {
+            return m_s < n_s ? m_s : n_s;
+        }
+    }();
+
+    const index_t m = in_mds.extent(0);
+    const index_t n = in_mds.extent(1);
+    const index_t k = m < n ? m : n;
+
+    auto p_indices = core::create_data<index_t>(extents<index_t, m_s>{m});
+    auto l = core::create_data<value_t>(extents<index_t, m_s, k_s>{m, k});
+
+    lu_p_indices_impl(in_mds, p_indices, l, u_mds);
+
+    // Apply the permutation to L
+    for (index_t i = 0; i < m; i++) {
+        for (index_t j = 0; j < k; j++) {
+            pl_mds(i, j) = l(p_indices(i), j);
+        }
+    }
+}
+
+} // namespace detail
+
+template <MPMode mpmode = MPMode::NONE, typename in_t, typename p_indices_t,
+          typename l_t, typename u_t>
+inline constexpr void lu_p_indices_to(in_t &&in, p_indices_t &&p_indices,
+                                      l_t &&l, u_t &&u) {
+    core::batch<mpmode>(
+        [](auto &&...elems) {
+            detail::lu_p_indices_impl(std::forward<decltype(elems)>(elems)...);
+        },
+        std::index_sequence<2, 1, 2, 2>{},
+        core::to_const_mdspan(std::forward<in_t>(in)),
+        core::to_mdspan(std::forward<p_indices_t>(p_indices)),
+        core::to_mdspan(std::forward<l_t>(l)),
+        core::to_mdspan(std::forward<u_t>(u)));
+}
+
+template <MPMode mpmode = MPMode::NONE, typename in_t, typename p_t,
+          typename l_t, typename u_t>
+inline constexpr void lu_full_to(in_t &&in, p_t &&p, l_t &&l, u_t &&u) {
+    core::batch<mpmode>(
+        [](auto &&...elems) {
+            detail::lu_full_impl(std::forward<decltype(elems)>(elems)...);
+        },
+        std::index_sequence<2, 2, 2, 2>{},
+        core::to_const_mdspan(std::forward<in_t>(in)),
+        core::to_mdspan(std::forward<p_t>(p)),
+        core::to_mdspan(std::forward<l_t>(l)),
+        core::to_mdspan(std::forward<u_t>(u)));
+}
+
+template <MPMode mpmode = MPMode::NONE, typename in_t, typename pl_t,
+          typename u_t>
+inline constexpr void lu_permute_l_to(in_t &&in, pl_t &&pl, u_t &&u) {
+    core::batch<mpmode>(
+        [](auto &&...elems) {
+            detail::lu_permute_l_impl(std::forward<decltype(elems)>(elems)...);
+        },
+        std::index_sequence<2, 2, 2>{},
+        core::to_const_mdspan(std::forward<in_t>(in)),
+        core::to_mdspan(std::forward<pl_t>(pl)),
+        core::to_mdspan(std::forward<u_t>(u)));
+}
+
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
+[[nodiscard]] inline constexpr auto lu_p_indices(in_t &&in) {
+    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
+
+    using index_t = typename in_mds_t::index_type;
+
+    constexpr size_t rank = in_mds_t::rank();
+
+    constexpr size_t m_s = in_mds_t::static_extent(rank - 2);
+    constexpr size_t n_s = in_mds_t::static_extent(rank - 1);
+    constexpr size_t k_s = [] {
+        if constexpr (m_s == dyn || n_s == dyn) {
+            return dyn;
+
+        } else {
+            return m_s < n_s ? m_s : n_s;
+        }
+    }();
+
+    const index_t m = in_mds.extent(rank - 2);
+    const index_t n = in_mds.extent(rank - 1);
+    const index_t k = m < n ? m : n;
+
+    auto p_indices = core::create_out<index_t>(
+        std::index_sequence<2>{}, extents<index_t, m_s>{m}, in_mds);
+    auto l = core::create_out<dtype>(std::index_sequence<2>{},
+                                     extents<index_t, m_s, k_s>{m, k}, in_mds);
+    auto u = core::create_out<dtype>(std::index_sequence<2>{},
+                                     extents<index_t, k_s, n_s>{k, n}, in_mds);
+
+    lu_p_indices_to<mpmode>(in_mds, p_indices, l, u);
+
+    return std::tuple{p_indices, l, u};
+}
+
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
+[[nodiscard]] inline constexpr auto lu_full(in_t &&in) {
+    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
+
+    using index_t = typename in_mds_t::index_type;
+
+    constexpr size_t rank = in_mds_t::rank();
+
+    constexpr size_t m_s = in_mds_t::static_extent(rank - 2);
+    constexpr size_t n_s = in_mds_t::static_extent(rank - 1);
+    constexpr size_t k_s = [] {
+        if constexpr (m_s == dyn || n_s == dyn) {
+            return dyn;
+
+        } else {
+            return m_s < n_s ? m_s : n_s;
+        }
+    }();
+
+    const index_t m = in_mds.extent(rank - 2);
+    const index_t n = in_mds.extent(rank - 1);
+    const index_t k = m < n ? m : n;
+
+    auto p = core::create_out<index_t>(
+        std::index_sequence<2>{}, extents<index_t, m_s, m_s>{m, m}, in_mds);
+    auto l = core::create_out<dtype>(std::index_sequence<2>{},
+                                     extents<index_t, m_s, k_s>{m, k}, in_mds);
+    auto u = core::create_out<dtype>(std::index_sequence<2>{},
+                                     extents<index_t, k_s, n_s>{k, n}, in_mds);
+
+    lu_full_to<mpmode>(in_mds, p, l, u);
+
+    return std::tuple{p, l, u};
+}
+
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
+[[nodiscard]] inline constexpr auto lu_permute_l(in_t &&in) {
+    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
+
+    using index_t = typename in_mds_t::index_type;
+
+    constexpr size_t rank = in_mds_t::rank();
+
+    constexpr size_t m_s = in_mds_t::static_extent(rank - 2);
+    constexpr size_t n_s = in_mds_t::static_extent(rank - 1);
+    constexpr size_t k_s = [] {
+        if constexpr (m_s == dyn || n_s == dyn) {
+            return dyn;
+
+        } else {
+            return m_s < n_s ? m_s : n_s;
+        }
+    }();
+
+    const index_t m = in_mds.extent(rank - 2);
+    const index_t n = in_mds.extent(rank - 1);
+    const index_t k = m < n ? m : n;
+
+    auto pl = core::create_out<dtype>(std::index_sequence<2>{},
+                                      extents<index_t, m_s, k_s>{m, k}, in_mds);
+    auto u = core::create_out<dtype>(std::index_sequence<2>{},
+                                     extents<index_t, k_s, n_s>{k, n}, in_mds);
+
+    lu_permute_l_to<mpmode>(in_mds, pl, u);
+
+    return std::pair{pl, u};
+}
+
+template <bool permute_l = false, bool p_indices = false, typename dtype = void,
+          MPMode mpmode = MPMode::NONE, typename in_t>
+[[nodiscard]] inline constexpr auto lu(in_t &&in) {
+    static_assert(!(permute_l && p_indices),
+                  "lu cannot return both permuted L and P indices.");
+
+    if constexpr (permute_l) {
+        return lu_permute_l<dtype, mpmode>(std::forward<in_t>(in));
+
+    } else if constexpr (p_indices) {
+        return lu_p_indices<dtype, mpmode>(std::forward<in_t>(in));
+
+    } else {
+        return lu_full<dtype, mpmode>(std::forward<in_t>(in));
+    }
+}
+
+} // namespace linalg
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/lu.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/matmul.hpp
 /**
  * @file
@@ -3344,6 +3829,166 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 } // namespace linalg
 } // namespace mdtensor
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/norm.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/solve.hpp
+/**
+ * @file
+ * @brief Linear system solve utilities for mdtensor (linalg).
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor {
+namespace linalg {
+namespace detail {
+
+template <md_c a_t, md_c b_t, md_c x_t>
+[[nodiscard]] inline constexpr bool solve_impl(a_t &&a, b_t &&b,
+                                               x_t &&x) noexcept {
+    auto a_mds = core::to_const_mdspan(std::forward<a_t>(a));
+    auto b_mds = core::to_const_mdspan(std::forward<b_t>(b));
+    auto x_mds = core::to_mdspan(std::forward<x_t>(x));
+
+    using a_mds_t = std::remove_cvref_t<decltype(a_mds)>;
+    using b_mds_t = std::remove_cvref_t<decltype(b_mds)>;
+    using x_mds_t = std::remove_cvref_t<decltype(x_mds)>;
+
+    static_assert(a_mds_t::rank() == 2);
+    static_assert(b_mds_t::rank() == 1 || b_mds_t::rank() == 2);
+    static_assert(x_mds_t::rank() == b_mds_t::rank());
+
+    using index_t = typename a_mds_t::index_type;
+    using value_t = typename x_mds_t::value_type;
+
+    const index_t n = a_mds.extent(0);
+
+    assert(a_mds.extent(1) == n);
+    assert(b_mds.extent(0) == n);
+    assert(x_mds.extent(0) == n);
+
+    // LU decomposition of A
+    const auto [p_indices, l, u] = lu_p_indices(a_mds);
+
+    // check singularity
+    for (index_t idx = 0; idx < n; idx++) {
+        if (u(idx, idx) == 0) {
+            return false;
+        }
+    }
+
+    if constexpr (b_mds_t::rank() == 1) {
+        // initialize out
+        for (index_t idx = 0; idx < n; idx++) {
+            x_mds(p_indices(idx)) = b_mds(idx);
+        }
+
+        // forward substitution
+        for (index_t idx = 0; idx < n; idx++) {
+            for (index_t jdx = 0; jdx < idx; jdx++) {
+                x_mds(idx) -= l(idx, jdx) * x_mds(jdx);
+            }
+        }
+
+        // backward substitution
+        for (index_t i = n; i > 0; i--) {
+            const index_t idx = i - 1;
+
+            for (index_t jdx = i; jdx < n; jdx++) {
+                x_mds(idx) -= u(idx, jdx) * x_mds(jdx);
+            }
+
+            if (u(idx, idx) == 0) {
+                return false;
+            }
+
+            x_mds(idx) /= u(idx, idx);
+        }
+
+    } else {
+        const index_t nrhs = b_mds.extent(1);
+
+        assert(x_mds.extent(1) == nrhs);
+
+        for (index_t rhs = 0; rhs < nrhs; rhs++) {
+            // initialize out
+            for (index_t idx = 0; idx < n; idx++) {
+                x_mds(p_indices(idx), rhs) = b_mds(idx, rhs);
+            }
+
+            // forward substitution
+            for (index_t idx = 0; idx < n; idx++) {
+                for (index_t jdx = 0; jdx < idx; jdx++) {
+                    x_mds(idx, rhs) -= l(idx, jdx) * x_mds(jdx, rhs);
+                }
+            }
+
+            // backward substitution
+            for (index_t i = n; i > 0; i--) {
+                const index_t idx = i - 1;
+
+                for (index_t jdx = i; jdx < n; jdx++) {
+                    x_mds(idx, rhs) -= u(idx, jdx) * x_mds(jdx, rhs);
+                }
+
+                if (u(idx, idx) == 0) {
+                    return false;
+                }
+
+                x_mds(idx, rhs) /= u(idx, idx);
+            }
+        }
+    }
+
+    return true;
+}
+
+} // namespace detail
+
+template <MPMode mpmode = MPMode::NONE, typename a_t, typename b_t,
+          typename x_t, typename valid_t>
+inline constexpr void solve_to(a_t &&a, b_t &&b, x_t &&x, valid_t &&valid) {
+    const auto a_mds = core::to_const_mdspan(std::forward<a_t>(a));
+    const auto b_mds = core::to_const_mdspan(std::forward<b_t>(b));
+
+    constexpr size_t rhs_rank = decltype(b_mds)::rank() == 1 ? 1 : 2;
+
+    core::batch<mpmode>(
+        [](auto &&a, auto &&b, auto &&x, auto &&valid) {
+            valid() = detail::solve_impl(std::forward<decltype(a)>(a),
+                                         std::forward<decltype(b)>(b),
+                                         std::forward<decltype(x)>(x));
+        },
+        std::index_sequence<2, rhs_rank, rhs_rank, 0>{}, a_mds, b_mds,
+        core::to_mdspan(std::forward<x_t>(x)),
+        core::to_mdspan(std::forward<valid_t>(valid)));
+}
+
+template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename a_t,
+          typename b_t>
+[[nodiscard]] inline constexpr auto solve(a_t &&a, b_t &&b) {
+    const auto a_mds = core::to_const_mdspan(std::forward<a_t>(a));
+    const auto b_mds = core::to_const_mdspan(std::forward<b_t>(b));
+
+    constexpr size_t rhs_rank = decltype(b_mds)::rank() == 1 ? 1 : 2;
+
+    auto x = core::create_out<dtype>(
+        std::index_sequence<2, rhs_rank>{},
+        core::slice_from_right<rhs_rank>(b_mds.extents()), a_mds, b_mds);
+
+    auto valid = core::create_out<uint8_t>(std::index_sequence<2, rhs_rank>{},
+                                           extents<uint8_t>{}, a_mds, b_mds);
+
+    solve_to<mpmode>(a_mds, b_mds, x, valid);
+
+    return std::pair{x, valid};
+}
+
+} // namespace linalg
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/solve.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/vecmat.hpp
 /**
  * @file
@@ -3722,84 +4367,6 @@ template <typename in_t> [[nodiscard]] inline constexpr bool all(in_t &&in) {
  */
 
 
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/absolute.hpp
-/**
- * @file
- * @brief Element-wise absolute value utilities for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
-
-namespace mdtensor {
-namespace detail {
-
-template <typename in_t, typename out_t>
-inline constexpr void absolute_impl(in_t &&in, out_t &&out) {
-#ifdef REAL_GCC
-    out() = std::abs(in());
-
-#else
-    // NOTE: std::abs is not constexpr in clang 16.
-    out() = in() >= 0 ? in() : -in();
-
-#endif
-}
-
-} // namespace detail
-
-/**
- * @brief Compute absolute value element-wise (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note Equivalent to out = std::abs(in) in terms of array broadcasting.
- *
- * @see mdtensor::absolute for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
-inline constexpr void absolute_to(in_t &&in, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::absolute_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in_t>(in)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
-
-/**
- * @brief Compute absolute value element-wise (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- *         input.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar.
- *
- * @note Equivalent to out = std::abs(in) in terms of array broadcasting.
- *
- * @see mdtensor::absolute_to for the in-place version that writes into an
- *      output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto absolute(in_t &&in) {
-    return core::batch_out<dtype, mpmode>(
-        [](auto &&...elems) {
-            detail::absolute_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in_t>(in)));
-}
-
-} // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/absolute.hpp
 
 namespace mdtensor {
 namespace detail {
