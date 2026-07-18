@@ -14,4 +14,5 @@
 #include "matmul.hpp"
 #include "matvec.hpp"
 #include "norm.hpp"
+#include "solve.hpp"
 #include "vecmat.hpp"
