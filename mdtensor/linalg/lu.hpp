@@ -152,7 +152,6 @@ inline constexpr void lu_full_impl(in_t &&in, p_t &&p, l_t &&l, u_t &&u) {
     constexpr size_t m_s = in_mds_t::static_extent(0);
 
     const index_t m = in_mds.extent(0);
-    const index_t n = in_mds.extent(1);
 
     auto p_indices = core::create_data<index_t>(extents<index_t, m_s>{m});
 
