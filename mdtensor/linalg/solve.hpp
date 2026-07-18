@@ -31,7 +31,6 @@ template <md_c a_t, md_c b_t, md_c x_t>
     static_assert(x_mds_t::rank() == b_mds_t::rank());
 
     using index_t = typename a_mds_t::index_type;
-    using value_t = typename x_mds_t::value_type;
 
     const index_t n = a_mds.extent(0);
 
