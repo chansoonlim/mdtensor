@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "cholesky.hpp"
 #include "inv.hpp"
 #include "lu.hpp"
 #include "matmul.hpp"
