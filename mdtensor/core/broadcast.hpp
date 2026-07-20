@@ -310,6 +310,12 @@ template <typename dtype, extents_c exts_t>
     if constexpr (exts_base_t::rank() == 0) {
         return dtype{};
 
+    } else if constexpr (exts_base_t::rank_dynamic() != 0 &&
+                         std::is_same_v<dtype, bool>) {
+        // NOTE: This is a workaround for the fact that std::vector<bool> is a
+        //       specialization that does not behave like a normal container.
+        return mdarray<int8_t, exts_base_t>{std::forward<exts_t>(exts)};
+
     } else {
         return mdarray<dtype, exts_base_t>{std::forward<exts_t>(exts)};
     }
