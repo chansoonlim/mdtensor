@@ -409,7 +409,8 @@ struct common_index_type_impl<U, S>
     : common_index_type_impl<std::remove_cvref_t<S>, std::remove_cvref_t<U>> {};
 
 template <typename T1, typename T2, typename... Ts>
-    requires requires { typename common_index_type_impl<T1, T2>::type; }
+    requires(sizeof...(Ts) > 0 &&
+             requires { typename common_index_type_impl<T1, T2>::type; })
 struct common_index_type_impl<T1, T2, Ts...> {
   public:
     using type = typename common_index_type_impl<
@@ -780,9 +781,9 @@ slice_from_right(in_t &&in = in_t{}) noexcept {
 }
 
 template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
-[[nodiscard]] inline constexpr auto concatenate(in1_t &&in1 = in1_t{},
-                                                in2_t &&in2 = in2_t{},
-                                                ins_t &&...ins) noexcept {
+[[nodiscard]] inline constexpr auto
+concatenate_extents(in1_t &&in1 = in1_t{}, in2_t &&in2 = in2_t{},
+                    ins_t &&...ins) noexcept {
     using in1_base_t = std::remove_cvref_t<in1_t>;
     using in2_base_t = std::remove_cvref_t<in2_t>;
     using index_t = common_index_type_t<typename in1_base_t::index_type,
@@ -802,78 +803,122 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
         return cexts;
 
     } else {
-        return concatenate(cexts, std::forward<ins_t>(ins)...);
+        return concatenate_extents(cexts, std::forward<ins_t>(ins)...);
     }
 }
 
 namespace detail {
 
-template <size_t Is, size_t brank, extents_c in1_t, extents_c in2_t>
-constexpr size_t broadcast_static_extent(in1_t &&in = in1_t{},
-                                         in2_t &&in2 = in2_t{}) noexcept {
-    constexpr size_t e1 =
-        (Is < brank - in1_t::rank()
-             ? 1
-             : in1_t::static_extent(Is - (brank - in1_t::rank())));
-    constexpr size_t e2 =
-        (Is < brank - in2_t::rank()
-             ? 1
-             : in2_t::static_extent(Is - (brank - in2_t::rank())));
-    static_assert(e1 == e2 || e1 == 1 || e1 == dyn || e2 == 1 || e2 == dyn,
-                  "incompatible extents for broadcasting.");
+template <size_t I, size_t brank, extents_c in_t>
+[[nodiscard]] inline constexpr size_t aligned_static_extent() noexcept {
+    using in_base_t = std::remove_cvref_t<in_t>;
 
-    return std::max(e1, e2);
+    constexpr size_t rank = in_base_t::rank();
+
+    if constexpr (I < brank - rank) {
+        return 1;
+
+    } else {
+        return in_base_t::static_extent(I - (brank - rank));
+    }
+}
+
+template <size_t... Exts>
+[[nodiscard]] inline constexpr size_t broadcast_static_extent() noexcept {
+
+    static_assert(
+        [&] {
+            constexpr auto exts = std::array{Exts...};
+
+            for (size_t i = 0; i < sizeof...(Exts); i++) {
+                for (size_t j = i + 1; j < sizeof...(Exts); j++) {
+                    const size_t ei = exts[i];
+                    const size_t ej = exts[j];
+
+                    if (ei != ej && ei != 1 && ei != dyn && ej != 1 &&
+                        ej != dyn) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }(),
+        "Incompatible static extents for broadcasting.");
+
+    return std::max({Exts...});
+}
+
+template <size_t I, size_t brank, extents_c in_t>
+[[nodiscard]] inline constexpr auto aligned_extent(in_t &&in) noexcept {
+    using in_base_t = std::remove_cvref_t<in_t>;
+
+    constexpr size_t rank = in_base_t::rank();
+
+    if constexpr (I < brank - rank) {
+        return typename in_base_t::index_type{1};
+
+    } else {
+        return in.extent(I - (brank - rank));
+    }
+}
+
+template <typename index_t, typename... exts_t>
+[[nodiscard]] inline constexpr index_t
+broadcast_extent(exts_t... exts) noexcept {
+    assert([&] {
+        for (size_t i = 0; i < sizeof...(exts); i++) {
+            for (size_t j = i + 1; j < sizeof...(exts); j++) {
+                const index_t ei = std::get<i>(std::forward_as_tuple(exts...));
+                const index_t ej = std::get<j>(std::forward_as_tuple(exts...));
+
+                if (ei != ej && ei != 1 && ej != 1) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }());
+
+    return std::max({static_cast<index_t>(exts)...});
 }
 
 } // namespace detail
 
-template <extents_c in_t>
-[[nodiscard]] inline constexpr auto broadcast(in_t &&in = in_t{}) noexcept {
-    return std::forward<in_t>(in);
-}
+template <extents_c... ins_t>
+[[nodiscard]] inline constexpr auto broadcast_extents(ins_t &&...ins) noexcept {
+    using index_t =
+        common_index_type_t<typename std::remove_cvref_t<ins_t>::index_type...>;
 
-template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
-[[nodiscard]] inline constexpr auto broadcast(in1_t &&in1 = in1_t{},
-                                              in2_t &&in2 = in2_t{},
-                                              ins_t &&...ins) noexcept {
-    using in1_base_t = std::remove_cvref_t<in1_t>;
-    using in2_base_t = std::remove_cvref_t<in2_t>;
-    using index_t = common_index_type_t<typename in1_base_t::index_type,
-                                        typename in2_base_t::index_type>;
+    constexpr size_t brank = std::max({std::remove_cvref_t<ins_t>::rank()...});
 
-    constexpr size_t brank = std::max(in1_base_t::rank(), in2_base_t::rank());
-
-    const auto bexts = [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return extents<index_t, detail::broadcast_static_extent<
-                                    Is, brank, in1_base_t, in2_base_t>()...>{
-            [&]() {
-                const size_t x1 =
-                    (Is < brank - in1_base_t::rank()
-                         ? 1
-                         : in1.extent(Is - (brank - in1_base_t::rank())));
-                const size_t x2 =
-                    (Is < brank - in2_base_t::rank()
-                         ? 1
-                         : in2.extent(Is - (brank - in2_base_t::rank())));
-
-                assert(x1 == x2 || x1 == 1 || x2 == 1);
-
-                return std::max(x1, x2);
-            }()...};
-    }(std::make_index_sequence<brank>{});
-
-    if constexpr (sizeof...(ins_t) == 0) {
-        return bexts;
+    if constexpr (brank == 0) {
+        return extents<index_t>{};
 
     } else {
-        return broadcast(bexts, std::forward<ins_t>(ins)...);
+        return [&]<size_t... Is>(std::index_sequence<Is...>) {
+            const auto static_extent_at = [&]<size_t I>() {
+                return detail::broadcast_static_extent<
+                    detail::aligned_static_extent<I, brank, ins_t>()...>();
+            };
+
+            const auto extent_at = [&]<size_t I>() {
+                return detail::broadcast_extent<index_t>(
+                    detail::aligned_extent<I, brank>(
+                        std::forward<ins_t>(ins))...);
+            };
+
+            return extents<index_t,
+                           static_extent_at.template operator()<Is>()...> {
+                extent_at.template operator()<Is>()...
+            };
+        }(std::make_index_sequence<brank>{});
     }
 }
 
 template <size_t offset, size_t brank, mdspan_c in_t, extents_c new_bexts_t>
 [[nodiscard]] inline constexpr auto
-broadcast_to(in_t &&in = in_t{},
-             new_bexts_t &&new_bexts = new_bexts_t{}) noexcept {
+broadcast_axes_to(in_t &&in = in_t{},
+                  new_bexts_t &&new_bexts = new_bexts_t{}) noexcept {
     using in_base_t = std::remove_cvref_t<in_t>;
     using new_bexts_base_t = std::remove_cvref_t<new_bexts_t>;
 
@@ -945,11 +990,12 @@ broadcast_to(in_t &&in = in_t{},
 
         const auto new_extents = [&]() {
             if constexpr (offset == 0) {
-                return concatenate(std::forward<new_bexts_t>(new_bexts),
-                                   slice_from_right<urank>(in.extents()));
+                return concatenate_extents(
+                    std::forward<new_bexts_t>(new_bexts),
+                    slice_from_right<urank>(in.extents()));
 
             } else {
-                return concatenate(
+                return concatenate_extents(
                     slice_from_left<offset>(in.extents()),
                     std::forward<new_bexts_t>(new_bexts),
                     slice_from_right<urank - offset>(in.extents()));
@@ -1078,16 +1124,16 @@ create_out(std::index_sequence<offsets...>, std::index_sequence<uranks...>,
     auto ins_tuple = std::forward_as_tuple(ins...);
 
     const auto bexts = [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return broadcast(slice_with_offset<ofst[Is], br[Is]>(
+        return broadcast_extents(slice_with_offset<ofst[Is], br[Is]>(
             std::get<Is>(ins_tuple).extents())...);
     }(std::make_index_sequence<sizeof...(ins_t)>{});
 
     constexpr size_t uout_offset = ofst[sizeof...(ins_t)];
 
-    return create_data<value_t>(
-        concatenate(slice_from_left<uout_offset>(uout_exts), bexts,
-                    slice_from_right<std::remove_cvref_t<uout_exts_t>::rank() -
-                                     uout_offset>(uout_exts)));
+    return create_data<value_t>(concatenate_extents(
+        slice_from_left<uout_offset>(uout_exts), bexts,
+        slice_from_right<std::remove_cvref_t<uout_exts_t>::rank() -
+                         uout_offset>(uout_exts)));
 }
 
 template <typename dtype = void, size_t... uranks, extents_c uout_exts_t,
@@ -1143,12 +1189,12 @@ create_outs(std::index_sequence<offsets...>, std::index_sequence<uranks...>,
     auto ins_tuple = std::forward_as_tuple(ins...);
 
     const auto bexts = [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return broadcast(slice_with_offset<ofst[Is], br[Is]>(
+        return broadcast_extents(slice_with_offset<ofst[Is], br[Is]>(
             std::get<Is>(ins_tuple).extents())...);
     }(std::make_index_sequence<sizeof...(ins_t)>{});
 
     return [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return std::tuple{create_data<value_t>(concatenate(
+        return std::tuple{create_data<value_t>(concatenate_extents(
             slice_from_left<ofst[sizeof...(ins_t) + Is]>(
                 std::get<Is>(uout_exts_tuple)),
             bexts,
@@ -1254,7 +1300,7 @@ inline constexpr void batch(func_t &&func, std::index_sequence<offsets...>,
                     std::index_sequence<offsets...>{},
                     static_reshape(
                         std::get<Is>(ins_tuple),
-                        concatenate(
+                        concatenate_extents(
                             slice_from_left<ofst[Is]>(
                                 std::get<Is>(ins_tuple).extents()),
                             extents<size_t, static_bsize>{static_bsize},
@@ -1271,15 +1317,15 @@ inline constexpr void batch(func_t &&func, std::index_sequence<offsets...>,
 
     } else {
         const auto bexts = [&]<size_t... Is>(std::index_sequence<Is...>) {
-            return broadcast(slice_with_offset<ofst[Is], br[Is]>(
+            return broadcast_extents(slice_with_offset<ofst[Is], br[Is]>(
                 std::get<Is>(ins_tuple).extents())...);
         }(std::make_index_sequence<sizeof...(ins_t)>{});
 
         [&]<size_t... Is>(std::index_sequence<Is...>) {
             detail::batch_impl<mpmode, decltype(bexts)::rank()>(
                 std::forward<func_t>(func), std::index_sequence<offsets...>{},
-                broadcast_to<ofst[Is], br[Is]>(std::get<Is>(ins_tuple),
-                                               bexts)...);
+                broadcast_axes_to<ofst[Is], br[Is]>(std::get<Is>(ins_tuple),
+                                                    bexts)...);
         }(std::make_index_sequence<sizeof...(ins_t)>{});
     }
 }
@@ -2139,7 +2185,7 @@ linspace(start_t &&start, stop_t &&stop, const exts_t &exts = exts_t{},
         ((Axis % static_cast<int64_t>(out_rank)) + (out_rank)) % out_rank);
 
     const auto bexts = start_mds.extents();
-    auto out = core::create_data<value_t>(core::concatenate(
+    auto out = core::create_data<value_t>(core::concatenate_extents(
         core::slice_from_left<axis>(bexts), exts,
         core::slice_from_right<decltype(bexts)::rank() - axis>(bexts)));
 
@@ -5396,6 +5442,101 @@ template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
  */
 
 
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/manipulation/broadcast_to.hpp
+/**
+ * @file
+ * @brief Broadcast_to utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor {
+
+template <typename in_t, extents_c new_extents_t>
+[[nodiscard]] inline constexpr auto
+broadcast_to(in_t &&in,
+             new_extents_t &&new_extents = new_extents_t{}) noexcept {
+    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+
+    using in_mds_base_t = std::remove_cvref_t<decltype(in_mds)>;
+    using new_extents_base_t = std::remove_cvref_t<new_extents_t>;
+
+    constexpr size_t org_rank = in_mds_base_t::rank();
+    constexpr size_t new_rank = new_extents_base_t::rank();
+
+    static_assert(org_rank <= new_rank, "Incompatible ranks for broadcasting.");
+
+    if constexpr (core::same<typename in_mds_base_t::extents_type,
+                             new_extents_base_t>()) {
+        return std::forward<in_t>(in);
+
+    } else if constexpr (org_rank == 0) {
+        using index_t = typename new_extents_base_t::index_type;
+
+        auto new_strides = std::array<index_t, new_rank>{};
+
+        for (size_t i = 0; i < new_rank; i++) {
+            new_strides[i] = 0;
+        }
+
+        return mdspan<typename in_mds_base_t::element_type, new_extents_base_t,
+                      layout_stride, typename in_mds_base_t::accessor_type>{
+            in_mds.data_handle(),
+            layout_stride::mapping{std::forward<new_extents_t>(new_extents),
+                                   new_strides}};
+
+    } else {
+        using index_t = typename new_extents_base_t::index_type;
+
+        // ni = new_rank - org_rank + oi
+        const auto get_ni = [](size_t i) { return new_rank - org_rank + i; };
+
+        // assertion
+        static_assert(
+            [&] {
+                for (size_t i = 0; i < org_rank; i++) {
+                    if (in_mds_base_t::static_extent(i) !=
+                            new_extents_base_t::static_extent(get_ni(i)) &&
+                        in_mds_base_t::static_extent(i) != 1 &&
+                        new_extents_base_t::static_extent(get_ni(i)) != dyn) {
+                        return false;
+                    }
+                }
+                return true;
+            }(),
+            "Incompatible extents for broadcasting.");
+
+        for (size_t i = 0; i < org_rank; i++) {
+            assert(static_cast<size_t>(in_mds.extent(i)) ==
+                       static_cast<size_t>(new_extents.extent(get_ni(i))) ||
+                   static_cast<size_t>(in_mds.extent(i)) == 1);
+        }
+
+        // calculation
+        auto new_strides = std::array<index_t, new_rank>{};
+
+        for (size_t i = 0; i < new_rank - org_rank; i++) {
+            new_strides[i] = 0;
+        }
+
+        for (size_t i = 0; i < org_rank; i++) {
+            new_strides[get_ni(i)] = static_cast<index_t>(in_mds.stride(i));
+        }
+
+        return mdspan<typename in_mds_base_t::element_type, new_extents_base_t,
+                      layout_stride, typename in_mds_base_t::accessor_type>{
+            in_mds.data_handle(),
+            layout_stride::mapping{std::forward<new_extents_t>(new_extents),
+                                   new_strides}};
+    }
+}
+
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/manipulation/broadcast_to.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/manipulation/concatenate.hpp
 /**
  * @file
