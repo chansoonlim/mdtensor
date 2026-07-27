@@ -29,7 +29,7 @@ broadcast_to(in_t &&in,
 
     if constexpr (core::same<typename in_mds_base_t::extents_type,
                              new_extents_base_t>()) {
-        return std::forward<in_t>(in);
+        return in_mds;
 
     } else if constexpr (org_rank == 0) {
         using index_t = typename new_extents_base_t::index_type;
