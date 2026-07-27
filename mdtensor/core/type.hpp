@@ -321,7 +321,8 @@ struct common_index_type_impl<U, S>
     : common_index_type_impl<std::remove_cvref_t<S>, std::remove_cvref_t<U>> {};
 
 template <typename T1, typename T2, typename... Ts>
-    requires requires { typename common_index_type_impl<T1, T2>::type; }
+    requires(sizeof...(Ts) > 0 &&
+             requires { typename common_index_type_impl<T1, T2>::type; })
 struct common_index_type_impl<T1, T2, Ts...> {
   public:
     using type = typename common_index_type_impl<

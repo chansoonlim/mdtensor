@@ -170,7 +170,7 @@ linspace(start_t &&start, stop_t &&stop, const exts_t &exts = exts_t{},
         ((Axis % static_cast<int64_t>(out_rank)) + (out_rank)) % out_rank);
 
     const auto bexts = start_mds.extents();
-    auto out = core::create_data<value_t>(core::concatenate(
+    auto out = core::create_data<value_t>(core::concatenate_extents(
         core::slice_from_left<axis>(bexts), exts,
         core::slice_from_right<decltype(bexts)::rank() - axis>(bexts)));
 

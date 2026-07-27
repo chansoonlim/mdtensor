@@ -151,3 +151,7 @@ TEST(test, bool_with_fpoint) {
     static_assert(std::same_as<test_t<bool, float>, float>);
     static_assert(std::same_as<test_t<bool, double>, double>);
 }
+
+TEST(test, triple) {
+    static_assert(std::same_as<test_t<float, float, float>, float>);
+}
