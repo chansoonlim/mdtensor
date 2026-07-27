@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "broadcast_to.hpp"
 #include "concatenate.hpp"
 #include "expand_dims.hpp"
 #include "reshape.hpp"

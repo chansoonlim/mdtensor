@@ -49,9 +49,9 @@ slice_from_right(in_t &&in = in_t{}) noexcept {
 }
 
 template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
-[[nodiscard]] inline constexpr auto concatenate(in1_t &&in1 = in1_t{},
-                                                in2_t &&in2 = in2_t{},
-                                                ins_t &&...ins) noexcept {
+[[nodiscard]] inline constexpr auto
+concatenate_extents(in1_t &&in1 = in1_t{}, in2_t &&in2 = in2_t{},
+                    ins_t &&...ins) noexcept {
     using in1_base_t = std::remove_cvref_t<in1_t>;
     using in2_base_t = std::remove_cvref_t<in2_t>;
     using index_t = common_index_type_t<typename in1_base_t::index_type,
@@ -71,7 +71,7 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
         return cexts;
 
     } else {
-        return concatenate(cexts, std::forward<ins_t>(ins)...);
+        return concatenate_extents(cexts, std::forward<ins_t>(ins)...);
     }
 }
 
@@ -153,7 +153,7 @@ broadcast_extent(exts_t... exts) noexcept {
 } // namespace detail
 
 template <extents_c... ins_t>
-[[nodiscard]] inline constexpr auto broadcast(ins_t &&...ins) noexcept {
+[[nodiscard]] inline constexpr auto broadcast_extents(ins_t &&...ins) noexcept {
     using index_t =
         common_index_type_t<typename std::remove_cvref_t<ins_t>::index_type...>;
 
@@ -185,8 +185,8 @@ template <extents_c... ins_t>
 
 template <size_t offset, size_t brank, mdspan_c in_t, extents_c new_bexts_t>
 [[nodiscard]] inline constexpr auto
-broadcast_to(in_t &&in = in_t{},
-             new_bexts_t &&new_bexts = new_bexts_t{}) noexcept {
+broadcast_axes_to(in_t &&in = in_t{},
+                  new_bexts_t &&new_bexts = new_bexts_t{}) noexcept {
     using in_base_t = std::remove_cvref_t<in_t>;
     using new_bexts_base_t = std::remove_cvref_t<new_bexts_t>;
 
@@ -258,11 +258,12 @@ broadcast_to(in_t &&in = in_t{},
 
         const auto new_extents = [&]() {
             if constexpr (offset == 0) {
-                return concatenate(std::forward<new_bexts_t>(new_bexts),
-                                   slice_from_right<urank>(in.extents()));
+                return concatenate_extents(
+                    std::forward<new_bexts_t>(new_bexts),
+                    slice_from_right<urank>(in.extents()));
 
             } else {
-                return concatenate(
+                return concatenate_extents(
                     slice_from_left<offset>(in.extents()),
                     std::forward<new_bexts_t>(new_bexts),
                     slice_from_right<urank - offset>(in.extents()));
@@ -391,16 +392,16 @@ create_out(std::index_sequence<offsets...>, std::index_sequence<uranks...>,
     auto ins_tuple = std::forward_as_tuple(ins...);
 
     const auto bexts = [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return broadcast(slice_with_offset<ofst[Is], br[Is]>(
+        return broadcast_extents(slice_with_offset<ofst[Is], br[Is]>(
             std::get<Is>(ins_tuple).extents())...);
     }(std::make_index_sequence<sizeof...(ins_t)>{});
 
     constexpr size_t uout_offset = ofst[sizeof...(ins_t)];
 
-    return create_data<value_t>(
-        concatenate(slice_from_left<uout_offset>(uout_exts), bexts,
-                    slice_from_right<std::remove_cvref_t<uout_exts_t>::rank() -
-                                     uout_offset>(uout_exts)));
+    return create_data<value_t>(concatenate_extents(
+        slice_from_left<uout_offset>(uout_exts), bexts,
+        slice_from_right<std::remove_cvref_t<uout_exts_t>::rank() -
+                         uout_offset>(uout_exts)));
 }
 
 template <typename dtype = void, size_t... uranks, extents_c uout_exts_t,
@@ -456,12 +457,12 @@ create_outs(std::index_sequence<offsets...>, std::index_sequence<uranks...>,
     auto ins_tuple = std::forward_as_tuple(ins...);
 
     const auto bexts = [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return broadcast(slice_with_offset<ofst[Is], br[Is]>(
+        return broadcast_extents(slice_with_offset<ofst[Is], br[Is]>(
             std::get<Is>(ins_tuple).extents())...);
     }(std::make_index_sequence<sizeof...(ins_t)>{});
 
     return [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return std::tuple{create_data<value_t>(concatenate(
+        return std::tuple{create_data<value_t>(concatenate_extents(
             slice_from_left<ofst[sizeof...(ins_t) + Is]>(
                 std::get<Is>(uout_exts_tuple)),
             bexts,
@@ -567,7 +568,7 @@ inline constexpr void batch(func_t &&func, std::index_sequence<offsets...>,
                     std::index_sequence<offsets...>{},
                     static_reshape(
                         std::get<Is>(ins_tuple),
-                        concatenate(
+                        concatenate_extents(
                             slice_from_left<ofst[Is]>(
                                 std::get<Is>(ins_tuple).extents()),
                             extents<size_t, static_bsize>{static_bsize},
@@ -584,15 +585,15 @@ inline constexpr void batch(func_t &&func, std::index_sequence<offsets...>,
 
     } else {
         const auto bexts = [&]<size_t... Is>(std::index_sequence<Is...>) {
-            return broadcast(slice_with_offset<ofst[Is], br[Is]>(
+            return broadcast_extents(slice_with_offset<ofst[Is], br[Is]>(
                 std::get<Is>(ins_tuple).extents())...);
         }(std::make_index_sequence<sizeof...(ins_t)>{});
 
         [&]<size_t... Is>(std::index_sequence<Is...>) {
             detail::batch_impl<mpmode, decltype(bexts)::rank()>(
                 std::forward<func_t>(func), std::index_sequence<offsets...>{},
-                broadcast_to<ofst[Is], br[Is]>(std::get<Is>(ins_tuple),
-                                               bexts)...);
+                broadcast_axes_to<ofst[Is], br[Is]>(std::get<Is>(ins_tuple),
+                                                    bexts)...);
         }(std::make_index_sequence<sizeof...(ins_t)>{});
     }
 }
