@@ -97,3 +97,7 @@ TEST(test, int_with_uint) {
     static_assert(std::same_as<test_t<int64_t, uint32_t>, int64_t>);
     static_assert(!assigned<int64_t, uint64_t>);
 }
+
+TEST(test, triple) {
+    static_assert(std::same_as<test_t<int16_t, int16_t, int16_t>, int16_t>);
+}

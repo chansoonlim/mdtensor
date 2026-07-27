@@ -77,65 +77,109 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
 
 namespace detail {
 
-template <size_t Is, size_t brank, extents_c in1_t, extents_c in2_t>
-constexpr size_t broadcast_static_extent(in1_t &&in = in1_t{},
-                                         in2_t &&in2 = in2_t{}) noexcept {
-    constexpr size_t e1 =
-        (Is < brank - in1_t::rank()
-             ? 1
-             : in1_t::static_extent(Is - (brank - in1_t::rank())));
-    constexpr size_t e2 =
-        (Is < brank - in2_t::rank()
-             ? 1
-             : in2_t::static_extent(Is - (brank - in2_t::rank())));
-    static_assert(e1 == e2 || e1 == 1 || e1 == dyn || e2 == 1 || e2 == dyn,
-                  "incompatible extents for broadcasting.");
+template <size_t I, size_t brank, extents_c in_t>
+[[nodiscard]] inline constexpr size_t aligned_static_extent() noexcept {
+    using in_base_t = std::remove_cvref_t<in_t>;
 
-    return std::max(e1, e2);
+    constexpr size_t rank = in_base_t::rank();
+
+    if constexpr (I < brank - rank) {
+        return 1;
+
+    } else {
+        return in_base_t::static_extent(I - (brank - rank));
+    }
+}
+
+template <size_t... Exts>
+[[nodiscard]] inline constexpr size_t broadcast_static_extent() noexcept {
+
+    static_assert(
+        [&] {
+            constexpr auto exts = std::array{Exts...};
+
+            for (size_t i = 0; i < sizeof...(Exts); i++) {
+                for (size_t j = i + 1; j < sizeof...(Exts); j++) {
+                    const size_t ei = exts[i];
+                    const size_t ej = exts[j];
+
+                    if (ei != ej && ei != 1 && ei != dyn && ej != 1 &&
+                        ej != dyn) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }(),
+        "Incompatible static extents for broadcasting.");
+
+    return std::max({Exts...});
+}
+
+template <size_t I, size_t brank, extents_c in_t>
+[[nodiscard]] inline constexpr auto aligned_extent(in_t &&in) noexcept {
+    using in_base_t = std::remove_cvref_t<in_t>;
+
+    constexpr size_t rank = in_base_t::rank();
+
+    if constexpr (I < brank - rank) {
+        return typename in_base_t::index_type{1};
+
+    } else {
+        return in.extent(I - (brank - rank));
+    }
+}
+
+template <typename index_t, typename... exts_t>
+[[nodiscard]] inline constexpr index_t
+broadcast_extent(exts_t... exts) noexcept {
+    assert([&] {
+        for (size_t i = 0; i < sizeof...(exts); i++) {
+            for (size_t j = i + 1; j < sizeof...(exts); j++) {
+                const index_t ei = std::get<i>(std::forward_as_tuple(exts...));
+                const index_t ej = std::get<j>(std::forward_as_tuple(exts...));
+
+                if (ei != ej && ei != 1 && ej != 1) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }());
+
+    return std::max({static_cast<index_t>(exts)...});
 }
 
 } // namespace detail
 
-template <extents_c in_t>
-[[nodiscard]] inline constexpr auto broadcast(in_t &&in = in_t{}) noexcept {
-    return std::forward<in_t>(in);
-}
+template <extents_c... ins_t>
+[[nodiscard]] inline constexpr auto broadcast(ins_t &&...ins) noexcept {
+    using index_t =
+        common_index_type_t<typename std::remove_cvref_t<ins_t>::index_type...>;
 
-template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
-[[nodiscard]] inline constexpr auto broadcast(in1_t &&in1 = in1_t{},
-                                              in2_t &&in2 = in2_t{},
-                                              ins_t &&...ins) noexcept {
-    using in1_base_t = std::remove_cvref_t<in1_t>;
-    using in2_base_t = std::remove_cvref_t<in2_t>;
-    using index_t = common_index_type_t<typename in1_base_t::index_type,
-                                        typename in2_base_t::index_type>;
+    constexpr size_t brank = std::max({std::remove_cvref_t<ins_t>::rank()...});
 
-    constexpr size_t brank = std::max(in1_base_t::rank(), in2_base_t::rank());
-
-    const auto bexts = [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return extents<index_t, detail::broadcast_static_extent<
-                                    Is, brank, in1_base_t, in2_base_t>()...>{
-            [&]() {
-                const size_t x1 =
-                    (Is < brank - in1_base_t::rank()
-                         ? 1
-                         : in1.extent(Is - (brank - in1_base_t::rank())));
-                const size_t x2 =
-                    (Is < brank - in2_base_t::rank()
-                         ? 1
-                         : in2.extent(Is - (brank - in2_base_t::rank())));
-
-                assert(x1 == x2 || x1 == 1 || x2 == 1);
-
-                return std::max(x1, x2);
-            }()...};
-    }(std::make_index_sequence<brank>{});
-
-    if constexpr (sizeof...(ins_t) == 0) {
-        return bexts;
+    if constexpr (brank == 0) {
+        return extents<index_t>{};
 
     } else {
-        return broadcast(bexts, std::forward<ins_t>(ins)...);
+        return [&]<size_t... Is>(std::index_sequence<Is...>) {
+            const auto static_extent_at = [&]<size_t I>() {
+                return detail::broadcast_static_extent<
+                    detail::aligned_static_extent<I, brank, ins_t>()...>();
+            };
+
+            const auto extent_at = [&]<size_t I>() {
+                return detail::broadcast_extent<index_t>(
+                    detail::aligned_extent<I, brank>(
+                        std::forward<ins_t>(ins))...);
+            };
+
+            return extents<index_t,
+                           static_extent_at.template operator()<Is>()...> {
+                extent_at.template operator()<Is>()...
+            };
+        }(std::make_index_sequence<brank>{});
     }
 }
 
