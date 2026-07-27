@@ -81,7 +81,13 @@ broadcast_to(in_t &&in,
         }
 
         for (size_t i = 0; i < org_rank; i++) {
-            new_strides[get_ni(i)] = static_cast<index_t>(in_mds.stride(i));
+            if (static_cast<size_t>(in_mds.extent(i)) ==
+                static_cast<size_t>(new_extents.extent(get_ni(i)))) {
+                new_strides[get_ni(i)] = static_cast<index_t>(in_mds.stride(i));
+
+            } else {
+                new_strides[get_ni(i)] = 0;
+            }
         }
 
         return mdspan<typename in_mds_base_t::element_type, new_extents_base_t,
