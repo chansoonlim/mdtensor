@@ -61,6 +61,7 @@ namespace std::experimental {
  */
 
 
+#include <algorithm>
 #include <optional>
 #include <tuple>
 
