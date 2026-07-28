@@ -14,7 +14,7 @@
 namespace mdtensor {
 namespace detail {
 
-template <typename in_t>
+template <core::mdspan_c in_t>
 [[nodiscard]] inline std::string to_string_impl(in_t &&in) {
     using index_t = typename std::remove_cvref_t<in_t>::index_type;
 
@@ -38,17 +38,6 @@ template <typename in_t>
 
 } // namespace detail
 
-/**
- * @brief Convert an extents object into a shape string.
- *
- * @tparam in_t Extents type satisfying extents_c.
- *
- * @param in Input extents.
- *
- * @return Shape string in the form "(d0, d1, ...)".
- *
- * @note This overload is useful for printing tensor shapes.
- */
 template <extents_c exts_t>
 [[nodiscard]] inline std::string to_string(exts_t &&exts) {
     using exts_base_t = std::remove_cvref_t<exts_t>;
@@ -65,17 +54,6 @@ template <extents_c exts_t>
     return str + ")";
 }
 
-/**
- * @brief Convert a tensor-like object into a nested bracket string.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- *
- * @return Nested bracket string representation.
- *
- * @note The input is converted to a const mdspan view before formatting.
- *
- * @see mdtensor::to_string(const extents_c&) for shape formatting.
- */
 template <typename in_t> [[nodiscard]] inline std::string to_string(in_t &&in) {
     return detail::to_string_impl(
         core::to_const_mdspan(std::forward<in_t>(in)));

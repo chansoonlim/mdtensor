@@ -10,7 +10,7 @@ TEST(stack, full) {
 
     constexpr auto a = md::full<T>(1, md::extents<size_t, 2, 1, 2>{});
     constexpr auto a_expect =
-        md::mdarray<T, md::extents<size_t, 2, 1, 2>>{{1, 1, 1, 1}};
+        md::container<T, md::extents<size_t, 2, 1, 2>>{{1, 1, 1, 1}};
 
     constexpr bool array_equal = md::array_equal(a, a_expect);
 
@@ -22,7 +22,7 @@ TEST(heap, full) {
 
     const auto a = md::full<T>(1, md::dims<3>{2, 1, 2});
     const auto a_expect =
-        md::mdarray<T, md::dims<3>>{{1, 1, 1, 1}, md::dims<3>{2, 1, 2}};
+        md::container<T, md::dims<3>>{{1, 1, 1, 1}, md::dims<3>{2, 1, 2}};
 
     const bool array_equal = md::array_equal(a, a_expect);
 

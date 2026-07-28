@@ -9,28 +9,21 @@
 
 #pragma once
 
-#include "convert.hpp"
-#include "type.hpp"
+#include "mdspan.hpp"
 
 namespace mdtensor {
-
-template <typename in_t, typename... slices_t>
-[[nodiscard]] inline constexpr auto submdspan(in_t &&in,
-                                              slices_t &&...slices) noexcept {
-    return std::experimental::submdspan(core::to_mdspan(std::forward<in_t>(in)),
-                                        std::forward<slices_t>(slices)...);
-}
-
 namespace core {
 
-template <size_t lspace, size_t rspace, typename in_t, typename... slices_t>
-[[nodiscard]] inline constexpr auto
-submdspan_with_space(in_t &&in, slices_t &&...slices) noexcept {
+template <size_t lspace = 0, size_t rspace = 0, typename in_t,
+          typename... slices_t>
+[[nodiscard]] inline constexpr auto submdspan(in_t &&in,
+                                              slices_t &&...slices) noexcept {
     return [&]<size_t... Is, size_t... Js>(std::index_sequence<Is...>,
                                            std::index_sequence<Js...>) {
-        return submdspan(std::forward<in_t>(in), ((void)Is, full_extent)...,
-                         std::forward<slices_t>(slices)...,
-                         ((void)Js, full_extent)...);
+        return std::experimental::submdspan(to_mdspan(std::forward<in_t>(in)),
+                                            ((void)Is, stdex::full_extent)...,
+                                            std::forward<slices_t>(slices)...,
+                                            ((void)Js, stdex::full_extent)...);
     }(std::make_index_sequence<lspace>{}, std::make_index_sequence<rspace>{});
 }
 
@@ -42,8 +35,8 @@ submdspan_from_left(in_t &&in, slices_t &&...slices) noexcept {
     constexpr size_t rspace =
         to_mdspan_t<in_base_t>::rank() - (lspace + sizeof...(slices_t));
 
-    return submdspan_with_space<lspace, rspace>(
-        std::forward<in_t>(in), std::forward<slices_t>(slices)...);
+    return submdspan<lspace, rspace>(std::forward<in_t>(in),
+                                     std::forward<slices_t>(slices)...);
 }
 
 template <size_t rspace = 0, typename in_t, typename... slices_t>
@@ -54,8 +47,8 @@ submdspan_from_right(in_t &&in, slices_t &&...slices) noexcept {
     constexpr size_t lspace =
         to_mdspan_t<in_base_t>::rank() - (rspace + sizeof...(slices_t));
 
-    return submdspan_with_space<lspace, rspace>(
-        std::forward<in_t>(in), std::forward<slices_t>(slices)...);
+    return submdspan<lspace, rspace>(std::forward<in_t>(in),
+                                     std::forward<slices_t>(slices)...);
 }
 
 } // namespace core

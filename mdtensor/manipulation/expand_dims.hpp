@@ -13,25 +13,6 @@
 
 namespace mdtensor {
 
-/**
- * @brief Insert a new axis of length 1 into the input (out-of-place view).
- *
- * @tparam Axis Axis position to insert the new dimension. Negative values are
- *         supported and normalized (NumPy-like semantics).
- * @tparam in_t Input type (mdspan, mdarray, scalar, etc.).
- *
- * @param in Input tensor-like object.
- *
- * @return A reshaped view with rank increased by 1.
- *
- * @note This function does not allocate new storage; it returns a view
- *       (via reshape or direct mdspan construction for rank-0).
- * @note For rank-0 inputs, the resulting shape is (1).
- * @note For rank>0 inputs, the new shape matches the input with a singleton
- *       inserted at Axis.
- *
- * @see mdtensor::reshape for general reshaping utilities.
- */
 template <int64_t Axis, typename in_t>
 [[nodiscard]] inline constexpr auto expand_dims(in_t &&in) noexcept {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));

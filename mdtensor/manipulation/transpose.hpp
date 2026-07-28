@@ -46,10 +46,11 @@ transpose(in_t &&in, std::integer_sequence<AxesType, Axes...>) noexcept {
         }(std::make_index_sequence<rank>{});
 
         return mdspan<typename in_mds_t::element_type,
-                      std::remove_cvref_t<decltype(new_extents)>, layout_stride,
+                      std::remove_cvref_t<decltype(new_extents)>,
+                      core::stdex::layout_stride,
                       typename in_mds_t::accessor_type>{
             in_mds.data_handle(),
-            layout_stride::mapping{new_extents, new_strides}};
+            core::stdex::layout_stride::mapping{new_extents, new_strides}};
     }
 }
 

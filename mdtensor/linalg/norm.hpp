@@ -36,21 +36,6 @@ inline constexpr void norm_impl(in_t &&in, out_t &&out) noexcept {
 
 } // namespace detail
 
-/**
- * @brief Compute Euclidean (L2) norm of a vector (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input tensor (mdspan, mdarray, etc.) (... x N).
- * @param out Output tensor (mdspan, mdarray, scalar, etc.) (...).
- *
- * @note When `mpmode == MPMode::SIMD`, the implementation uses the element-wise
- *       pipeline `sum(multiply(in, in))` followed by `sqrt` to improve
- *       vectorization opportunities.
- *
- * @see mdtensor::linalg::norm for the out-of-place version that returns the
- * result.
- */
 template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
 inline constexpr void norm_to(in_t &&in, out_t &&out) noexcept {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
@@ -65,27 +50,11 @@ inline constexpr void norm_to(in_t &&in, out_t &&out) noexcept {
             [](auto &&...elems) {
                 detail::norm_impl(std::forward<decltype(elems)>(elems)...);
             },
-            std::index_sequence<1, 0>{}, in_mds, out_mds);
+            std::index_sequence<1, 0>{},
+            std::integer_sequence<bool, false, true>{}, in_mds, out_mds);
     }
 }
 
-/**
- * @brief Compute Euclidean (L2) norm of a vector (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- * input.
- *
- * @param in Input tensor (mdspan, mdarray, etc.) (... x N).
- *
- * @return mdarray or scalar matching the batch extents of the input.
- *
- * @note This function creates a rank-0 output container and then calls
- *       mdtensor::linalg::norm_to.
- *
- * @see mdtensor::linalg::norm_to for the in-place version that writes into an
- * output.
- */
 template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto norm(in_t &&in) noexcept {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));

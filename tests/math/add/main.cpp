@@ -9,12 +9,12 @@ TEST(stack, add) {
     using T = double;
 
     constexpr auto a =
-        md::mdarray<T, md::extents<size_t, 2, 1, 2>>{{1, 2, 3, 4}};
-    constexpr auto b = md::mdarray<T, md::extents<size_t, 2, 1>>{{5, 6}};
+        md::container<T, md::extents<size_t, 2, 1, 2>>{{1, 2, 3, 4}};
+    constexpr auto b = md::container<T, md::extents<size_t, 2, 1>>{{5, 6}};
     constexpr auto c = md::add(a, b);
 
-    constexpr auto c_expect =
-        md::mdarray<T, md::extents<size_t, 2, 2, 2>>{{6, 7, 7, 8, 8, 9, 9, 10}};
+    constexpr auto c_expect = md::container<T, md::extents<size_t, 2, 2, 2>>{
+        {6, 7, 7, 8, 8, 9, 9, 10}};
 
     constexpr bool is_allclose = md::allclose(c, c_expect);
 
@@ -25,12 +25,12 @@ TEST(stack, add_scalar) {
     using T = double;
 
     constexpr auto a =
-        md::mdarray<T, md::extents<size_t, 2, 1, 2>>{{1, 2, 3, 4}};
+        md::container<T, md::extents<size_t, 2, 1, 2>>{{1, 2, 3, 4}};
     constexpr T b = 5;
     constexpr auto c = md::add(a, b);
 
     constexpr auto c_expect =
-        md::mdarray<T, md::extents<size_t, 2, 1, 2>>{{6, 7, 8, 9}};
+        md::container<T, md::extents<size_t, 2, 1, 2>>{{6, 7, 8, 9}};
 
     constexpr bool is_allclose = md::allclose(c, c_expect);
 
@@ -41,12 +41,12 @@ TEST(heap, add) {
     using T = double;
 
     const auto a =
-        md::mdarray<T, md::dims<3>>{{1, 2, 3, 4}, md::dims<3>{2, 1, 2}};
-    const auto b = md::mdarray<T, md::dims<2>>{{5, 6}, md::dims<2>{2, 1}};
+        md::container<T, md::dims<3>>{{1, 2, 3, 4}, md::dims<3>{2, 1, 2}};
+    const auto b = md::container<T, md::dims<2>>{{5, 6}, md::dims<2>{2, 1}};
     const auto c = md::add(a, b);
 
-    const auto c_expect = md::mdarray<T, md::dims<3>>{{6, 7, 7, 8, 8, 9, 9, 10},
-                                                      md::dims<3>{2, 2, 2}};
+    const auto c_expect = md::container<T, md::dims<3>>{
+        {6, 7, 7, 8, 8, 9, 9, 10}, md::dims<3>{2, 2, 2}};
 
     const bool is_allclose = md::allclose(c, c_expect);
 
@@ -57,12 +57,12 @@ TEST(heap, add_scalar) {
     using T = double;
 
     const auto a =
-        md::mdarray<T, md::dims<3>>{{1, 2, 3, 4}, md::dims<3>{2, 1, 2}};
+        md::container<T, md::dims<3>>{{1, 2, 3, 4}, md::dims<3>{2, 1, 2}};
     const T b = 5;
     const auto c = md::add(a, b);
 
     const auto c_expect =
-        md::mdarray<T, md::dims<3>>{{6, 7, 8, 9}, md::dims<3>{2, 1, 2}};
+        md::container<T, md::dims<3>>{{6, 7, 8, 9}, md::dims<3>{2, 1, 2}};
 
     const bool is_allclose = md::allclose(c, c_expect);
 
@@ -73,12 +73,12 @@ TEST(mix, add) {
     using T = double;
 
     constexpr auto a =
-        md::mdarray<T, md::extents<size_t, 2, 1, 2>>{{1, 2, 3, 4}};
-    const auto b = md::mdarray<T, md::dims<2>>{{5, 6}, md::dims<2>{2, 1}};
+        md::container<T, md::extents<size_t, 2, 1, 2>>{{1, 2, 3, 4}};
+    const auto b = md::container<T, md::dims<2>>{{5, 6}, md::dims<2>{2, 1}};
     const auto c = md::add(a, b);
 
-    const auto c_expect = md::mdarray<T, md::dims<3>>{{6, 7, 7, 8, 8, 9, 9, 10},
-                                                      md::dims<3>{2, 2, 2}};
+    const auto c_expect = md::container<T, md::dims<3>>{
+        {6, 7, 7, 8, 8, 9, 9, 10}, md::dims<3>{2, 2, 2}};
 
     const bool is_allclose = md::allclose(c, c_expect);
 

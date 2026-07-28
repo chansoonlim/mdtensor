@@ -10,7 +10,7 @@ TEST(test, 1) {
 
     ASSERT_TRUE(md::array_equal(
         md::ones<T>(5),
-        md::mdarray<T, md::extents<size_t, 5>>{{1, 1, 1, 1, 1}}));
+        md::container<T, md::extents<size_t, 5>>{{1, 1, 1, 1, 1}}));
 }
 
 TEST(test, 2) {
@@ -18,7 +18,7 @@ TEST(test, 2) {
 
     static_assert(md::array_equal(
         md::ones<T>(md::extents<size_t, 5>{5}),
-        md::mdarray<T, md::extents<size_t, 5>>{{1, 1, 1, 1, 1}}));
+        md::container<T, md::extents<size_t, 5>>{{1, 1, 1, 1, 1}}));
 }
 
 TEST(test, 3) {
@@ -26,7 +26,7 @@ TEST(test, 3) {
 
     static_assert(
         md::array_equal(md::ones<T>(md::extents<size_t, 2, 1>{2, 1}),
-                        md::mdarray<T, md::extents<size_t, 2, 1>>{{1, 1}}));
+                        md::container<T, md::extents<size_t, 2, 1>>{{1, 1}}));
 }
 
 TEST(test, 4) {
@@ -34,5 +34,5 @@ TEST(test, 4) {
 
     static_assert(md::array_equal(
         md::ones<T>(md::extents<size_t, 2, 2>{2, 2}),
-        md::mdarray<T, md::extents<size_t, 2, 2>>{{1, 1, 1, 1}}));
+        md::container<T, md::extents<size_t, 2, 2>>{{1, 1, 1, 1}}));
 }

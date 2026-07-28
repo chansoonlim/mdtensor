@@ -43,22 +43,6 @@ inline constexpr void all_impl(in_t &&in, out_t &&out) {
 
 } // namespace detail
 
-/**
- * @brief Compute logical all along a specified axis (in-place).
- *
- * @tparam Axis Axis to reduce. Negative values are supported and normalized
- *         by the input rank (NumPy-like semantics).
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc. (rank reduced by 1).
- *
- * @note The output values are written as boolean results (true/false) into out.
- *
- * @see mdtensor::all<Axis, dtype>(in) for the out-of-place axis-reduction
- *      version.
- * @see mdtensor::all(in) for full-tensor reduction returning bool.
- */
 template <int64_t Axis, MPMode mpmode = MPMode::NONE, typename in_t,
           typename out_t>
 inline constexpr void all(in_t &&in, out_t &&out) {
@@ -75,28 +59,11 @@ inline constexpr void all(in_t &&in, out_t &&out) {
         [](auto &&...elems) {
             detail::all_impl(std::forward<decltype(elems)>(elems)...);
         },
-        std::index_sequence<rin_rank, rin_rank - 1>{}, in_mds, out_mds);
+        std::index_sequence<rin_rank, rin_rank - 1>{},
+        std::integer_sequence<bool, false, true>{}, in_mds, out_mds);
 }
 
-/**
- * @brief Compute logical all along a specified axis (out-of-place).
- *
- * @tparam Axis Axis to reduce. Negative values are supported and normalized
- *         by the input rank (NumPy-like semantics).
- * @tparam dtype (optional) Data type of the result tensor. Default is int8_t.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- *
- * @return Reduced tensor (mdarray or scalar), with rank reduced by 1.
- *
- * @note dtype controls the storage type of the output tensor. The produced
- *       values represent boolean results (0/1) when dtype is integral.
- *
- * @see mdtensor::all<Axis>(in, out) for the in-place version.
- * @see mdtensor::all(in) for full-tensor reduction returning bool.
- */
-template <int64_t Axis, typename dtype = int8_t, MPMode mpmode = MPMode::NONE,
+template <int64_t Axis, typename dtype = bool, MPMode mpmode = MPMode::NONE,
           typename in_t>
 [[nodiscard]] inline constexpr auto all(in_t &&in) {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
@@ -107,26 +74,15 @@ template <int64_t Axis, typename dtype = int8_t, MPMode mpmode = MPMode::NONE,
         static_cast<size_t>(
             ((Axis % static_cast<int64_t>(in_rank)) + (in_rank)) % in_rank);
 
-    return core::batch_out<dtype, mpmode>(
-        [](auto &&...elems) {
-            detail::all_impl(std::forward<decltype(elems)>(elems)...);
-        },
+    auto out = core::create_out<dtype>(
         std::index_sequence<rin_rank>{},
-        core::slice_from_right<rin_rank - 1>(in_mds.extents()), in_mds);
+        core::slice_extents_from_right<rin_rank - 1>(in_mds.extents()), in_mds);
+
+    all<Axis, mpmode>(std::forward<in_t>(in), out);
+
+    return out;
 }
 
-/**
- * @brief Compute logical all over the entire input (full reduction).
- *
- * @tparam in_t Input type (mdspan, mdarray, scalar, etc.).
- *
- * @param in Input tensor-like object.
- *
- * @return true if all elements are truthy, otherwise false.
- *
- * @note For rank-0 inputs, this returns static_cast<bool>(in()).
- * @note For rank>0 inputs, the reduction is performed recursively.
- */
 template <typename in_t> [[nodiscard]] inline constexpr bool all(in_t &&in) {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
 

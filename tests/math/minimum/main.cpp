@@ -10,12 +10,12 @@ TEST(test, 1) {
     using T = double;
 
     static_assert(md::array_equal(
-        md::minimum(md::mdarray<T, md::extents<size_t, 3>>{{2, 3, 4}},
-                    md::mdarray<T, md::extents<size_t, 3>>{{1, 5, 2}}),
-        md::mdarray<T, md::extents<size_t, 3>>{{1, 3, 2}}));
+        md::minimum(md::container<T, md::extents<size_t, 3>>{{2, 3, 4}},
+                    md::container<T, md::extents<size_t, 3>>{{1, 5, 2}}),
+        md::container<T, md::extents<size_t, 3>>{{1, 3, 2}}));
 
     static_assert(md::array_equal(
         md::minimum(md::eye<T>(md::extents<size_t, 2, 2>{}),
-                    md::mdarray<T, md::extents<size_t, 2>>{{0.5, 2}}),
-        md::mdarray<T, md::extents<size_t, 2, 2>>{{0.5, 0, 0, 1}}));
+                    md::container<T, md::extents<size_t, 2>>{{0.5, 2}}),
+        md::container<T, md::extents<size_t, 2, 2>>{{0.5, 0, 0, 1}}));
 }

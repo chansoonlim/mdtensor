@@ -7,23 +7,23 @@ namespace md = mdtensor;
 
 TEST(test, 1) {
     constexpr auto x =
-        md::mdarray<int, md::extents<size_t, 6>>{{1, 2, 3, 4, 5, 6}};
+        md::container<int, md::extents<size_t, 6>>{{1, 2, 3, 4, 5, 6}};
 
     static_assert(md::array_equal(
         md::full_like(x, 1),
-        md::mdarray<int, md::extents<size_t, 6>>{{1, 1, 1, 1, 1, 1}}));
+        md::container<int, md::extents<size_t, 6>>{{1, 1, 1, 1, 1, 1}}));
 
     static_assert(md::array_equal(
         md::full_like(x, 0.1),
-        md::mdarray<int, md::extents<size_t, 6>>{{0, 0, 0, 0, 0, 0}}));
+        md::container<int, md::extents<size_t, 6>>{{0, 0, 0, 0, 0, 0}}));
 
     static_assert(md::array_equal(md::full_like<double>(x, 0.1),
-                                  md::mdarray<double, md::extents<size_t, 6>>{
+                                  md::container<double, md::extents<size_t, 6>>{
                                       {0.1, 0.1, 0.1, 0.1, 0.1, 0.1}}));
 
     static_assert(md::array_equal(
         md::full_like<std::optional<double>>(x, std::nullopt),
-        md::mdarray<std::optional<double>, md::extents<size_t, 6>>{
+        md::container<std::optional<double>, md::extents<size_t, 6>>{
             {std::nullopt, std::nullopt, std::nullopt, std::nullopt,
              std::nullopt, std::nullopt}}));
 }

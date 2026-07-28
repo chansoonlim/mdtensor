@@ -9,14 +9,10 @@
 
 #pragma once
 
-#ifdef MDTENSOR_USE_EIGEN
 #include <Eigen/Dense>
-#endif
 
-#include "../convert.hpp"
+#include "../mdspan.hpp"
 #include "../type.hpp"
-
-#ifdef MDTENSOR_USE_EIGEN
 
 namespace mdtensor {
 namespace core {
@@ -97,5 +93,3 @@ template <typename in_t>
 } // namespace eigen
 } // namespace core
 } // namespace mdtensor
-
-#endif // MDTENSOR_USE_EIGEN

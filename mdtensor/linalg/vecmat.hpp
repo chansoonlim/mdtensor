@@ -116,21 +116,6 @@ inline constexpr void vecmat_impl(in1_t &&in1, in2_t &&in2,
 
 } // namespace detail
 
-/**
- * @brief Vector-matrix multiplication (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 Input vector (rank-1 mdspan, mdarray, etc.) (... x K).
- * @param in2 Input matrix (rank-2 mdspan, mdarray, etc.) (... x K x N).
- * @param out Output vector (rank-1 mdspan, mdarray, etc.) (... x N).
- *
- * @note The multiplication is performed per-instance when inputs are batched.
- *       The last dimension of `in1` must match the first dimension of `in2`.
- *
- * @see mdtensor::linalg::vecmat for the out-of-place version that returns the
- * result.
- */
 template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
           typename out_t>
 inline constexpr void vecmat_to(in1_t &&in1, in2_t &&in2,
@@ -140,57 +125,31 @@ inline constexpr void vecmat_to(in1_t &&in1, in2_t &&in2,
             detail::vecmat_impl(std::forward<decltype(elems)>(elems)...);
         },
         std::index_sequence<1, 2, 1>{},
-        core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)),
-        core::to_mdspan(std::forward<out_t>(out)));
+        std::integer_sequence<bool, false, false, true>{},
+        std::forward<in1_t>(in1), std::forward<in2_t>(in2),
+        std::forward<out_t>(out));
 }
 
-/**
- * @brief Vector-matrix multiplication (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- * inputs.
- *
- * @param in1 Input vector (rank-1 mdspan, mdarray, etc.) (... x K).
- * @param in2 Input matrix (rank-2 mdspan, mdarray, etc.) (... x K x N).
- *
- * @return Vector (mdarray) with shape (... x N).
- *
- * @note The multiplication is performed per-instance when inputs are batched.
- *
- * @see mdtensor::linalg::vecmat_to for the in-place version that writes into an
- * output.
- */
 template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto vecmat(in1_t &&in1, in2_t &&in2) noexcept {
     const auto in1_mds = core::to_const_mdspan(std::forward<in1_t>(in1));
     const auto in2_mds = core::to_const_mdspan(std::forward<in2_t>(in2));
 
-    const auto uin1_exts = core::slice_from_right<2>(in1_mds.extents());
-    const auto uin2_exts = core::slice_from_right<2>(in2_mds.extents());
+    const auto uin1_exts = core::slice_extents_from_right<2>(in1_mds.extents());
+    const auto uin2_exts = core::slice_extents_from_right<2>(in2_mds.extents());
     const auto uout_exts = extents<
         core::common_data_type_t<typename decltype(uin1_exts)::index_type,
                                  typename decltype(uin2_exts)::index_type>,
         decltype(uin2_exts)::static_extent(1)>{uin2_exts.extent(1)};
 
-    return core::batch_out<dtype, mpmode>(
-        [](auto &&...elems) {
-            detail::vecmat_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<1, 2>{}, uout_exts, in1_mds, in2_mds);
+    auto out = core::create_out<dtype>(std::index_sequence<1, 2>{}, uout_exts,
+                                       in1_mds, in2_mds);
+
+    vecmat_to<mpmode>(in1_mds, in2_mds, out);
+
+    return out;
 }
 
 } // namespace linalg
-
-inline constexpr void vecmat_to(auto &&...elems) noexcept {
-    linalg::vecmat_to(std::forward<decltype(elems)>(elems)...);
-}
-
-template <typename dtype = void>
-[[nodiscard]] inline constexpr auto vecmat(auto &&...elems) noexcept {
-    return linalg::vecmat<dtype>(std::forward<decltype(elems)>(elems)...);
-}
-
 } // namespace mdtensor

@@ -9,10 +9,10 @@ namespace md = mdtensor;
 TEST(test, 1) {
     using T = double;
 
-    constexpr auto x = md::mdarray<T, md::extents<size_t, 4>>{{-1, 1, 1, -1}};
-    constexpr auto y = md::mdarray<T, md::extents<size_t, 4>>{{-1, -1, 1, 1}};
+    constexpr auto x = md::container<T, md::extents<size_t, 4>>{{-1, 1, 1, -1}};
+    constexpr auto y = md::container<T, md::extents<size_t, 4>>{{-1, -1, 1, 1}};
 
     static_assert(md::allclose(
         md::rad2deg(md::atan2(y, x)),
-        md::mdarray<T, md::extents<size_t, 4>>{{-135, -45, 45, 135}}));
+        md::container<T, md::extents<size_t, 4>>{{-135, -45, 45, 135}}));
 }

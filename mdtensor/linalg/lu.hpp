@@ -52,7 +52,7 @@ inline constexpr void lu_p_indices_impl(in_t &&in, p_indices_t &&p_indices,
 
     // initialize
     auto in_copy = copy(in_mds);
-    auto row_order = core::create_data<index_t>(extents<index_t, m_s>{m});
+    auto row_order = core::make_container<index_t>(extents<index_t, m_s>{m});
     for (index_t i = 0; i < m; i++) {
         row_order(i) = i;
     }
@@ -153,7 +153,7 @@ inline constexpr void lu_full_impl(in_t &&in, p_t &&p, l_t &&l, u_t &&u) {
 
     const index_t m = in_mds.extent(0);
 
-    auto p_indices = core::create_data<index_t>(extents<index_t, m_s>{m});
+    auto p_indices = core::make_container<index_t>(extents<index_t, m_s>{m});
 
     lu_p_indices_impl(in_mds, p_indices, l_mds, u_mds);
 
@@ -196,8 +196,8 @@ inline constexpr void lu_permute_l_impl(in_t &&in, pl_t &&pl, u_t &&u) {
     const index_t n = in_mds.extent(1);
     const index_t k = m < n ? m : n;
 
-    auto p_indices = core::create_data<index_t>(extents<index_t, m_s>{m});
-    auto l = core::create_data<value_t>(extents<index_t, m_s, k_s>{m, k});
+    auto p_indices = core::make_container<index_t>(extents<index_t, m_s>{m});
+    auto l = core::make_container<value_t>(extents<index_t, m_s, k_s>{m, k});
 
     lu_p_indices_impl(in_mds, p_indices, l, u_mds);
 
@@ -220,10 +220,9 @@ inline constexpr void lu_p_indices_to(in_t &&in, p_indices_t &&p_indices,
             detail::lu_p_indices_impl(std::forward<decltype(elems)>(elems)...);
         },
         std::index_sequence<2, 1, 2, 2>{},
-        core::to_const_mdspan(std::forward<in_t>(in)),
-        core::to_mdspan(std::forward<p_indices_t>(p_indices)),
-        core::to_mdspan(std::forward<l_t>(l)),
-        core::to_mdspan(std::forward<u_t>(u)));
+        std::integer_sequence<bool, false, true, true, true>{},
+        std::forward<in_t>(in), std::forward<p_indices_t>(p_indices),
+        std::forward<l_t>(l), std::forward<u_t>(u));
 }
 
 template <MPMode mpmode = MPMode::NONE, typename in_t, typename p_t,
@@ -234,10 +233,9 @@ inline constexpr void lu_full_to(in_t &&in, p_t &&p, l_t &&l, u_t &&u) {
             detail::lu_full_impl(std::forward<decltype(elems)>(elems)...);
         },
         std::index_sequence<2, 2, 2, 2>{},
-        core::to_const_mdspan(std::forward<in_t>(in)),
-        core::to_mdspan(std::forward<p_t>(p)),
-        core::to_mdspan(std::forward<l_t>(l)),
-        core::to_mdspan(std::forward<u_t>(u)));
+        std::integer_sequence<bool, false, true, true, true>{},
+        std::forward<in_t>(in), std::forward<p_t>(p), std::forward<l_t>(l),
+        std::forward<u_t>(u));
 }
 
 template <MPMode mpmode = MPMode::NONE, typename in_t, typename pl_t,
@@ -248,9 +246,8 @@ inline constexpr void lu_permute_l_to(in_t &&in, pl_t &&pl, u_t &&u) {
             detail::lu_permute_l_impl(std::forward<decltype(elems)>(elems)...);
         },
         std::index_sequence<2, 2, 2>{},
-        core::to_const_mdspan(std::forward<in_t>(in)),
-        core::to_mdspan(std::forward<pl_t>(pl)),
-        core::to_mdspan(std::forward<u_t>(u)));
+        std::integer_sequence<bool, false, true, true>{},
+        std::forward<in_t>(in), std::forward<pl_t>(pl), std::forward<u_t>(u));
 }
 
 template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
@@ -278,16 +275,16 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
     const index_t n = in_mds.extent(rank - 1);
     const index_t k = m < n ? m : n;
 
-    auto p_indices = core::create_out<index_t>(
-        std::index_sequence<2>{}, extents<index_t, m_s>{m}, in_mds);
-    auto l = core::create_out<dtype>(std::index_sequence<2>{},
-                                     extents<index_t, m_s, k_s>{m, k}, in_mds);
-    auto u = core::create_out<dtype>(std::index_sequence<2>{},
-                                     extents<index_t, k_s, n_s>{k, n}, in_mds);
+    auto outs = core::create_outs<dtype>(
+        std::index_sequence<2>{},
+        std::tuple{extents<index_t, m_s>{m}, extents<index_t, m_s, k_s>{m, k},
+                   extents<index_t, k_s, n_s>{k, n}},
+        in_mds);
 
-    lu_p_indices_to<mpmode>(in_mds, p_indices, l, u);
+    lu_p_indices_to<mpmode>(in_mds, std::get<0>(outs), std::get<1>(outs),
+                            std::get<2>(outs));
 
-    return std::tuple{p_indices, l, u};
+    return outs;
 }
 
 template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
@@ -315,16 +312,17 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
     const index_t n = in_mds.extent(rank - 1);
     const index_t k = m < n ? m : n;
 
-    auto p = core::create_out<index_t>(
-        std::index_sequence<2>{}, extents<index_t, m_s, m_s>{m, m}, in_mds);
-    auto l = core::create_out<dtype>(std::index_sequence<2>{},
-                                     extents<index_t, m_s, k_s>{m, k}, in_mds);
-    auto u = core::create_out<dtype>(std::index_sequence<2>{},
-                                     extents<index_t, k_s, n_s>{k, n}, in_mds);
+    auto outs =
+        core::create_outs<dtype>(std::index_sequence<2>{},
+                                 std::tuple{extents<index_t, m_s, m_s>{m, m},
+                                            extents<index_t, m_s, k_s>{m, k},
+                                            extents<index_t, k_s, n_s>{k, n}},
+                                 in_mds);
 
-    lu_full_to<mpmode>(in_mds, p, l, u);
+    lu_full_to<mpmode>(in_mds, std::get<0>(outs), std::get<1>(outs),
+                       std::get<2>(outs));
 
-    return std::tuple{p, l, u};
+    return outs;
 }
 
 template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
@@ -352,14 +350,15 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
     const index_t n = in_mds.extent(rank - 1);
     const index_t k = m < n ? m : n;
 
-    auto pl = core::create_out<dtype>(std::index_sequence<2>{},
-                                      extents<index_t, m_s, k_s>{m, k}, in_mds);
-    auto u = core::create_out<dtype>(std::index_sequence<2>{},
-                                     extents<index_t, k_s, n_s>{k, n}, in_mds);
+    auto outs =
+        core::create_outs<dtype>(std::index_sequence<2>{},
+                                 std::tuple{extents<index_t, m_s, k_s>{m, k},
+                                            extents<index_t, k_s, n_s>{k, n}},
+                                 in_mds);
 
-    lu_permute_l_to<mpmode>(in_mds, pl, u);
+    lu_permute_l_to<mpmode>(in_mds, std::get<0>(outs), std::get<1>(outs));
 
-    return std::pair{pl, u};
+    return outs;
 }
 
 template <bool permute_l = false, bool p_indices = false, typename dtype = void,

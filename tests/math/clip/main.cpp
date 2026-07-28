@@ -22,15 +22,15 @@ TEST(test, 1) {
 TEST(test, 2) {
     using T = double;
 
-    constexpr auto in =
-        md::mdarray<T, md::extents<size_t, 10>>{{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}};
+    constexpr auto in = md::container<T, md::extents<size_t, 10>>{
+        {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}};
 
     static_assert(md::array_equal(md::clip(in, 1, 8),
-                                  md::mdarray<T, md::extents<size_t, 10>>{
+                                  md::container<T, md::extents<size_t, 10>>{
                                       {1, 1, 2, 3, 4, 5, 6, 7, 8, 8}}));
 
     static_assert(md::array_equal(md::clip(in, 8, 1),
-                                  md::mdarray<T, md::extents<size_t, 10>>{
+                                  md::container<T, md::extents<size_t, 10>>{
                                       {1, 1, 1, 1, 1, 1, 1, 1, 1, 1}}));
 }
 
@@ -38,8 +38,8 @@ TEST(stack, clip) {
     using T = double;
 
     constexpr auto a = md::random::rand<T>(md::extents<size_t, 2, 1, 2>{});
-    constexpr auto a_min = md::mdarray<T, md::extents<size_t, 1>>{{0.4}};
-    constexpr auto a_max = md::mdarray<T, md::extents<size_t, 1>>{{0.6}};
+    constexpr auto a_min = md::container<T, md::extents<size_t, 1>>{{0.4}};
+    constexpr auto a_max = md::container<T, md::extents<size_t, 1>>{{0.6}};
 
     constexpr auto a_clip = md::clip(a, a_min, a_max);
 
@@ -76,8 +76,8 @@ TEST(heap, clip) {
     using T = double;
 
     const auto a = md::random::rand<T>(md::dims<3>{2, 1, 2});
-    const auto a_min = md::mdarray<T, md::dims<1>>{{0.4}, md::dims<1>{1}};
-    const auto a_max = md::mdarray<T, md::dims<1>>{{0.6}, md::dims<1>{1}};
+    const auto a_min = md::container<T, md::dims<1>>{{0.4}, md::dims<1>{1}};
+    const auto a_max = md::container<T, md::dims<1>>{{0.6}, md::dims<1>{1}};
 
     const auto a_clip = md::clip(a, a_min, a_max);
 

@@ -12,7 +12,7 @@ TEST(stack, single) {
 
 TEST(stack, mdarray) {
     constexpr auto a =
-        md::mdarray<int, md::extents<size_t, 2, 1, 2>>{{1, 2, 3, 4}};
+        md::container<int, md::extents<size_t, 2, 1, 2>>{{1, 2, 3, 4}};
 
     ASSERT_TRUE(md::to_string(a) == "[[[1, 2]], [[3, 4]]]");
     ASSERT_TRUE(md::to_string(a.extents()) == "(2, 1, 2)");
@@ -20,7 +20,7 @@ TEST(stack, mdarray) {
 
 TEST(heap, mdarray) {
     const auto a =
-        md::mdarray<int, md::dims<3>>{{1, 2, 3, 4}, md::dims<3>{2, 1, 2}};
+        md::container<int, md::dims<3>>{{1, 2, 3, 4}, md::dims<3>{2, 1, 2}};
 
     ASSERT_TRUE(md::to_string(a) == "[[[1, 2]], [[3, 4]]]");
     ASSERT_TRUE(md::to_string(a.extents()) == "(2, 1, 2)");

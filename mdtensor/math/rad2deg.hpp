@@ -15,20 +15,6 @@
 
 namespace mdtensor {
 
-/**
- * @brief Convert radians to degrees element-wise (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input angles in radians (mdspan, mdarray, scalar, etc.).
- * @param out Output angles in degrees (mdspan, mdarray, scalar, etc.).
- *
- * @note Equivalent to out = in * (180 / pi) in terms of array broadcasting.
- * @note The scaling constant is computed in a common type of the input value
- *       type and float to ensure floating-point conversion.
- *
- * @see mdtensor::rad2deg for the out-of-place version that returns the result.
- */
 template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
 inline constexpr void rad2deg_to(in_t &&in, out_t &&out) {
     using value_t =
@@ -41,24 +27,6 @@ inline constexpr void rad2deg_to(in_t &&in, out_t &&out) {
     multiply_to<mpmode>(std::forward<in_t>(in), R2D, std::forward<out_t>(out));
 }
 
-/**
- * @brief Convert radians to degrees element-wise (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- *         input.
- *
- * @param in Input angles in radians (mdspan, mdarray, scalar, etc.).
- *
- * @return mdarray or scalar.
- *
- * @note Equivalent to out = in * (180 / pi) in terms of array broadcasting.
- * @note The scaling constant is computed in a common type of the input value
- *       type and float to ensure floating-point conversion.
- *
- * @see mdtensor::rad2deg_to for the in-place version that writes into an
- *      output.
- */
 template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto rad2deg(in_t &&in) {
     using value_t =

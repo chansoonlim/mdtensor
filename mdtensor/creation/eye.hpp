@@ -27,46 +27,16 @@ template <typename in_t> inline constexpr void eye_impl(in_t &&in) {
 
 } // namespace detail
 
-/**
- * @brief Fill a 2D tensor with an identity matrix pattern (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Output matrix to fill (mdspan, mdarray, etc.). Rank must be greater
- *        than or equal to 2.
- *
- * @note This function writes `1` on the main diagonal and `0` elsewhere.
- *
- * @see mdtensor::eye for the out-of-place version that allocates and returns
- * an identity matrix.
- */
 template <MPMode mpmode = MPMode::NONE, typename in_t>
 inline constexpr void eye_to(in_t &&in) {
     core::batch<mpmode>(
         [](auto &&...elems) {
             detail::eye_impl(std::forward<decltype(elems)>(elems)...);
         },
-        std::index_sequence<2>{}, core::to_mdspan(std::forward<in_t>(in)));
+        std::index_sequence<2>{}, std::integer_sequence<bool, true>{},
+        std::forward<in_t>(in));
 }
 
-/**
- * @brief Create an identity matrix (out-of-place).
- *
- * @tparam dtype Element type of the created matrix.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam exts_t (optional) Extents type describing the matrix shape. Default
- * is extents<uint8_t>.
- *
- * @param exts Output matrix extents (shape). Rank must be greater than or equal
- * to 2.
- *
- * @return A newly allocated matrix filled as an identity matrix.
- *
- * @note Equivalent to allocating `empty<dtype>(exts)` and then calling
- *       `eye_to` on it.
- *
- * @see mdtensor::eye_to for the in-place version that fills an existing output.
- */
 template <typename dtype, MPMode mpmode = MPMode::NONE,
           extents_c exts_t = extents<uint8_t>>
 [[nodiscard]] inline constexpr auto eye(exts_t &&exts = exts_t{}) {

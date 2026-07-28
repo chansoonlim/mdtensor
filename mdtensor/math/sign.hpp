@@ -21,47 +21,24 @@ inline constexpr void sign_impl(in_t &&in, out_t &&out) {
 
 } // namespace detail
 
-/**
- * @brief Compute sign element-wise (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @see mdtensor::sign for the out-of-place version that returns the result.
- */
 template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
 inline constexpr void sign_to(in_t &&in, out_t &&out) {
     core::batch<mpmode>(
         [](auto &&...elems) {
             detail::sign_impl(std::forward<decltype(elems)>(elems)...);
         },
-        core::to_const_mdspan(std::forward<in_t>(in)),
-        core::to_mdspan(std::forward<out_t>(out)));
+        std::integer_sequence<bool, false, true>{}, std::forward<in_t>(in),
+        std::forward<out_t>(out));
 }
 
-/**
- * @brief Compute sign element-wise (out-of-place).
- *
- * @tparam dtype (optional) Data type of the result. Default is int8_t.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar.
- *
- * @note By default, the result type is int8_t to represent {-1, 0, 1}.
- *
- * @see mdtensor::sign_to for the in-place version that writes into an output.
- */
 template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto sign(in_t &&in) {
-    return core::batch_out<dtype, mpmode>(
-        [](auto &&...elems) {
-            detail::sign_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in_t>(in)));
+    auto out =
+        core::create_out<dtype>(extents<uint8_t>{}, std::forward<in_t>(in));
+
+    sign_to<mpmode>(std::forward<in_t>(in), out);
+
+    return out;
 }
 
 } // namespace mdtensor

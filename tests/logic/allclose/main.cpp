@@ -14,7 +14,7 @@ TEST(stack, allclose) {
     constexpr auto a = md::random::rand<T>(md::extents<size_t, 2, 3>{});
     constexpr auto a_diff =
         md::multiply(md::random::rand<T>(md::extents<size_t, 2, 3>{}),
-                     md::mdarray<T, md::extents<size_t, 1>>{{scale}});
+                     md::container<T, md::extents<size_t, 1>>{{scale}});
 
     constexpr auto b = md::add(a, a_diff);
 
@@ -30,7 +30,7 @@ TEST(heap, allclose) {
     const auto a = md::random::rand<T>(md::dims<2>{2, 3});
     const auto a_diff =
         md::multiply(md::random::rand<T>(md::dims<2>{2, 3}),
-                     md::mdarray<T, md::dims<1>>{{scale}, md::dims<1>{1}});
+                     md::container<T, md::dims<1>>{{scale}, md::dims<1>{1}});
 
     const auto b = md::add(a, a_diff);
 

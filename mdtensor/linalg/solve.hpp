@@ -130,9 +130,9 @@ inline constexpr void solve_to(a_t &&a, b_t &&b, x_t &&x, valid_t &&valid) {
                                          std::forward<decltype(b)>(b),
                                          std::forward<decltype(x)>(x));
         },
-        std::index_sequence<2, rhs_rank, rhs_rank, 0>{}, a_mds, b_mds,
-        core::to_mdspan(std::forward<x_t>(x)),
-        core::to_mdspan(std::forward<valid_t>(valid)));
+        std::index_sequence<2, rhs_rank, rhs_rank, 0>{},
+        std::integer_sequence<bool, false, false, true, true>{}, a_mds, b_mds,
+        std::forward<x_t>(x), std::forward<valid_t>(valid));
 }
 
 template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename a_t,
@@ -145,7 +145,8 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename a_t,
 
     auto x = core::create_out<dtype>(
         std::index_sequence<2, rhs_rank>{},
-        core::slice_from_right<rhs_rank>(b_mds.extents()), a_mds, b_mds);
+        core::slice_extents_from_right<rhs_rank>(b_mds.extents()), a_mds,
+        b_mds);
 
     auto valid = core::create_out<bool>(std::index_sequence<2, rhs_rank>{},
                                         extents<uint8_t>{}, a_mds, b_mds);

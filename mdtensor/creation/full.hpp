@@ -14,25 +14,6 @@
 
 namespace mdtensor {
 
-/**
- * @brief Create a new tensor filled with a scalar value (out-of-place).
- *
- * @tparam dtype Element type of the result tensor.
- * @tparam mpmode (optional) Parallel execution mode used for filling. Default
- * is MPMode::NONE.
- * @tparam exts_t (optional) Extents type. Default is extents<uint8_t>.
- *
- * @param val Fill value.
- * @param exts Output extents.
- *
- * @return Newly allocated tensor (mdarray) with extents `exts`, filled with
- * `val`.
- *
- * @note Equivalent to `out = empty<dtype>(exts); fill(out, val);`.
- *
- * @see mdtensor::empty
- * @see mdtensor::fill
- */
 template <typename dtype, MPMode mpmode = MPMode::NONE,
           extents_c exts_t = extents<uint8_t>>
 [[nodiscard]] inline constexpr auto full(dtype &&val,

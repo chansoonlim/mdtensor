@@ -9,30 +9,30 @@ TEST(stack, copy) {
     using T = double;
 
     constexpr auto in =
-        md::mdarray<T, md::extents<size_t, 2, 3>>{{1, 2, 3, 4, 5, 6}};
+        md::container<T, md::extents<size_t, 2, 3>>{{1, 2, 3, 4, 5, 6}};
 
     static_assert(md::allclose(
-        md::sum<-1>(in), md::mdarray<T, md::extents<size_t, 2>>{{6, 15}}));
+        md::sum<-1>(in), md::container<T, md::extents<size_t, 2>>{{6, 15}}));
 
     static_assert(md::allclose(
-        md::sum<0>(in), md::mdarray<T, md::extents<size_t, 3>>{{5, 7, 9}}));
+        md::sum<0>(in), md::container<T, md::extents<size_t, 3>>{{5, 7, 9}}));
 
     static_assert(md::allclose(
-        md::sum<1>(in), md::mdarray<T, md::extents<size_t, 2>>{{6, 15}}));
+        md::sum<1>(in), md::container<T, md::extents<size_t, 2>>{{6, 15}}));
 }
 
 TEST(heap, copy) {
     using T = double;
 
     const auto in =
-        md::mdarray<T, md::dims<2>>{{1, 2, 3, 4, 5, 6}, md::dims<2>{2, 3}};
+        md::container<T, md::dims<2>>{{1, 2, 3, 4, 5, 6}, md::dims<2>{2, 3}};
 
-    ASSERT_TRUE(md::allclose(
-        md::sum<-1>(in), md::mdarray<T, md::dims<1>>{{6, 15}, md::dims<1>{2}}));
+    ASSERT_TRUE(md::allclose(md::sum<-1>(in), md::container<T, md::dims<1>>{
+                                                  {6, 15}, md::dims<1>{2}}));
 
-    ASSERT_TRUE(md::allclose(md::sum<0>(in), md::mdarray<T, md::dims<1>>{
+    ASSERT_TRUE(md::allclose(md::sum<0>(in), md::container<T, md::dims<1>>{
                                                  {5, 7, 9}, md::dims<1>{3}}));
 
-    ASSERT_TRUE(md::allclose(
-        md::sum<1>(in), md::mdarray<T, md::dims<1>>{{6, 15}, md::dims<1>{2}}));
+    ASSERT_TRUE(md::allclose(md::sum<1>(in), md::container<T, md::dims<1>>{
+                                                 {6, 15}, md::dims<1>{2}}));
 }

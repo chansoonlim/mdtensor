@@ -13,42 +13,12 @@
 
 namespace mdtensor {
 
-/**
- * @brief Create a tensor filled with zeros (general extents overload).
- *
- * @tparam dtype Output value type.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam exts_t (optional) Extents type specifying the tensor shape.
- * Default is `extents<uint8_t>`.
- *
- * @param exts Extents describing the output shape.
- *
- * @return mdarray filled with zeros.
- *
- * @note Equivalent to full(0, exts).
- *
- * @see mdtensor::full for the general fill-value version.
- */
 template <typename dtype, MPMode mpmode = MPMode::NONE,
           extents_c exts_t = extents<uint8_t>>
 [[nodiscard]] inline constexpr auto zeros(exts_t &&exts = exts_t{}) {
     return full<dtype, mpmode, exts_t>(0, std::forward<exts_t>(exts));
 }
 
-/**
- * @brief Create a 1D tensor filled with zeros (length overload).
- *
- * @tparam dtype Output value type.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param len Length of the output 1D tensor.
- *
- * @return 1D mdarray of length `len`, filled with zeros.
- *
- * @note Equivalent to full(0, dims<1>{len}).
- *
- * @see mdtensor::zeros(extents) for the general extents version.
- */
 template <typename dtype, MPMode mpmode = MPMode::NONE>
 [[nodiscard]] inline constexpr auto zeros(const size_t &len) {
     return full<dtype, mpmode>(0, mdtensor::dims<1>{len});

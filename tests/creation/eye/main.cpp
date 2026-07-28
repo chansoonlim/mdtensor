@@ -11,7 +11,7 @@ TEST(stack, fill) {
     constexpr auto out = md::eye<T>(md::extents<size_t, 2, 3, 2>{});
 
     constexpr bool is_array_equal =
-        md::array_equal(out, md::mdarray<T, md::extents<size_t, 2, 3, 2>>{
+        md::array_equal(out, md::container<T, md::extents<size_t, 2, 3, 2>>{
                                  {1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0}});
 
     ASSERT_TRUE(is_array_equal);
@@ -23,7 +23,7 @@ TEST(heap, fill) {
     const auto out = md::eye<T>(md::dims<3>{2, 3, 2});
 
     const bool is_array_equal =
-        md::array_equal(out, md::mdarray<T, md::extents<size_t, 2, 3, 2>>{
+        md::array_equal(out, md::container<T, md::extents<size_t, 2, 3, 2>>{
                                  {1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0}});
 
     ASSERT_TRUE(is_array_equal);

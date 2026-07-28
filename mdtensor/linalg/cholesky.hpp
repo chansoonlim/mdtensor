@@ -139,9 +139,9 @@ inline constexpr void cholesky_to(in_t &&in, out_t &&out, valid_t &&valid,
                     std::forward<decltype(out)>(out));
             },
             std::index_sequence<2, 2, 0>{},
-            core::to_const_mdspan(std::forward<in_t>(in)),
-            core::to_mdspan(std::forward<out_t>(out)),
-            core::to_mdspan(std::forward<valid_t>(valid)));
+            std::integer_sequence<bool, false, true, true>{},
+            std::forward<in_t>(in), std::forward<out_t>(out),
+            std::forward<valid_t>(valid));
     };
 
     if (upper) {

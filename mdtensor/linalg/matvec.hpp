@@ -112,22 +112,6 @@ inline constexpr void matvec_impl(in1_t &&in1, in2_t &&in2,
 
 } // namespace detail
 
-/**
- * @brief Matrix-vector multiplication (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 Input matrix (mdspan, mdarray, etc.) (... x M x K).
- * @param in2 Input vector (mdspan, mdarray, etc.) (... x K).
- * @param out Output vector (mdspan, mdarray, etc.) (... x M).
- *
- * @note The multiplication is performed per instance when inputs are batched.
- *       The last 2 axes of `in1` are treated as matrix axes, and the last axis
- *       of `in2` / `out` is treated as the vector axis.
- *
- * @see mdtensor::linalg::matvec for the out-of-place version that returns the
- * result.
- */
 template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
           typename out_t>
 inline constexpr void matvec_to(in1_t &&in1, in2_t &&in2,
@@ -137,57 +121,31 @@ inline constexpr void matvec_to(in1_t &&in1, in2_t &&in2,
             detail::matvec_impl(std::forward<decltype(elems)>(elems)...);
         },
         std::index_sequence<2, 1, 1>{},
-        core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)),
-        core::to_mdspan(std::forward<out_t>(out)));
+        std::integer_sequence<bool, false, false, true>{},
+        std::forward<in1_t>(in1), std::forward<in2_t>(in2),
+        std::forward<out_t>(out));
 }
 
-/**
- * @brief Matrix-vector multiplication (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- * inputs.
- *
- * @param in1 Input matrix (mdspan, mdarray, etc.) (... x M x K).
- * @param in2 Input vector (mdspan, mdarray, etc.) (... x K).
- *
- * @return Vector (mdarray) with shape (... x M).
- *
- * @note The multiplication is performed per instance when inputs are batched.
- *
- * @see mdtensor::linalg::matvec_to for the in-place version that writes into an
- * output.
- */
 template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto matvec(in1_t &&in1, in2_t &&in2) noexcept {
     const auto in1_mds = core::to_const_mdspan(std::forward<in1_t>(in1));
     const auto in2_mds = core::to_const_mdspan(std::forward<in2_t>(in2));
 
-    const auto uin1_exts = core::slice_from_right<2>(in1_mds.extents());
-    const auto uin2_exts = core::slice_from_right<2>(in2_mds.extents());
+    const auto uin1_exts = core::slice_extents_from_right<2>(in1_mds.extents());
+    const auto uin2_exts = core::slice_extents_from_right<2>(in2_mds.extents());
     const auto uout_exts = extents<
         core::common_index_type_t<typename decltype(uin1_exts)::index_type,
                                   typename decltype(uin2_exts)::index_type>,
         decltype(uin1_exts)::static_extent(0)>{uin1_exts.extent(0)};
 
-    return core::batch_out<dtype, mpmode>(
-        [](auto &&...elems) {
-            detail::matvec_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<2, 1>{}, uout_exts, in1_mds, in2_mds);
+    auto out = core::create_out<dtype>(std::index_sequence<2, 1>{}, uout_exts,
+                                       in1_mds, in2_mds);
+
+    matvec_to<mpmode>(in1_mds, in2_mds, out);
+
+    return out;
 }
 
 } // namespace linalg
-
-inline constexpr void matvec_to(auto &&...elems) noexcept {
-    linalg::matvec_to(std::forward<decltype(elems)>(elems)...);
-}
-
-template <typename dtype = void>
-[[nodiscard]] inline constexpr auto matvec(auto &&...elems) noexcept {
-    return linalg::matvec<dtype>(std::forward<decltype(elems)>(elems)...);
-}
-
 } // namespace mdtensor

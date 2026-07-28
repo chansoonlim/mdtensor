@@ -13,45 +13,15 @@
 
 namespace mdtensor {
 
-/**
- * @brief Create a tensor filled with ones (general extents overload).
- *
- * @tparam dtype Output value type.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam exts_t (optional) Extents type specifying the tensor shape.
- * Default is `extents<uint8_t>`.
- *
- * @param exts Extents describing the output shape.
- *
- * @return mdarray filled with ones.
- *
- * @note Equivalent to full(1, exts).
- *
- * @see mdtensor::full for the general fill-value version.
- */
 template <typename dtype, MPMode mpmode = MPMode::NONE,
           extents_c exts_t = extents<uint8_t>>
 [[nodiscard]] inline constexpr auto ones(exts_t &&exts = exts_t{}) {
     return full<dtype, mpmode, exts_t>(1, std::forward<exts_t>(exts));
 }
 
-/**
- * @brief Create a 1D tensor filled with ones (length overload).
- *
- * @tparam dtype Output value type.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param len Length of the output 1D tensor.
- *
- * @return 1D mdarray of length `len`, filled with ones.
- *
- * @note Equivalent to full(1, dims<1>{len}).
- *
- * @see mdtensor::ones(extents) for the general extents version.
- */
 template <typename dtype, MPMode mpmode = MPMode::NONE>
 [[nodiscard]] inline constexpr auto ones(const size_t &len) {
-    return full<dtype, mpmode>(1, mdtensor::dims<1>{len});
+    return full<dtype, mpmode>(1, dims<1>{len});
 }
 
 } // namespace mdtensor

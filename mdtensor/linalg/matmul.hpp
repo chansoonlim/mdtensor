@@ -118,20 +118,6 @@ inline constexpr void matmul_impl(in1_t &&in1, in2_t &&in2,
 
 } // namespace detail
 
-/**
- * @brief Matrix multiplication (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 First input matrix (mdspan, mdarray, etc.) (... x M x K).
- * @param in2 Second input matrix (mdspan, mdarray, etc.) (... x K x N).
- * @param out Output matrix (mdspan, mdarray, etc.) (... x M x N).
- *
- * @note The multiplication is performed per-matrix when inputs are batched.
- *
- * @see mdtensor::linalg::matmul for the out-of-place version that returns the
- * result.
- */
 template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
           typename out_t>
 inline constexpr void matmul_to(in1_t &&in1, in2_t &&in2,
@@ -141,36 +127,19 @@ inline constexpr void matmul_to(in1_t &&in1, in2_t &&in2,
             detail::matmul_impl(std::forward<decltype(elems)>(elems)...);
         },
         std::index_sequence<2, 2, 2>{},
-        core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)),
-        core::to_mdspan(std::forward<out_t>(out)));
+        std::integer_sequence<bool, false, false, true>{},
+        std::forward<in1_t>(in1), std::forward<in2_t>(in2),
+        std::forward<out_t>(out));
 }
 
-/**
- * @brief Matrix multiplication (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- * input.
- *
- * @param in1 First input matrix (mdspan, mdarray, etc.) (... x M x K).
- * @param in2 Second input matrix (mdspan, mdarray, etc.) (... x K x N).
- *
- * @return matrix (mdarray) matching the batch extents of the inputs.
- *
- * @note The multiplication is performed per-matrix when inputs are batched.
- *
- * @see mdtensor::linalg::matmul_to for the in-place version that writes into an
- * output.
- */
 template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
           typename in2_t>
 [[nodiscard]] inline constexpr auto matmul(in1_t &&in1, in2_t &&in2) noexcept {
     const auto in1_mds = core::to_const_mdspan(std::forward<in1_t>(in1));
     const auto in2_mds = core::to_const_mdspan(std::forward<in2_t>(in2));
 
-    const auto uin1_exts = core::slice_from_right<2>(in1_mds.extents());
-    const auto uin2_exts = core::slice_from_right<2>(in2_mds.extents());
+    const auto uin1_exts = core::slice_extents_from_right<2>(in1_mds.extents());
+    const auto uin2_exts = core::slice_extents_from_right<2>(in2_mds.extents());
     const auto uout_exts = extents<
         core::common_index_type_t<typename decltype(uin1_exts)::index_type,
                                   typename decltype(uin2_exts)::index_type>,
@@ -178,22 +147,13 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
         decltype(uin2_exts)::static_extent(1)>{uin1_exts.extent(0),
                                                uin2_exts.extent(1)};
 
-    return core::batch_out<dtype, mpmode>(
-        [](auto &&...elems) {
-            detail::matmul_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<2, 2>{}, uout_exts, in1_mds, in2_mds);
+    auto out = core::create_out<dtype>(std::index_sequence<2, 2>{}, uout_exts,
+                                       in1_mds, in2_mds);
+
+    matmul_to<mpmode>(in1_mds, in2_mds, out);
+
+    return out;
 }
 
 } // namespace linalg
-
-inline constexpr void matmul_to(auto &&...elems) noexcept {
-    linalg::matmul_to(std::forward<decltype(elems)>(elems)...);
-}
-
-template <typename dtype = void>
-[[nodiscard]] inline constexpr auto matmul(auto &&...elems) noexcept {
-    return linalg::matmul<dtype>(std::forward<decltype(elems)>(elems)...);
-}
-
 } // namespace mdtensor

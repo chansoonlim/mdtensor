@@ -100,23 +100,6 @@ concatenate_extents(std::tuple<ins_t...> &&ins) noexcept {
 
 } // namespace detail
 
-/**
- * @brief Concatenate multiple inputs along a specified axis (out-of-place).
- *
- * @tparam Axis Axis to concatenate. Negative values are supported and
- *         normalized by the input rank (NumPy-like semantics).
- * @tparam ins_t Input types (mdspan, mdarray, scalar, etc.).
- *
- * @param ins Input tensors to concatenate.
- *
- * @return Newly allocated mdarray containing the concatenation result.
- *
- * @note Rank-0 inputs (scalars) are expanded to rank-1 along the last axis
- *       using expand_dims<-1>.
- * @note All inputs must have the same rank after scalar expansion.
- * @note For dimensions other than Axis, extents must match.
- * @note The output dtype is the common_type of all input value types.
- */
 template <int64_t Axis, typename... ins_t>
 [[nodiscard]] inline constexpr auto concatenate(ins_t &&...ins) noexcept {
     constexpr size_t num_ins = sizeof...(ins_t);
@@ -167,12 +150,13 @@ template <int64_t Axis, typename... ins_t>
              const size_t extent = std::get<Is>(ins_mds).extent(axis);
              constexpr size_t stride = 1;
 
-             copy_to(std::get<Is>(ins_mds),
-                     [&]<size_t... Js>(std::index_sequence<Js...>) {
-                         return core::submdspan_from_left(
-                             core::to_mdspan(out), ((void)Js, full_extent)...,
-                             strided_slice{offset, extent, stride});
-                     }(std::make_index_sequence<axis>{}));
+             copy_to(std::get<Is>(ins_mds), [&]<size_t... Js>(
+                                                std::index_sequence<Js...>) {
+                 return core::submdspan_from_left(
+                     core::to_mdspan(out),
+                     ((void)Js, core::stdex::full_extent)...,
+                     core::stdex::strided_slice{offset, extent, stride});
+             }(std::make_index_sequence<axis>{}));
          })(),
          ...);
     }(std::make_index_sequence<num_ins>{});

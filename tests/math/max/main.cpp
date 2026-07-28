@@ -9,13 +9,14 @@ TEST(test, 1) {
     using T = int;
 
     static_assert(md::array_equal(
-        md::max(md::mdarray<T, md::extents<uint8_t, 2, 2>>{{0, 1, 2, 3}}), 3));
+        md::max(md::container<T, md::extents<uint8_t, 2, 2>>{{0, 1, 2, 3}}),
+        3));
 
     static_assert(md::array_equal(
-        md::max<0>(md::mdarray<T, md::extents<uint8_t, 2, 2>>{{0, 1, 2, 3}}),
-        md::mdarray<T, md::extents<uint8_t, 2>>{{2, 3}}));
+        md::max<0>(md::container<T, md::extents<uint8_t, 2, 2>>{{0, 1, 2, 3}}),
+        md::container<T, md::extents<uint8_t, 2>>{{2, 3}}));
 
     static_assert(md::array_equal(
-        md::max<1>(md::mdarray<T, md::extents<uint8_t, 2, 2>>{{0, 1, 2, 3}}),
-        md::mdarray<T, md::extents<uint8_t, 2>>{{1, 3}}));
+        md::max<1>(md::container<T, md::extents<uint8_t, 2, 2>>{{0, 1, 2, 3}}),
+        md::container<T, md::extents<uint8_t, 2>>{{1, 3}}));
 }

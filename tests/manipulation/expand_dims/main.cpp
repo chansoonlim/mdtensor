@@ -8,11 +8,11 @@ namespace md = mdtensor;
 TEST(stack, 1) {
     using T = double;
 
-    constexpr auto x = md::mdarray<T, md::extents<size_t, 2>>{
+    constexpr auto x = md::container<T, md::extents<size_t, 2>>{
         {1, 2}, md::extents<size_t, 2>{}};
     const auto b = md::expand_dims<-1>(x);
 
-    constexpr auto b_expect = md::mdarray<T, md::extents<size_t, 2, 1>>{
+    constexpr auto b_expect = md::container<T, md::extents<size_t, 2, 1>>{
         {1, 2}, md::extents<size_t, 2, 1>{}};
 
     const bool array_equal = md::array_equal(b, b_expect);
@@ -27,7 +27,7 @@ TEST(stack, 2) {
     const auto b = md::expand_dims<0>(x);
 
     constexpr auto b_expect =
-        md::mdarray<T, md::extents<size_t, 1>>{{1}, md::extents<size_t, 1>{}};
+        md::container<T, md::extents<size_t, 1>>{{1}, md::extents<size_t, 1>{}};
 
     const bool array_equal = md::array_equal(b, b_expect);
 

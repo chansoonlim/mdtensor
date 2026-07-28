@@ -121,22 +121,6 @@ template <md_c in_t, md_c out_t>
 
 } // namespace detail
 
-/**
- * @brief Compute matrix inverse (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input matrix (mdspan, mdarray, etc.) (... x N x N).
- * @param out Output matrix (mdspan, mdarray, etc.) (... x N x N).
- * @param valid Output mdspan, mdarray, or scalar indicating validity of the
- * inverse.
- *
- * @note The inverse is computed per-matrix when `in` is batched. The `valid`
- *       flag is produced per matrix instance.
- *
- * @see mdtensor::linalg::inv for the out-of-place version that returns the
- * result.
- */
 template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t,
           typename valid_t>
 inline constexpr void inv_to(in_t &&in, out_t &&out, valid_t &&valid) {
@@ -146,35 +130,18 @@ inline constexpr void inv_to(in_t &&in, out_t &&out, valid_t &&valid) {
                                        std::forward<decltype(out)>(out));
         },
         std::index_sequence<2, 2, 0>{},
-        core::to_const_mdspan(std::forward<in_t>(in)),
-        core::to_mdspan(std::forward<out_t>(out)),
-        core::to_mdspan(std::forward<valid_t>(valid)));
+        std::integer_sequence<bool, false, true, true>{},
+        std::forward<in_t>(in), std::forward<out_t>(out),
+        std::forward<valid_t>(valid));
 }
 
-/**
- * @brief Compute matrix inverse (out-of-place).
- *
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- * input.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input matrix (mdspan, mdarray, etc.) (... x N x N).
- *
- * @return A tuple-like output from batch_out consisting of:
- *         - inverse matrix (mdarray) (... x N x N).
- *         - validity flag (mdarray or scalar) (...), indicating if the inverse
- *        was successfully computed for each matrix instance.
- *
- * @see mdtensor::linalg::inv_to for the in-place version that writes into an
- * output.
- */
 template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto inv(in_t &&in) {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
 
     auto out = core::create_out<dtype>(
-        std::index_sequence<2>{}, core::slice_from_right<2>(in_mds.extents()),
-        in_mds);
+        std::index_sequence<2>{},
+        core::slice_extents_from_right<2>(in_mds.extents()), in_mds);
     auto valid = core::create_out<bool>(std::index_sequence<2>{},
                                         extents<uint8_t>{}, in_mds);
 

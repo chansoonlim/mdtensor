@@ -6,32 +6,32 @@
 namespace md = mdtensor;
 
 TEST(test, 1) {
-    static_assert(
-        md::array_equal(md::any(md::mdarray<int8_t, md::extents<uint8_t, 2, 2>>{
-                            {true, false, true, false}}),
-                        true));
+    static_assert(md::array_equal(
+        md::any(md::container<int8_t, md::extents<uint8_t, 2, 2>>{
+            {true, false, true, false}}),
+        true));
 
     static_assert(md::array_equal(
-        md::any<0>(md::mdarray<int8_t, md::extents<uint8_t, 2, 3>>{
+        md::any<0>(md::container<int8_t, md::extents<uint8_t, 2, 3>>{
             {true, false, true, false, false, false}}),
-        md::mdarray<int8_t, md::extents<uint8_t, 3>>{{true, false, true}}));
+        md::container<int8_t, md::extents<uint8_t, 3>>{{true, false, true}}));
 
     static_assert(md::array_equal(
-        md::any(md::mdarray<int8_t, md::extents<uint8_t, 3>>{{-1, 0, 5}}),
+        md::any(md::container<int8_t, md::extents<uint8_t, 3>>{{-1, 0, 5}}),
         true));
 }
 
 TEST(test, 2) {
     using T = int8_t;
 
-    constexpr auto a =
-        md::mdarray<T, md::extents<uint8_t, 3, 3>>{{1, 0, 0, 0, 0, 1, 0, 0, 0}};
+    constexpr auto a = md::container<T, md::extents<uint8_t, 3, 3>>{
+        {1, 0, 0, 0, 0, 1, 0, 0, 0}};
 
     static_assert(md::array_equal(
         md::any<0>(a),
-        md::mdarray<T, md::extents<uint8_t, 3>>{{true, false, true}}));
+        md::container<T, md::extents<uint8_t, 3>>{{true, false, true}}));
 
     static_assert(md::array_equal(
         md::any<1>(a),
-        md::mdarray<T, md::extents<uint8_t, 3>>{{true, true, false}}));
+        md::container<T, md::extents<uint8_t, 3>>{{true, true, false}}));
 }

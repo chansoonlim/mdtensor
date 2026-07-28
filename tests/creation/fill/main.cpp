@@ -8,11 +8,11 @@ namespace md = mdtensor;
 TEST(stack, fill) {
     using T = double;
 
-    auto a = md::mdarray<T, md::extents<size_t, 2, 1, 2>>{};
+    auto a = md::container<T, md::extents<size_t, 2, 1, 2>>{};
     md::fill(a, 1);
 
     constexpr auto a_expect =
-        md::mdarray<T, md::extents<size_t, 2, 1, 2>>{{1, 1, 1, 1}};
+        md::container<T, md::extents<size_t, 2, 1, 2>>{{1, 1, 1, 1}};
 
     const bool array_equal = md::array_equal(a, a_expect);
 
@@ -22,11 +22,11 @@ TEST(stack, fill) {
 TEST(heap, fill) {
     using T = double;
 
-    auto a = md::mdarray<T, md::dims<3>>{md::dims<3>{2, 1, 2}};
+    auto a = md::container<T, md::dims<3>>{md::dims<3>{2, 1, 2}};
     md::fill(a, 1);
 
     const auto a_expect =
-        md::mdarray<T, md::dims<3>>{{1, 1, 1, 1}, md::dims<3>{2, 1, 2}};
+        md::container<T, md::dims<3>>{{1, 1, 1, 1}, md::dims<3>{2, 1, 2}};
 
     const bool array_equal = md::array_equal(a, a_expect);
 
