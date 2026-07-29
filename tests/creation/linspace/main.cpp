@@ -1,61 +1,108 @@
+/**
+ * @file
+ * @brief test
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
 #include <gtest/gtest.h>
 
-#include "mdtensor/creation/linspace.hpp"
-#include "mdtensor/logic/array_equal.hpp"
-#include "mdtensor/random/uniform.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
 namespace md = mdtensor;
 
-TEST(stack, 1) {
-    using T = double;
+TEST(run_time, 1) {
+    const auto out = md::linspace(5, 2.0, 3.0, true);
 
-    static_assert(md::array_equal(
-        md::linspace((T)2, (T)3, md::extents<uint8_t, 5>{}, true),
-        md::container<T, md::extents<size_t, 5>>{{2, 2.25, 2.5, 2.75, 3}}));
+    EXPECT_TRUE(
+        md::allclose(out, md::container<float, md::extents<std::size_t, 5>>{
+                              {2, 2.25, 2.5, 2.75, 3}}));
 
-    static_assert(md::array_equal(
-        md::linspace((T)2, (T)3, md::extents<uint8_t, 5>{}, false),
-        md::container<T, md::extents<size_t, 5>>{{2, 2.2, 2.4, 2.6, 2.8}}));
+    std::cout << "out: " << md::to_string(out) << std::endl;
 }
 
-TEST(stack, 2) {
-    using T = double;
+TEST(run_time, 2) {
+    const auto out = md::linspace(5, 2.0, 3.0, false);
 
-    constexpr size_t ext1 = 2;
-    constexpr size_t ext2 = 3;
-    constexpr size_t num = 10;
+    EXPECT_TRUE(
+        md::allclose(out, md::container<float, md::extents<std::size_t, 5>>{
+                              {2, 2.2, 2.4, 2.6, 2.8}}));
+
+    std::cout << "out: " << md::to_string(out) << std::endl;
+}
+
+TEST(compile_time, 1) {
+    constexpr auto out = md::linspace<5>(2.0, 3.0, true);
+
+    static_assert(
+        md::allclose(out, md::container<float, md::extents<std::size_t, 5>>{
+                              {2, 2.25, 2.5, 2.75, 3}}));
+
+    std::cout << "out: " << md::to_string(out) << std::endl;
+}
+
+TEST(compile_time, 2) {
+    constexpr auto out = md::linspace<5>(2.0, 3.0, false);
+
+    static_assert(
+        md::allclose(out, md::container<float, md::extents<std::size_t, 5>>{
+                              {2, 2.2, 2.4, 2.6, 2.8}}));
+
+    std::cout << "out: " << md::to_string(out) << std::endl;
+}
+
+TEST(compile_time, 3) {
+    using value_t = double;
+    using index_t = std::size_t;
+
+    constexpr index_t ext1 = 2;
+    constexpr index_t ext2 = 3;
+    constexpr index_t num = 10;
 
     constexpr auto start =
-        md::random::uniform<T>(md::extents<size_t, ext1, ext2>{}, 0, 1);
+        md::random::uniform<value_t, md::random::generator::SplitMix64>(
+            md::extents<index_t, ext1, ext2>{}, 0, 1, std::nullopt,
+            md::random::seed_t{0});
     constexpr auto stop =
-        md::random::uniform<T>(md::extents<size_t, ext1, ext2>{}, 2, 3);
+        md::random::uniform<value_t, md::random::generator::SplitMix64>(
+            md::extents<index_t, ext1, ext2>{}, 2, 3, std::nullopt,
+            md::random::seed_t{1});
 
-    constexpr auto out1 =
-        md::linspace<0>(start, stop, md::extents<uint8_t, num>{}, true);
-    constexpr auto out2 =
-        md::linspace<1>(start, stop, md::extents<uint8_t, num>{}, true);
-    constexpr auto out3 =
-        md::linspace<2>(start, stop, md::extents<uint8_t, num>{}, true);
-    constexpr auto out4 =
-        md::linspace<-1>(start, stop, md::extents<uint8_t, num>{}, true);
+    constexpr auto out1 = md::linspace<num, 0>(start, stop, true);
+    constexpr auto out2 = md::linspace<num, 1>(start, stop, true);
+    constexpr auto out3 = md::linspace<num, 2>(start, stop, true);
+    constexpr auto out4 = md::linspace<num, -1>(start, stop, true);
+    constexpr auto out5 = md::linspace<num, -2>(start, stop, true);
+    constexpr auto out6 = md::linspace<num, -3>(start, stop, true);
 
-    static_assert(md::core::same_extents(
-        out1.extents(), md::extents<size_t, num, ext1, ext2>{}));
-    static_assert(out1(0, 0, 0) == start(0, 0));
-    static_assert(out1(num - 1, ext1 - 1, ext2 - 1) ==
-                  stop(ext1 - 1, ext2 - 1));
+    static_assert(md::is_same_extents(out1.extents(),
+                                      md::extents<index_t, num, ext1, ext2>{}));
+    static_assert(md::array_equal(
+        md::submdspan(out1, 0, md::full_extent, md::full_extent), start));
+    static_assert(md::array_equal(
+        md::submdspan(out1, num - 1, md::full_extent, md::full_extent), stop));
 
-    static_assert(md::core::same_extents(
-        out2.extents(), md::extents<size_t, ext1, num, ext2>{}));
-    static_assert(out2(0, 0, 0) == start(0, 0));
-    static_assert(out2(ext1 - 1, num - 1, ext2 - 1) ==
-                  stop(ext1 - 1, ext2 - 1));
+    static_assert(md::is_same_extents(out2.extents(),
+                                      md::extents<index_t, ext1, num, ext2>{}));
+    static_assert(md::array_equal(
+        md::submdspan(out2, md::full_extent, 0, md::full_extent), start));
+    static_assert(md::array_equal(
+        md::submdspan(out2, md::full_extent, num - 1, md::full_extent), stop));
 
-    static_assert(md::core::same_extents(
-        out3.extents(), md::extents<size_t, ext1, ext2, num>{}));
-    static_assert(out3(0, 0, 0) == start(0, 0));
-    static_assert(out3(ext1 - 1, ext2 - 1, num - 1) ==
-                  stop(ext1 - 1, ext2 - 1));
+    static_assert(md::is_same_extents(out3.extents(),
+                                      md::extents<index_t, ext1, ext2, num>{}));
+    static_assert(md::array_equal(
+        md::submdspan(out3, md::full_extent, md::full_extent, 0), start));
+    static_assert(md::array_equal(
+        md::submdspan(out3, md::full_extent, md::full_extent, num - 1), stop));
 
     static_assert(md::array_equal(out3, out4));
+    static_assert(md::array_equal(out2, out5));
+    static_assert(md::array_equal(out1, out6));
 }

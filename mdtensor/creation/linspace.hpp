@@ -9,111 +9,127 @@
 
 #pragma once
 
-#include "../core/core.hpp"
+#include "../math/add.hpp"
+#include "../math/multiply.hpp"
+#include "../math/subtract.hpp"
+#include "copy.hpp"
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <core::md_c start_t, core::md_c stop_t, core::md_c out_t>
-    requires(std::remove_cvref_t<start_t>::rank() == 0 &&
-             std::remove_cvref_t<stop_t>::rank() == 0 &&
-             std::remove_cvref_t<out_t>::rank() == 1)
-inline constexpr void linspace_impl(start_t &&start, stop_t &&stop, out_t &&out,
-                                    const bool endpoint = true) noexcept {
-    using out_base_t = std::remove_cvref_t<out_t>;
+template <core::Backend backend = core::Backend::AUTO>
+constexpr void linspace_ufunc(auto &&start, auto &&stop, auto &&out,
+                              const bool endpoint = true) {
+    const auto start_mds =
+        core::to_const_mdspan(std::forward<decltype(start)>(start));
+    const auto stop_mds =
+        core::to_const_mdspan(std::forward<decltype(stop)>(stop));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
 
-    using value_t = typename out_base_t::value_type;
-    using index_t = typename out_base_t::index_type;
+    using value_t = typename decltype(out_mds)::value_type;
+    using index_t = typename decltype(out_mds)::index_type;
 
-    const index_t num = out.extent(0);
+    const index_t num = out_mds.extent(0);
 
-    if (num == 0) [[unlikely]] {
-        // do nothing
+    if (num == 0) {
+        return;
 
-    } else if (num == 1) [[unlikely]] {
-        out(0) = static_cast<value_t>(start());
+    } else if (num == 1) {
+        if (!endpoint) {
+            static_cast<void>(
+                copy(start_mds, core::submdspan_from_left(out_mds)));
+
+        } else {
+            static_cast<void>(
+                copy(stop_mds, core::submdspan_from_left(out_mds)));
+        }
 
     } else {
-        const value_t start_val = static_cast<value_t>(start());
-        const value_t stop_val = static_cast<value_t>(stop());
-        const value_t step =
-            (stop_val - start_val) / (endpoint ? num - 1 : num);
+        const value_t scale = value_t{1} / (endpoint ? num - 1 : num);
 
-        for (index_t i = 0; i < num; i++) {
-            out(i) = start_val + step * i;
+        const auto step = multiply<value_t, backend>(
+            subtract<value_t, backend>(stop_mds, start_mds), scale);
+
+        static_cast<void>(copy(start_mds, out_mds));
+
+        for (index_t i = 1; i < num; i++) {
+            static_cast<void>(add<void, backend>(
+                core::submdspan_from_left(out_mds, i),
+                multiply<value_t, backend>(step, static_cast<value_t>(i)),
+                core::submdspan_from_left(out_mds, i)));
+        }
+
+        if (endpoint) {
+            // Ensure that the last element is exactly equal to the stop value
+            static_cast<void>(
+                copy(stop_mds, core::submdspan_from_left(out_mds, num - 1)));
         }
     }
 }
 
-} // namespace detail
+} // namespace ufunc
 
-template <int64_t Axis = 0, typename start_t, typename stop_t, typename out_t>
-inline constexpr void linspace_to(start_t &&start, stop_t &&stop, out_t &&out,
-                                  const bool endpoint = true) noexcept {
-    const auto start_mds = core::to_const_mdspan(std::forward<start_t>(start));
-    const auto stop_mds = core::to_const_mdspan(std::forward<stop_t>(stop));
-    const auto out_mds = core::to_mdspan(std::forward<out_t>(out));
+template <std::int64_t axis = 0, typename dtype = void,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto linspace(auto &&shape, auto &&start, auto &&stop,
+                                      const bool endpoint = true,
+                                      out_t &&out = out_t{std::nullopt}) {
+    const auto exts = core::to_extents(std::forward<decltype(shape)>(shape));
 
-    using start_mds_t = decltype(start_mds);
-    using stop_mds_t = decltype(stop_mds);
-    using out_mds_t = decltype(out_mds);
+    static_assert(exts.rank() == 1,
+                  "The extents for linspace must be a 1D tensor.");
 
-    static_assert(start_mds_t::rank() == stop_mds_t::rank() &&
-                      start_mds_t::rank() + 1 == out_mds_t::rank(),
-                  "linspace does not support broadcasting");
-    // TODO: support broadcasting without changing rank.
+    const auto [bcasts, bexts] = core::broadcast(
+        std::index_sequence<0, 0>{}, std::integer_sequence<bool, true, true>{},
+        std::forward<decltype(start)>(start),
+        std::forward<decltype(stop)>(stop));
+    const auto start_bcast = std::get<0>(bcasts);
+    const auto stop_bcast = std::get<1>(bcasts);
 
-    if constexpr (start_mds_t::rank() == 0) {
-        detail::linspace_impl(start_mds, stop_mds, out_mds, endpoint);
+    constexpr std::size_t baxis =
+        static_cast<std::size_t>(core::bounding_index(axis, bexts.rank()));
+    constexpr std::size_t out_urank = bexts.rank() + 1 - baxis;
 
-    } else {
-        constexpr size_t out_rank = out_mds_t::rank();
-        constexpr size_t axis = static_cast<size_t>(
-            ((Axis % static_cast<int64_t>(out_rank)) + (out_rank)) % out_rank);
-        constexpr size_t lspace = axis == 0 ? 1 : 0;
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            using value_t =
+                core::output_value_t<dtype,
+                                     typename decltype(start_bcast)::value_type,
+                                     typename decltype(stop_bcast)::value_type>;
 
-        assert(start_mds.extent(0) == stop_mds.extent(0));
-        assert(start_mds.extent(0) == out_mds.extent(lspace));
+            return empty<value_t>(core::compose_extents(
+                core::slice_extents_from_left<baxis>(bexts), exts,
+                core::slice_extents_from_right<out_urank - 1>(bexts)));
 
-        for (typename out_mds_t::index_type i = 0; i < out_mds.extent(lspace);
-             i++) {
-            linspace_to<axis - (lspace == 0 ? 1 : 0)>(
-                core::submdspan_from_left(start_mds, i),
-                core::submdspan_from_left(stop_mds, i),
-                core::submdspan_from_left<lspace>(out_mds, i), endpoint);
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
         }
-    }
+    }();
+
+    core::batch_with_broadcast<backend>(
+        [&](auto &&...elems) {
+            ufunc::linspace_ufunc<core::Backend::NATIVE>(
+                std::forward<decltype(elems)>(elems)..., endpoint);
+        },
+        std::index_sequence<out_urank - 1, out_urank - 1, out_urank>{},
+        std::integer_sequence<bool, true, true, false>{}, start_bcast,
+        stop_bcast, out_md);
+
+    return out_md;
 }
 
-template <int64_t Axis = 0, core::extents_c exts_t = core::extents<uint8_t, 50>,
-          typename dtype = void, typename start_t, typename stop_t>
-    requires(exts_t::rank() == 1)
-[[nodiscard]] inline constexpr auto
-linspace(start_t &&start, stop_t &&stop, const exts_t &exts = exts_t{},
-         const bool endpoint = true) noexcept {
-    const auto start_mds = core::to_const_mdspan(std::forward<start_t>(start));
-    const auto stop_mds = core::to_const_mdspan(std::forward<stop_t>(stop));
-
-    using start_mds_t = decltype(start_mds);
-    using stop_mds_t = decltype(stop_mds);
-
-    using value_t = std::conditional_t<
-        !std::is_void_v<dtype>, dtype,
-        core::common_data_type_t<typename start_mds_t::value_type,
-                                 typename stop_mds_t::value_type>>;
-
-    constexpr size_t out_rank = start_mds_t::rank() + 1;
-    constexpr size_t axis = static_cast<size_t>(
-        ((Axis % static_cast<int64_t>(out_rank)) + (out_rank)) % out_rank);
-
-    const auto bexts = start_mds.extents();
-    auto out = core::create_out<value_t>(core::compose_extents(
-        core::slice_extents_from_left<axis>(bexts), exts,
-        core::slice_extents_from_right<decltype(bexts)::rank() - axis>(bexts)));
-
-    linspace_to<Axis>(start_mds, stop_mds, out, endpoint);
-
-    return out;
+template <std::size_t num, std::int64_t axis = 0, typename dtype = void,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto linspace(auto &&start, auto &&stop,
+                                      const bool endpoint = true,
+                                      out_t &&out = out_t{std::nullopt}) {
+    return linspace<axis, dtype, backend>(
+        core::extents<std::size_t, num>{}, std::forward<decltype(start)>(start),
+        std::forward<decltype(stop)>(stop), endpoint,
+        std::forward<decltype(out)>(out));
 }
 
 } // namespace mdtensor

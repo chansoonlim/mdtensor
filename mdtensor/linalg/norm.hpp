@@ -13,61 +13,59 @@
 #include "../math/sqrt.hpp"
 #include "../math/sum.hpp"
 
-namespace mdtensor {
-namespace linalg {
-namespace detail {
+namespace mdtensor::linalg {
+namespace ufunc {
 
-template <core::md_c in_t, core::md_c out_t>
-inline constexpr void norm_impl(in_t &&in, out_t &&out) noexcept {
-    static_assert(std::remove_cvref_t<in_t>::rank() == 1);
-    static_assert(std::remove_cvref_t<out_t>::rank() == 0);
+constexpr void norm_ufunc(auto &&in, auto &&out) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
 
-    using index_t = typename std::remove_cvref_t<in_t>::index_type;
+    using index_t = typename decltype(in_mds)::index_type;
 
-    out() = 0;
-    for (index_t i = 0; i < in.extent(0); i++) {
-        out() += in(i)*in(i);
+    out_mds() = 0;
+    for (index_t i = 0; i < in_mds.extent(0); i++) {
+        out_mds() += in_mds(i) * in_mds(i);
     }
 
-    if (out() > 0) {
-        out() = sqrt(out());
+    if (out_mds() > 0) {
+        out_mds() = sqrt(out_mds());
     }
 }
 
-} // namespace detail
+} // namespace ufunc
 
-template <core::MPMode mpmode = core::MPMode::NONE, typename in_t,
-          typename out_t>
-inline constexpr void norm_to(in_t &&in, out_t &&out) noexcept {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-    const auto out_mds = core::to_mdspan(std::forward<out_t>(out));
+template <core::Backend backend = core::Backend::AUTO>
+constexpr void norm_to(auto &&in, auto &&out) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
 
-    if constexpr (mpmode == core::MPMode::SIMD) [[unlikely]] {
-        sum_to<-1, mpmode>(multiply<void, mpmode>(in_mds, in_mds), out_mds);
-        sqrt_to<mpmode>(out_mds, out_mds);
+    if constexpr (backend == core::Backend::SIMD) {
+        static_cast<void>(sum<-1, void, false, backend>(
+            multiply<void, backend>(in_mds, in_mds), out_mds));
+        static_cast<void>(sqrt<void, backend>(out_mds, out_mds));
 
     } else {
-        core::batch<mpmode>(
+        core::batch_with_broadcast<backend>(
             [](auto &&...elems) {
-                detail::norm_impl(std::forward<decltype(elems)>(elems)...);
+                ufunc::norm_ufunc(std::forward<decltype(elems)>(elems)...);
             },
             std::index_sequence<1, 0>{},
-            std::integer_sequence<bool, false, true>{}, in_mds, out_mds);
+            std::integer_sequence<bool, true, false>{}, in_mds, out_mds);
     }
 }
 
-template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
-          typename in_t>
-[[nodiscard]] inline constexpr auto norm(in_t &&in) noexcept {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto norm(auto &&in) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out = core::create_out<dtype>(std::index_sequence<1>{},
-                                       core::extents<uint8_t>{}, in_mds);
+    auto out = core::make_output<dtype>(std::index_sequence<1>{},
+                                        core::extents<std::uint8_t>{}, in_mds);
 
-    norm_to<mpmode>(in_mds, out);
+    norm_to<backend>(in_mds, out);
 
     return out;
 }
 
-} // namespace linalg
-} // namespace mdtensor
+} // namespace mdtensor::linalg

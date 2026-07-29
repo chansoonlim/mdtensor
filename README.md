@@ -47,11 +47,12 @@ Try it on Godbolt:
 ## Available Functions
 
 - **Array creation routines**: [empty](mdtensor/creation/empty.hpp), [empty_like](mdtensor/creation/empty_like.hpp), [eye](mdtensor/creation/eye.hpp), [ones](mdtensor/creation/ones.hpp), [ones_like](mdtensor/creation/ones_like.hpp), [zeros](mdtensor/creation/zeros.hpp), [zeros_like](mdtensor/creation/zeros_like.hpp), [full](mdtensor/creation/full.hpp), [full_like](mdtensor/creation/full_like.hpp), [copy](mdtensor/creation/copy.hpp), [arange](mdtensor/creation/arange.hpp), [linspace](mdtensor/creation/linspace.hpp).
-- **Array manipulation routines**: [reshape](mdtensor/manipulation/reshape.hpp), [expand_dims](mdtensor/manipulation/expand_dims.hpp), [concatenate](mdtensor/manipulation/concatenate.hpp).
-- **Linear algebra**: [matmul](mdtensor/linalg/matmul.hpp), [matvec](mdtensor/linalg/matvec.hpp), [vecmat](mdtensor/linalg/vecmat.hpp), [norm](mdtensor/linalg/norm.hpp), [inv](mdtensor/linalg/inv.hpp).
-- **Logic functions**: [all](mdtensor/logic/all.hpp), [any](mdtensor/logic/any.hpp), [allclose](mdtensor/logic/allclose.hpp), [isclose](mdtensor/logic/isclose.hpp), [array_equal](mdtensor/logic/array_equal.hpp), [array_equiv](mdtensor/logic/array_equiv.hpp), [greater](mdtensor/logic/greater.hpp), [greater_equal](mdtensor/logic/greater_equal.hpp), [less](mdtensor/logic/less.hpp), [less_equal](mdtensor/logic/less_equal.hpp), [equal](mdtensor/logic/equal.hpp), [not_equal](mdtensor/logic/not_equal.hpp).
-- **Mathematical functions**: [sin](mdtensor/math/sin.hpp), [cos](mdtensor/math/cos.hpp), [tan](mdtensor/math/tan.hpp), [atan2](mdtensor/math/atan2.hpp), [deg2rad](mdtensor/math/deg2rad.hpp), [rad2deg](mdtensor/math/rad2deg.hpp), [sum](mdtensor/math/sum.hpp), [add](mdtensor/math/add.hpp), [negative](mdtensor/math/negative.hpp), [multiply](mdtensor/math/multiply.hpp), [divide](mdtensor/math/divide.hpp), [subtract](mdtensor/math/subtract.hpp), [maximum](mdtensor/math/maximum.hpp), [max](mdtensor/math/max.hpp), [minimum](mdtensor/math/minimum.hpp), [min](mdtensor/math/min.hpp), [clip](mdtensor/math/clip.hpp), [sqrt](mdtensor/math/sqrt.hpp), [absolute](mdtensor/math/absolute.hpp), [sign](mdtensor/math/sign.hpp).
-- **Random sampling**: [rand](mdtensor/random/rand.hpp), [uniform](mdtensor/random/uniform.hpp).
+- **Array manipulation routines**: [reshape](mdtensor/manipulation/reshape.hpp), [flatten](mdtensor/manipulation/flatten.hpp), [transpose](mdtensor/manipulation/transpose.hpp), [broadcast](mdtensor/manipulation/broadcast.hpp), [broadcast_to](mdtensor/manipulation/broadcast_to.hpp), [expand_dims](mdtensor/manipulation/expand_dims.hpp), [concatenate](mdtensor/manipulation/concatenate.hpp).
+- **Linear algebra**: [matmul](mdtensor/linalg/matmul.hpp), [matvec](mdtensor/linalg/matvec.hpp), [vecmat](mdtensor/linalg/vecmat.hpp), [cholesky](mdtensor/linalg/cholesky.hpp), [norm](mdtensor/linalg/norm.hpp), [inv](mdtensor/linalg/inv.hpp), [lu](mdtensor/linalg/lu.hpp), [solve](mdtensor/linalg/solve.hpp).
+- **Logic functions**: [all](mdtensor/logic/all.hpp), [any](mdtensor/logic/any.hpp), [isinf](mdtensor/logic/isinf.hpp), [isnan](mdtensor/logic/isnan.hpp), [logical_and](mdtensor/logic/logical_and.hpp), [logical_or](mdtensor/logic/logical_or.hpp), [logical_not](mdtensor/logic/logical_not.hpp), [logical_xor](mdtensor/logic/logical_xor.hpp), [allclose](mdtensor/logic/allclose.hpp), [isclose](mdtensor/logic/isclose.hpp), [array_equal](mdtensor/logic/array_equal.hpp), [array_equiv](mdtensor/logic/array_equiv.hpp), [greater](mdtensor/logic/greater.hpp), [greater_equal](mdtensor/logic/greater_equal.hpp), [less](mdtensor/logic/less.hpp), [less_equal](mdtensor/logic/less_equal.hpp), [equal](mdtensor/logic/equal.hpp), [not_equal](mdtensor/logic/not_equal.hpp).
+- **Mathematical functions**: [sin](mdtensor/math/sin.hpp), [cos](mdtensor/math/cos.hpp), [tan](mdtensor/math/tan.hpp), [atan2](mdtensor/math/atan2.hpp), [deg2rad](mdtensor/math/deg2rad.hpp), [rad2deg](mdtensor/math/rad2deg.hpp), [sum](mdtensor/math/sum.hpp), [add](mdtensor/math/add.hpp), [negative](mdtensor/math/negative.hpp), [multiply](mdtensor/math/multiply.hpp), [divide](mdtensor/math/divide.hpp), [subtract](mdtensor/math/subtract.hpp), [maximum](mdtensor/math/maximum.hpp), [max](mdtensor/math/max.hpp), [nanmax](mdtensor/math/nanmax.hpp), [minimum](mdtensor/math/minimum.hpp), [min](mdtensor/math/min.hpp), [nanmin](mdtensor/math/nanmin.hpp), [clip](mdtensor/math/clip.hpp), [sqrt](mdtensor/math/sqrt.hpp), [absolute](mdtensor/math/absolute.hpp), [sign](mdtensor/math/sign.hpp).
+- **Random sampling**: [rand](mdtensor/random/rand.hpp), [randint](mdtensor/random/randint.hpp), [uniform](mdtensor/random/uniform.hpp).
+- **Other**: [broadcast_extents](mdtensor/util/broadcast_extents.hpp), [fill](mdtensor/util/fill.hpp).
 
 
 ## Installation
@@ -71,11 +72,11 @@ mdtensor is a header-only library, so you can start using it by simply including
 
   namespace md = mdtensor;
 
-  constexpr auto a = md::full<int>(1, md::extents<size_t, 3, 1, 2>{});
-  constexpr auto b = md::full<int>(2, md::extents<size_t, 2, 1>{});
+  constexpr auto a = md::full<int>(md::extents<std::size_t, 3, 1, 2>{}, 1);
+  constexpr auto b = md::full<int>(md::extents<std::size_t, 2, 1>{}, 2);
   constexpr auto c = md::add(a, b);
 
-  constexpr auto c_expect = md::full<int>(3, md::extents<size_t, 3, 2, 2>{});
+  constexpr auto c_expect = md::full<int>(md::extents<std::size_t, 3, 2, 2>{}, 3);
 
   constexpr bool is_allclose = md::allclose(c, c_expect);
 

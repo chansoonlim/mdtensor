@@ -9,17 +9,16 @@
 
 #pragma once
 
-#include "empty_like.hpp"
-#include "fill.hpp"
+#include "full.hpp"
 
 namespace mdtensor {
 
-template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
-          typename in_t, typename val_t>
-[[nodiscard]] inline constexpr auto full_like(in_t &&in, val_t &&val) {
-    auto out = empty_like<dtype>(std::forward<in_t>(in));
-    fill<mpmode>(out, std::forward<val_t>(val));
-    return out;
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto full_like(auto &&in, auto &&val) {
+    using value_t = core::output_value_t<dtype, decltype(in)>;
+
+    return full<value_t, backend>(in.extents(),
+                                  std::forward<decltype(val)>(val));
 }
 
 } // namespace mdtensor

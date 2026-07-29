@@ -10,51 +10,42 @@
 #pragma once
 
 #include "broadcast.hpp"
-#include "container.hpp"
-#include "extents.hpp"
-#include "mdspan.hpp"
-#include "submdspan.hpp"
 
-namespace mdtensor {
-namespace core {
+namespace mdtensor::core {
 namespace detail {
 
-template <size_t brank, typename func_t, mdspan_c io_t, mdspan_c... ios_t>
-inline constexpr void batch_impl_none(func_t &&func, io_t &&io,
-                                      ios_t &&...ios) {
-    using index_t = typename std::remove_cvref_t<io_t>::index_type;
-
+template <std::size_t brank, mdspan_c io_t, mdspan_c... ios_t>
+constexpr void batch_impl_native(auto &&func, io_t &&io, ios_t &&...ios) {
     if constexpr (brank == 0) {
-        std::forward<func_t>(func)(std::forward<io_t>(io),
-                                   std::forward<ios_t>(ios)...);
+        func(std::forward<io_t>(io), std::forward<ios_t>(ios)...);
 
     } else {
+        using index_t = typename std::remove_cvref_t<io_t>::index_type;
+
         for (index_t i = 0; i < io.extent(0); i++) {
-            batch_impl_none<brank - 1>(
-                std::forward<func_t>(func),
+            batch_impl_native<brank - 1>(
+                std::forward<decltype(func)>(func),
                 submdspan_from_left(std::forward<io_t>(io), i),
                 submdspan_from_left(std::forward<ios_t>(ios), i)...);
         }
     }
 }
 
-#if defined(_OPENMP) && defined(REAL_GCC)
+#ifdef MDTENSOR_USE_OPENMP
 
-template <size_t brank, typename func_t, mdspan_c io_t, mdspan_c... ios_t>
-inline constexpr void batch_impl_cpump(func_t &&func, io_t &&io,
-                                       ios_t &&...ios) {
-    using index_t = typename std::remove_cvref_t<io_t>::index_type;
-
+template <std::size_t brank, mdspan_c io_t, mdspan_c... ios_t>
+void batch_impl_openmp(auto &&func, io_t &&io, ios_t &&...ios) {
     if constexpr (brank == 0) {
-        std::forward<func_t>(func)(std::forward<io_t>(io),
-                                   std::forward<ios_t>(ios)...);
+        func(std::forward<io_t>(io), std::forward<ios_t>(ios)...);
 
     } else {
+        // Parallelize only the outermost batch axis.
+        using index_t = typename std::remove_cvref_t<io_t>::index_type;
+
 #pragma omp parallel for
         for (index_t i = 0; i < io.extent(0); i++) {
-            // NOTE: parallelization applied to the outermost loop (brank == 1)
-            batch_impl_none<brank - 1>(
-                std::forward<func_t>(func),
+            batch_impl_native<brank - 1>(
+                std::forward<decltype(func)>(func),
                 submdspan_from_left(std::forward<io_t>(io), i),
                 submdspan_from_left(std::forward<ios_t>(ios), i)...);
         }
@@ -63,140 +54,68 @@ inline constexpr void batch_impl_cpump(func_t &&func, io_t &&io,
 
 #endif
 
-template <MPMode mpmode, size_t brank, typename func_t, mdspan_c... ios_t>
-inline constexpr void batch_impl(func_t &&func, ios_t &&...ios) {
-    if constexpr (mpmode == MPMode::CPUMP) {
-        batch_impl_cpump<brank>(std::forward<func_t>(func),
-                                std::forward<ios_t>(ios)...);
-
-    } else {
-        batch_impl_none<brank>(std::forward<func_t>(func),
-                               std::forward<ios_t>(ios)...);
-    }
-}
-
 } // namespace detail
 
-template <typename dtype = void, size_t... uranks, extents_c uout_exts_t,
-          typename... ins_t>
-[[nodiscard]] inline constexpr auto create_out(std::index_sequence<uranks...>,
-                                               uout_exts_t &&uout_exts,
-                                               ins_t &&...ins) {
-    static_assert(sizeof...(uranks) == sizeof...(ins_t),
-                  "Number of uranks must match number of inputs.");
+template <core::Backend backend, std::size_t brank>
+constexpr void batch(auto &&func, auto &&...ios) {
+    // TODO: assert when backend is not specified in each funciton call
+    // assert(backend != core::Backend::AUTO);
+    [[maybe_unused]] constexpr auto be = [&]() {
+        if constexpr (backend == core::Backend::AUTO) {
+            return core::Backend::NATIVE; // temporary approach.
 
-    constexpr size_t ins_num = sizeof...(uranks);
+        } else {
+            return backend;
+        }
+    }();
 
-    if constexpr (ins_num == 0) {
-        return make_container<dtype>(std::forward<uout_exts_t>(uout_exts));
+    if constexpr (
+#ifdef MDTENSOR_USE_OPENMP
+        be == core::Backend::OPENMP
+#else
+        false
+#endif
+    ) {
+#ifdef MDTENSOR_USE_OPENMP
+        detail::batch_impl_openmp<brank>(
+            std::forward<decltype(func)>(func),
+            core::to_mdspan(std::forward<decltype(ios)>(ios))...);
+#endif
 
     } else {
-        using value_t =
-            std::conditional_t<!std::is_void_v<dtype>, dtype,
-                               common_data_type_t<value_type_t<ins_t>...>>;
-
-        // calculate mdspans for inputs
-        auto ins_mds =
-            std::make_tuple(to_const_mdspan(std::forward<ins_t>(ins))...);
-
-        // calculate broadcasted extents
-        const auto bexts = detail::get_broadcast_extents(
-            std::index_sequence<uranks...>{}, ins_mds);
-
-        // make output container
-        return make_container<value_t>(
-            compose_extents(bexts, std::forward<uout_exts_t>(uout_exts)));
+        detail::batch_impl_native<brank>(
+            std::forward<decltype(func)>(func),
+            core::to_mdspan(std::forward<decltype(ios)>(ios))...);
     }
 }
 
-template <typename dtype = void, extents_c uout_exts_t, typename... ins_t>
-[[nodiscard]] inline constexpr auto create_out(uout_exts_t &&uout_exts,
-                                               ins_t &&...ins) {
-    return [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return create_out<dtype>(std::index_sequence<((void)Is, 0)...>{},
-                                 std::forward<uout_exts_t>(uout_exts),
-                                 std::forward<ins_t>(ins)...);
-    }(std::make_index_sequence<sizeof...(ins_t)>{});
-}
-
-template <typename dtype = void, size_t... uranks,
-          extents_tuple_c uout_exts_tuple_t, typename... ins_t>
-[[nodiscard]] inline constexpr auto
-create_outs(std::index_sequence<uranks...>, uout_exts_tuple_t &&uout_exts_tuple,
-            ins_t &&...ins) {
-    static_assert(sizeof...(uranks) == sizeof...(ins_t),
-                  "Number of uranks must match number of inputs.");
-
-    constexpr size_t ins_num = sizeof...(uranks);
-    constexpr size_t outs_num =
-        std::tuple_size_v<std::remove_cvref_t<uout_exts_tuple_t>>;
-
-    if constexpr (ins_num == 0) {
-        return [&]<size_t... Is>(std::index_sequence<Is...>) {
-            return std::tuple{
-                make_container<dtype>(std::get<Is>(uout_exts_tuple))...};
-        }(std::make_index_sequence<outs_num>{});
-
-    } else {
-        using value_t =
-            std::conditional_t<!std::is_void_v<dtype>, dtype,
-                               common_data_type_t<value_type_t<ins_t>...>>;
-
-        // calculate mdspans for inputs
-        auto ins_mds =
-            std::make_tuple(to_const_mdspan(std::forward<ins_t>(ins))...);
-
-        // calculate broadcasted extents
-        const auto bexts = detail::get_broadcast_extents(
-            std::index_sequence<uranks...>{}, ins_mds);
-
-        // make output container
-        return [&]<size_t... Is>(std::index_sequence<Is...>) {
-            return std::tuple{make_container<value_t>(
-                compose_extents(bexts, std::get<Is>(uout_exts_tuple)))...};
-        }(std::make_index_sequence<outs_num>{});
-    }
-}
-
-template <typename dtype = void, extents_tuple_c uout_exts_tuple_t,
-          typename... ins_t>
-[[nodiscard]] inline constexpr auto
-create_outs(uout_exts_tuple_t &&uout_exts_tuple, ins_t &&...ins) {
-    return [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return create_outs<dtype>(
-            std::index_sequence<((void)Is, 0)...>{},
-            std::forward<uout_exts_tuple_t>(uout_exts_tuple),
-            std::forward<ins_t>(ins)...);
-    }(std::make_index_sequence<sizeof...(ins_t)>{});
-}
-
-template <MPMode mpmode, typename func_t, size_t... uranks, bool... writable,
-          typename... ios_t>
-inline constexpr void batch(func_t &&func, std::index_sequence<uranks...>,
-                            std::integer_sequence<bool, writable...>,
-                            ios_t &&...ios) {
+template <core::Backend backend, std::size_t... uranks, bool... bcast>
+constexpr void batch_with_broadcast(auto &&func, std::index_sequence<uranks...>,
+                                    std::integer_sequence<bool, bcast...>,
+                                    auto &&...ios) {
+    // broadcast which bcast = true
     const auto [ios_bcast, bexts] =
         broadcast(std::index_sequence<uranks...>{},
-                  std::integer_sequence<bool, writable...>{},
-                  std::forward<ios_t>(ios)...);
+                  std::integer_sequence<bool, bcast...>{},
+                  std::forward<decltype(ios)>(ios)...);
 
-    [&]<size_t... Is>(std::index_sequence<Is...>) {
-        detail::batch_impl<mpmode, bexts.rank()>(std::forward<func_t>(func),
-                                                 std::get<Is>(ios_bcast)...);
-    }(std::make_index_sequence<sizeof...(ios_t)>{});
+    // batch
+    [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        batch<backend, bexts.rank()>(std::forward<decltype(func)>(func),
+                                     std::get<Is>(ios_bcast)...);
+    }(std::make_index_sequence<sizeof...(ios)>{});
 }
 
-template <MPMode mpmode, typename func_t, bool... writable, typename... ios_t>
-inline constexpr void
-batch(func_t &&func, std::integer_sequence<bool, writable...>, ios_t &&...ios) {
-    [&]<size_t... Is>(std::index_sequence<Is...>) {
-        batch<mpmode>(std::forward<func_t>(func),
-                      std::index_sequence<((void)Is, 0)...>{},
-                      std::integer_sequence<bool, writable...>{},
-                      std::get<Is>(std::forward_as_tuple(
-                          std::forward<ios_t>(ios)...))...);
-    }(std::make_index_sequence<sizeof...(ios_t)>{});
+template <core::Backend backend, bool... bcast>
+constexpr void batch_with_broadcast(auto &&func,
+                                    std::integer_sequence<bool, bcast...>,
+                                    auto &&...ios) {
+    [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        batch_with_broadcast<backend>(std::forward<decltype(func)>(func),
+                                      std::index_sequence<((void)Is, 0)...>{},
+                                      std::integer_sequence<bool, bcast...>{},
+                                      std::forward<decltype(ios)>(ios)...);
+    }(std::make_index_sequence<sizeof...(ios)>{});
 }
 
-} // namespace core
-} // namespace mdtensor
+} // namespace mdtensor::core

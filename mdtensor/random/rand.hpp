@@ -9,122 +9,95 @@
 
 #pragma once
 
-#include <cstdint>
-#include <random>
-
-#include "../creation/copy.hpp"
 #include "../creation/empty.hpp"
+#include "randint.hpp"
 
-namespace mdtensor {
-namespace random {
-namespace detail {
+namespace mdtensor::random {
+namespace ufunc {
 
-// Code adapted from:
-// https://mklimenko.github.io/english/2018/06/04/constexpr-random/
+template <std::floating_point value_t>
+[[nodiscard]] constexpr value_t pow2_neg(std::size_t bits) noexcept {
+    value_t result = value_t{1};
 
-constexpr std::uint32_t lce_a = 16807;
-constexpr std::uint32_t lce_c = 0;
-constexpr std::uint32_t lce_m = 2147483647;
-
-[[nodiscard]] inline constexpr std::uint32_t time_from_string(const char *str,
-                                                              int offset) {
-    return static_cast<std::uint32_t>(str[offset] - '0') * 10 +
-           static_cast<std::uint32_t>(str[offset + 1] - '0');
-}
-
-[[nodiscard]] inline constexpr std::uint32_t get_seed_constexpr() {
-    const char *t = __TIME__;
-    return time_from_string(t, 0) * 3600 + time_from_string(t, 3) * 60 +
-           time_from_string(t, 6);
-}
-
-struct LCEngine {
-    std::uint32_t state;
-
-    constexpr LCEngine(std::uint32_t seed) : state(seed) {}
-
-    [[nodiscard]] constexpr std::uint32_t next() {
-        state = (lce_a * state + lce_c) % lce_m;
-        return state;
+    for (std::size_t i = 0; i < bits; i++) {
+        result *= value_t{0.5};
     }
 
-    [[nodiscard]] constexpr double next_normalized() {
-        return static_cast<double>(next()) / lce_m;
-    }
-};
-
-template <typename T, size_t sz>
-[[nodiscard]] inline constexpr auto uniform_distribution(T min, T max) {
-    std::array<T, sz> dst{};
-    LCEngine rng{get_seed_constexpr()};
-    for (auto &el : dst)
-        el = static_cast<T>(rng.next_normalized() * (max - min) + min);
-    return dst;
+    return result;
 }
 
-template <core::md_c in_t>
-    requires(
-        std::remove_cvref_t<in_t>::rank() == 0 &&
-        std::floating_point<typename std::remove_cvref_t<in_t>::value_type>)
-inline void rand_impl(in_t &&in) noexcept {
-    using dist_t = std::uniform_real_distribution<
-        typename std::remove_cvref_t<in_t>::value_type>;
+constexpr void rand_ufunc(auto &&out, auto &&engine) {
+    using value_t = std::remove_cvref_t<decltype(out())>;
 
-    static auto rd = std::random_device{};
-    thread_local static auto gen = std::mt19937(rd());
-    static auto dist = dist_t{0, 1};
+    static_assert(std::is_floating_point_v<value_t>,
+                  "rand_ufunc requires floating-point value type.");
 
-    in() = dist(gen);
-}
+    using base_t = typename std::remove_cvref_t<decltype(engine)>::base_t;
 
-} // namespace detail
+    static_assert(std::unsigned_integral<base_t>,
+                  "rand_ufunc requires an unsigned integral engine result.");
 
-template <core::MPMode mpmode = core::MPMode::NONE, typename in_t>
-inline constexpr void rand_to(in_t &&in) noexcept {
-    const auto in_mds = core::to_mdspan(std::forward<in_t>(in));
-    using in_mds_t = decltype(in_mds);
+    constexpr std::size_t base_bits = std::numeric_limits<base_t>::digits;
+    constexpr std::size_t value_bits = std::numeric_limits<value_t>::digits;
 
-    if constexpr (in_mds_t::rank_dynamic() == 0) {
-        if (std::is_constant_evaluated()) {
-            using T = core::value_type_t<in_mds_t>;
+    if constexpr (value_bits <= base_bits) {
+        const base_t bits = engine() >> (base_bits - value_bits);
+        out() = static_cast<value_t>(bits) * pow2_neg<value_t>(value_bits);
 
-            if constexpr (in_mds_t::rank() == 0) {
-                constexpr auto data =
-                    detail::uniform_distribution<T, 1>(0, 1)[0];
-                in_mds() = data;
+    } else {
+        value_t result = value_t{0};
+        value_t scale = value_t{1};
 
-            } else {
-                constexpr auto data_size =
-                    []<size_t... Is>(std::index_sequence<Is...>) {
-                        return (in_mds_t::static_extent(Is) * ...);
-                    }(std::make_index_sequence<in_mds_t::rank()>{});
+        std::size_t remaining = value_bits;
 
-                constexpr auto data =
-                    core::container<T, typename in_mds_t::extents_type>{
-                        detail::uniform_distribution<T, data_size>(0, 1)};
+        while (remaining > 0) {
+            const std::size_t take =
+                remaining < base_bits ? remaining : base_bits;
 
-                copy_to(data, in_mds);
-            }
+            const base_t bits = engine() >> (base_bits - take);
 
-            return;
+            scale *= pow2_neg<value_t>(take);
+            result += static_cast<value_t>(bits) * scale;
+
+            remaining -= take;
         }
+
+        out() = result;
     }
+}
 
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::rand_impl(std::forward<decltype(elems)>(elems)...);
+} // namespace ufunc
+
+template <typename dtype = double,
+          typename EngineType = default_random_engine_t,
+          typename shape_t = core::extents<std::uint8_t>,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto rand(shape_t &&shape = shape_t{},
+                                  out_t &&out = out_t{std::nullopt},
+                                  const seed_t seed = make_random_seed()) {
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return empty<dtype>(std::forward<decltype(shape)>(shape));
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    static_assert(core::floating_point_c<
+                      typename core::to_mdspan_t<decltype(out_md)>::value_type>,
+                  "Output must have a floating point value type.");
+
+    auto engine = generator::EngineWrapper<EngineType>{seed.value};
+
+    core::batch<core::Backend::NATIVE,
+                core::to_mdspan_t<decltype(out_md)>::rank()>(
+        [&](auto &&...elems) {
+            ufunc::rand_ufunc(std::forward<decltype(elems)>(elems)..., engine);
         },
-        std::integer_sequence<bool, true>{}, in_mds);
+        out_md);
+
+    return out_md;
 }
 
-template <std::floating_point dtype = float,
-          core::MPMode mpmode = core::MPMode::NONE,
-          core::extents_c exts_t = core::extents<uint8_t>>
-[[nodiscard]] inline constexpr auto rand(exts_t &&exts = exts_t{}) noexcept {
-    auto out = empty<dtype>(std::forward<exts_t>(exts));
-    rand_to<mpmode>(out);
-    return out;
-}
-
-} // namespace random
-} // namespace mdtensor
+} // namespace mdtensor::random

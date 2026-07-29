@@ -9,41 +9,20 @@
 
 #pragma once
 
-#include "reshape.hpp"
+#include "../core/core.hpp"
 
 namespace mdtensor {
 
-template <int64_t Axis, typename in_t>
-[[nodiscard]] inline constexpr auto expand_dims(in_t &&in) noexcept {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-    using in_mds_t = decltype(in_mds);
+template <std::integral axes_t, axes_t... axes>
+[[nodiscard]] constexpr auto
+expand_dims(auto &&in, std::integer_sequence<axes_t, axes...>) {
+    return core::expand_dims(std::forward<decltype(in)>(in),
+                             std::integer_sequence<axes_t, axes...>{});
+}
 
-    constexpr size_t rank = in_mds_t::rank();
-
-    if constexpr (rank == 0) {
-        auto new_extents = core::extents<typename in_mds_t::index_type, 1>{1};
-        return core::mdspan<typename in_mds_t::element_type,
-                            decltype(new_extents)>{in_mds.data_handle(),
-                                                   new_extents};
-
-    } else {
-        constexpr size_t axis = static_cast<size_t>(
-            ((Axis % static_cast<int64_t>(rank + 1)) + (rank + 1)) %
-            (rank + 1));
-
-        const auto new_extents = [&in_mds]<size_t... Is>(
-                                     std::index_sequence<Is...>) {
-            return core::extents<
-                typename in_mds_t::index_type,
-                (Is < axis
-                     ? in_mds_t::static_extent(Is)
-                     : (Is == axis ? 1 : in_mds_t::static_extent(Is - 1)))...>{
-                (Is < axis ? in_mds.extent(Is)
-                           : (Is == axis ? 1 : in_mds.extent(Is - 1)))...};
-        }(std::make_index_sequence<rank + 1>{});
-
-        return reshape(std::forward<in_t>(in), new_extents);
-    }
+template <std::int64_t... axes>
+[[nodiscard]] constexpr auto expand_dims(auto &&in) {
+    return core::expand_dims<axes...>(std::forward<decltype(in)>(in));
 }
 
 } // namespace mdtensor

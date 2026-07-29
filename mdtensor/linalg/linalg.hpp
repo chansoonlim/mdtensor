@@ -20,30 +20,30 @@
 
 namespace mdtensor {
 
-inline constexpr void matmul_to(auto &&...elems) noexcept {
+constexpr void matmul_to(auto &&...elems) {
     linalg::matmul_to(std::forward<decltype(elems)>(elems)...);
 }
 
 template <typename dtype = void>
-[[nodiscard]] inline constexpr auto matmul(auto &&...elems) noexcept {
+[[nodiscard]] constexpr auto matmul(auto &&...elems) {
     return linalg::matmul<dtype>(std::forward<decltype(elems)>(elems)...);
 }
 
-inline constexpr void matvec_to(auto &&...elems) noexcept {
+constexpr void matvec_to(auto &&...elems) {
     linalg::matvec_to(std::forward<decltype(elems)>(elems)...);
 }
 
 template <typename dtype = void>
-[[nodiscard]] inline constexpr auto matvec(auto &&...elems) noexcept {
+[[nodiscard]] constexpr auto matvec(auto &&...elems) {
     return linalg::matvec<dtype>(std::forward<decltype(elems)>(elems)...);
 }
 
-inline constexpr void vecmat_to(auto &&...elems) noexcept {
+constexpr void vecmat_to(auto &&...elems) {
     linalg::vecmat_to(std::forward<decltype(elems)>(elems)...);
 }
 
 template <typename dtype = void>
-[[nodiscard]] inline constexpr auto vecmat(auto &&...elems) noexcept {
+[[nodiscard]] constexpr auto vecmat(auto &&...elems) {
     return linalg::vecmat<dtype>(std::forward<decltype(elems)>(elems)...);
 }
 

@@ -13,12 +13,12 @@
 
 namespace mdtensor {
 
-template <typename dtype = void, typename in_t>
-[[nodiscard]] inline constexpr auto empty_like(in_t &&in) noexcept {
-    using value_t = std::conditional_t<std::is_void_v<dtype>,
-                                       core::value_type_t<in_t>, dtype>;
+template <typename dtype = void>
+[[nodiscard]] constexpr auto empty_like(auto &&in) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+    using value_t = core::output_value_t<dtype, decltype(in_mds)>;
+
     return empty<value_t>(in_mds.extents());
 }
 

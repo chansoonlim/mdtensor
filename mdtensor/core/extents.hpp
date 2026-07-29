@@ -9,98 +9,148 @@
 
 #pragma once
 
-#include "type.hpp"
+#include "util.hpp"
 
-namespace mdtensor {
-namespace core {
+namespace mdtensor::core {
 
 template <extents_c in_t>
-[[nodiscard]] inline constexpr size_t extents_size(in_t &&in) noexcept {
-    using base_t = std::remove_cvref_t<in_t>;
+[[nodiscard]] constexpr std::size_t extents_size(in_t &&in) noexcept {
+    if constexpr (in.rank() == 0) {
+        // NOTE: mdspan with rank 0 can capture a single element.
+        return 1;
 
-    if constexpr (base_t::rank() == 0) {
-        return 0;
-
-    } else if constexpr (base_t::rank_dynamic() == 0) {
-        return []<size_t... Is>(std::index_sequence<Is...>) {
-            return (base_t::static_extent(Is) * ...);
-        }(std::make_index_sequence<base_t::rank()>{});
+    } else if constexpr (in.rank_dynamic() == 0) {
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            return (in.static_extent(Is) * ...);
+        }(std::make_index_sequence<in.rank()>{});
 
     } else {
-        return [&]<size_t... Is>(std::index_sequence<Is...>) {
-            return (in.extent(Is) * ...);
-        }(std::make_index_sequence<base_t::rank()>{});
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            return (static_cast<std::size_t>(in.extent(Is)) * ...);
+        }(std::make_index_sequence<in.rank()>{});
     }
 }
 
 template <extents_c in_t>
-[[nodiscard]] inline constexpr bool same_extents(in_t &&in) noexcept {
+[[nodiscard]] consteval bool is_always_same_extents() noexcept {
     return true;
 }
 
 template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
-[[nodiscard]] inline constexpr bool same_extents(in1_t &&in1, in2_t &&in2,
-                                                 ins_t &&...ins) noexcept {
-    // FIXME: direct comparision of extents has issues:
-    // It cannot capture the case where the ranks are different.
+[[nodiscard]] consteval bool is_always_same_extents() noexcept {
+    using base1_t = std::remove_cvref_t<in1_t>;
+    using base2_t = std::remove_cvref_t<in2_t>;
 
-    if constexpr (std::remove_cvref_t<in1_t>::rank() !=
-                  std::remove_cvref_t<in2_t>::rank()) {
+    if constexpr (base1_t::rank() != base2_t::rank()) {
         return false;
 
-    } else if (std::forward<in1_t>(in1) != std::forward<in2_t>(in2)) {
+    } else if constexpr (base1_t::rank_dynamic() != 0 ||
+                         base2_t::rank_dynamic() != 0) {
+        return false;
+
+    } else if constexpr ([&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                             return ((base1_t::static_extent(Is) !=
+                                      base2_t::static_extent(Is)) ||
+                                     ...);
+                         }(std::make_index_sequence<base1_t::rank()>{})) {
         return false;
     }
 
     if constexpr (sizeof...(ins_t) != 0) {
-        return same_extents(std::forward<in2_t>(in2),
-                            std::forward<ins_t>(ins)...);
+        return is_always_same_extents<in2_t, ins_t...>();
 
     } else {
         return true;
     }
 }
 
-template <size_t offset, size_t rank, extents_c in_t>
-[[nodiscard]] inline constexpr auto slice_extents(in_t &&in) noexcept {
-    using base_t = std::remove_cvref_t<in_t>;
+template <extents_c in_t>
+[[nodiscard]] constexpr bool is_same_extents(in_t &&in) noexcept {
+    return true;
+}
 
-    static_assert(base_t::rank() >= offset + rank,
+template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
+[[nodiscard]] constexpr bool is_same_extents(in1_t &&in1, in2_t &&in2,
+                                             ins_t &&...ins) noexcept {
+    using base1_t = std::remove_cvref_t<in1_t>;
+    using base2_t = std::remove_cvref_t<in2_t>;
+
+    if constexpr (base1_t::rank() != base2_t::rank()) {
+        return false;
+    }
+
+    using index_t = common_index_type_t<typename base1_t::index_type,
+                                        typename base2_t::index_type>;
+
+    for (std::size_t i = 0; i < base1_t::rank(); i++) {
+        if (static_cast<index_t>(in1.extent(i)) !=
+            static_cast<index_t>(in2.extent(i))) {
+            return false;
+        }
+    }
+
+    if constexpr (sizeof...(ins_t) != 0) {
+        return is_same_extents(in2, ins...);
+
+    } else {
+        return true;
+    }
+}
+
+template <std::size_t offset, std::size_t rank, extents_c in_t>
+[[nodiscard]] constexpr auto slice_extents(in_t &&in) noexcept {
+    using index_t = typename std::remove_cvref_t<in_t>::index_type;
+
+    static_assert(in.rank() >= offset + rank,
                   "Incompatible offset and rank for slicing.");
 
-    return [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return stdex::extents<typename base_t::index_type,
-                              base_t::static_extent(offset + Is)...>{
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return extents<index_t, in.static_extent(offset + Is)...>{
             in.extent(offset + Is)...};
     }(std::make_index_sequence<rank>{});
 }
 
-template <size_t rank, extents_c in_t>
-[[nodiscard]] inline constexpr auto
-slice_extents_from_left(in_t &&in) noexcept {
+template <std::size_t rank, extents_c in_t>
+[[nodiscard]] constexpr auto slice_extents_from_left(in_t &&in) noexcept {
     return slice_extents<0, rank>(std::forward<in_t>(in));
 }
 
-template <size_t rank, extents_c in_t>
-[[nodiscard]] inline constexpr auto
-slice_extents_from_right(in_t &&in) noexcept {
+template <std::size_t rank, extents_c in_t>
+[[nodiscard]] constexpr auto slice_extents_from_right(in_t &&in) noexcept {
     return slice_extents<std::remove_cvref_t<in_t>::rank() - rank, rank>(
         std::forward<in_t>(in));
 }
 
+[[nodiscard]] constexpr auto to_extents(auto &&shape) {
+    using base_t = std::remove_cvref_t<decltype(shape)>;
+
+    if constexpr (core::extents_c<base_t>) {
+        return std::forward<decltype(shape)>(shape);
+
+    } else if constexpr (integral_c<base_t>) {
+        if (shape < base_t{0}) {
+            throw std::invalid_argument("shape must be non-negative");
+        }
+
+        using index_t = std::make_unsigned_t<base_t>;
+
+        return core::dextents<index_t, 1>{static_cast<index_t>(shape)};
+    }
+}
+
 template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
-[[nodiscard]] inline constexpr auto compose_extents(in1_t &&in1, in2_t &&in2,
-                                                    ins_t &&...ins) noexcept {
+[[nodiscard]] constexpr auto compose_extents(in1_t &&in1, in2_t &&in2,
+                                             ins_t &&...ins) noexcept {
     using base1_t = std::remove_cvref_t<in1_t>;
     using base2_t = std::remove_cvref_t<in2_t>;
     using index_t = common_index_type_t<typename base1_t::index_type,
                                         typename base2_t::index_type>;
 
     const auto cexts =
-        [&]<size_t... Is, size_t... Js>(std::index_sequence<Is...>,
-                                        std::index_sequence<Js...>) {
-            return stdex::extents<index_t, base1_t::static_extent(Is)...,
-                                  base2_t::static_extent(Js)...>{
+        [&]<std::size_t... Is, std::size_t... Js>(std::index_sequence<Is...>,
+                                                  std::index_sequence<Js...>) {
+            return extents<index_t, base1_t::static_extent(Is)...,
+                           base2_t::static_extent(Js)...>{
                 static_cast<index_t>(in1.extent(Is))...,
                 static_cast<index_t>(in2.extent(Js))...};
         }(std::make_index_sequence<base1_t::rank()>{},
@@ -114,5 +164,41 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
     }
 }
 
-} // namespace core
-} // namespace mdtensor
+namespace {
+
+template <extents_c in_t>
+[[nodiscard]] constexpr auto expand_extents_dims_impl_(in_t &&in,
+                                                       std::index_sequence<>) {
+    return std::forward<in_t>(in);
+}
+
+template <extents_c in_t, std::size_t axis, std::size_t... axes>
+[[nodiscard]] constexpr auto
+expand_extents_dims_impl_(in_t &&in, std::index_sequence<axis, axes...>) {
+    // NOTE: this function requires ordered axes and does not check duplicates.
+
+    using base_t = std::remove_cvref_t<in_t>;
+
+    return expand_extents_dims_impl_(
+        compose_extents(slice_extents_from_left<axis>(std::forward<in_t>(in)),
+                        extents<uint8_t, 1>{},
+                        slice_extents_from_right<base_t::rank() - axis>(
+                            std::forward<in_t>(in))),
+        std::index_sequence<axes...>{});
+}
+
+} // namespace
+
+template <extents_c in_t, std::integral axes_t, axes_t... axes>
+[[nodiscard]] constexpr auto
+expand_extents_dims(in_t &&in, std::integer_sequence<axes_t, axes...>) {
+    constexpr auto axes_sorted = get_sorted_axes<in.rank() + sizeof...(axes)>(
+        std::integer_sequence<axes_t, axes...>{}, std::less<std::size_t>{});
+
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return expand_extents_dims_impl_(
+            std::forward<in_t>(in), std::index_sequence<axes_sorted[Is]...>{});
+    }(std::make_index_sequence<axes_sorted.size()>{});
+}
+
+} // namespace mdtensor::core

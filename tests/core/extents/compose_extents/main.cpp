@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Tests
+ * @brief test
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -9,15 +9,18 @@
 
 #include <gtest/gtest.h>
 
-#include "mdtensor/core/extents.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
-namespace stdex = std::experimental;
 namespace md = mdtensor;
 
 TEST(compose_extents, 1) {
-    constexpr auto exts1 = stdex::extents<size_t, 1, 2>{};
-    constexpr auto exts2 = stdex::extents<size_t, 3, 4>{};
-    constexpr auto exts = stdex::extents<size_t, 1, 2, 3, 4>{};
+    constexpr auto exts1 = md::core::extents<std::size_t, 1, 2>{};
+    constexpr auto exts2 = md::core::extents<std::size_t, 3, 4>{};
+    constexpr auto exts = md::core::extents<std::size_t, 1, 2, 3, 4>{};
 
     static_assert(md::core::compose_extents(exts1, exts2) == exts);
 }

@@ -12,35 +12,53 @@
 #include "../core/core.hpp"
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in_t, typename out_t>
-inline constexpr void cos_impl(in_t &&in, out_t &&out) {
-    out() = std::cos(in());
+constexpr void cos_ufunc(auto &&in, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
+    using value_t = core::common_data_type_t<decltype(in()), decltype(out())>;
+
+    out() = std::cos(static_cast<value_t>(in()));
 }
 
-} // namespace detail
+} // namespace ufunc
 
-template <core::MPMode mpmode = core::MPMode::NONE, typename in_t,
-          typename out_t>
-inline constexpr void cos_to(in_t &&in, out_t &&out) {
-    core::batch<mpmode>(
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto cos(auto &&in, out_t &&out = out_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            // NOTE: ensure that the output type is at least float precision
+            using value_t = core::output_value_t<
+                dtype, typename decltype(in_mds)::value_type, float>;
+
+            return core::make_output<value_t>(core::extents<std::uint8_t>{},
+                                              in_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::cos_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::cos_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, false, true>{}, std::forward<in_t>(in),
-        std::forward<out_t>(out));
-}
+        std::integer_sequence<bool, true, false, true>{},
+        std::forward<decltype(in)>(in), out_md,
+        std::forward<decltype(where)>(where));
 
-template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
-          typename in_t>
-[[nodiscard]] inline constexpr auto cos(in_t &&in) {
-    auto out = core::create_out<dtype>(core::extents<uint8_t>{},
-                                       std::forward<in_t>(in));
-
-    cos_to<mpmode>(std::forward<in_t>(in), out);
-
-    return out;
+    return out_md;
 }
 
 } // namespace mdtensor

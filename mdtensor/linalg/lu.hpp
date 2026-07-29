@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief SciPy-like LU decomposition utilities for mdtensor (linalg).
+ * @brief LU decomposition utilities for mdtensor (linalg).
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -11,35 +11,26 @@
 
 #include "../creation/arange.hpp"
 #include "../creation/copy.hpp"
+#include "../creation/empty.hpp"
 #include "../math/absolute.hpp"
 
-namespace mdtensor {
-namespace linalg {
-namespace detail {
+namespace mdtensor::linalg {
+namespace ufunc {
 
-template <core::md_c in_t, core::md_c p_indices_t, core::md_c l_t,
-          core::md_c u_t>
-inline constexpr void lu_p_indices_impl(in_t &&in, p_indices_t &&p_indices,
-                                        l_t &&l, u_t &&u) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+constexpr void lu_p_indices_ufunc(auto &&in, auto &&p_indices, auto &&l,
+                                  auto &&u) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
     const auto p_indices_mds =
-        core::to_mdspan(std::forward<p_indices_t>(p_indices));
-    const auto l_mds = core::to_mdspan(std::forward<l_t>(l));
-    const auto u_mds = core::to_mdspan(std::forward<u_t>(u));
+        core::to_output_mdspan(std::forward<decltype(p_indices)>(p_indices));
+    const auto l_mds = core::to_output_mdspan(std::forward<decltype(l)>(l));
+    const auto u_mds = core::to_output_mdspan(std::forward<decltype(u)>(u));
 
-    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
-    using p_indices_mds_t = std::remove_cvref_t<decltype(p_indices_mds)>;
-    using l_mds_t = std::remove_cvref_t<decltype(l_mds)>;
-    using u_mds_t = std::remove_cvref_t<decltype(u_mds)>;
-
-    static_assert(in_mds_t::rank() == 2);
-    static_assert(p_indices_mds_t::rank() == 1);
-    static_assert(l_mds_t::rank() == 2);
-    static_assert(u_mds_t::rank() == 2);
+    using in_mds_t = decltype(in_mds);
+    using p_indices_mds_t = decltype(p_indices_mds);
 
     using index_t = typename in_mds_t::index_type;
 
-    constexpr size_t m_s = in_mds_t::static_extent(0);
+    constexpr std::size_t m_s = in_mds_t::static_extent(0);
 
     const index_t m = in_mds.extent(0);
     const index_t n = in_mds.extent(1);
@@ -53,8 +44,7 @@ inline constexpr void lu_p_indices_impl(in_t &&in, p_indices_t &&p_indices,
 
     // initialize
     auto in_copy = copy(in_mds);
-    auto row_order =
-        core::make_container<index_t>(core::extents<index_t, m_s>{m});
+    auto row_order = empty<index_t>(core::extents<index_t, m_s>{m});
     for (index_t i = 0; i < m; i++) {
         row_order(i) = i;
     }
@@ -132,33 +122,24 @@ inline constexpr void lu_p_indices_impl(in_t &&in, p_indices_t &&p_indices,
     }
 }
 
-template <core::md_c in_t, core::md_c p_t, core::md_c l_t, core::md_c u_t>
-inline constexpr void lu_full_impl(in_t &&in, p_t &&p, l_t &&l, u_t &&u) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-    const auto p_mds = core::to_mdspan(std::forward<p_t>(p));
-    const auto l_mds = core::to_mdspan(std::forward<l_t>(l));
-    const auto u_mds = core::to_mdspan(std::forward<u_t>(u));
+constexpr void lu_full_ufunc(auto &&in, auto &&p, auto &&l, auto &&u) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+    const auto p_mds = core::to_output_mdspan(std::forward<decltype(p)>(p));
+    const auto l_mds = core::to_output_mdspan(std::forward<decltype(l)>(l));
+    const auto u_mds = core::to_output_mdspan(std::forward<decltype(u)>(u));
 
-    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
-    using p_mds_t = std::remove_cvref_t<decltype(p_mds)>;
-    using l_mds_t = std::remove_cvref_t<decltype(l_mds)>;
-    using u_mds_t = std::remove_cvref_t<decltype(u_mds)>;
-
-    static_assert(in_mds_t::rank() == 2);
-    static_assert(p_mds_t::rank() == 2);
-    static_assert(l_mds_t::rank() == 2);
-    static_assert(u_mds_t::rank() == 2);
+    using in_mds_t = decltype(in_mds);
+    using p_mds_t = decltype(p_mds);
 
     using index_t = typename p_mds_t::index_type;
 
-    constexpr size_t m_s = in_mds_t::static_extent(0);
+    constexpr std::size_t m_s = in_mds_t::static_extent(0);
 
     const index_t m = in_mds.extent(0);
 
-    auto p_indices =
-        core::make_container<index_t>(core::extents<index_t, m_s>{m});
+    auto p_indices = empty<index_t>(core::extents<index_t, m_s>{m});
 
-    lu_p_indices_impl(in_mds, p_indices, l_mds, u_mds);
+    lu_p_indices_ufunc(in_mds, p_indices, l_mds, u_mds);
 
     for (index_t i = 0; i < m; i++) {
         for (index_t j = 0; j < m; j++) {
@@ -167,26 +148,20 @@ inline constexpr void lu_full_impl(in_t &&in, p_t &&p, l_t &&l, u_t &&u) {
     }
 }
 
-template <core::md_c in_t, core::md_c pl_t, core::md_c u_t>
-inline constexpr void lu_permute_l_impl(in_t &&in, pl_t &&pl, u_t &&u) {
-    auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-    auto pl_mds = core::to_mdspan(std::forward<pl_t>(pl));
-    auto u_mds = core::to_mdspan(std::forward<u_t>(u));
+constexpr void lu_permute_l_ufunc(auto &&in, auto &&pl, auto &&u) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+    const auto pl_mds = core::to_output_mdspan(std::forward<decltype(pl)>(pl));
+    const auto u_mds = core::to_output_mdspan(std::forward<decltype(u)>(u));
 
-    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
-    using pl_mds_t = std::remove_cvref_t<decltype(pl_mds)>;
-    using u_mds_t = std::remove_cvref_t<decltype(u_mds)>;
-
-    static_assert(in_mds_t::rank() == 2);
-    static_assert(pl_mds_t::rank() == 2);
-    static_assert(u_mds_t::rank() == 2);
+    using in_mds_t = decltype(in_mds);
+    using pl_mds_t = decltype(pl_mds);
 
     using index_t = typename in_mds_t::index_type;
     using value_t = typename pl_mds_t::value_type;
 
-    constexpr size_t m_s = in_mds_t::static_extent(0);
-    constexpr size_t n_s = in_mds_t::static_extent(1);
-    constexpr size_t k_s = [] {
+    constexpr std::size_t m_s = in_mds_t::static_extent(0);
+    constexpr std::size_t n_s = in_mds_t::static_extent(1);
+    constexpr std::size_t k_s = [] {
         if constexpr (m_s == dyn || n_s == dyn) {
             return dyn;
 
@@ -199,12 +174,10 @@ inline constexpr void lu_permute_l_impl(in_t &&in, pl_t &&pl, u_t &&u) {
     const index_t n = in_mds.extent(1);
     const index_t k = m < n ? m : n;
 
-    auto p_indices =
-        core::make_container<index_t>(core::extents<index_t, m_s>{m});
-    auto l =
-        core::make_container<value_t>(core::extents<index_t, m_s, k_s>{m, k});
+    auto p_indices = empty<index_t>(core::extents<index_t, m_s>{m});
+    auto l = empty<value_t>(core::extents<index_t, m_s, k_s>{m, k});
 
-    lu_p_indices_impl(in_mds, p_indices, l, u_mds);
+    lu_p_indices_ufunc(in_mds, p_indices, l, u_mds);
 
     // Apply the permutation to L
     for (index_t i = 0; i < m; i++) {
@@ -214,61 +187,58 @@ inline constexpr void lu_permute_l_impl(in_t &&in, pl_t &&pl, u_t &&u) {
     }
 }
 
-} // namespace detail
+} // namespace ufunc
 
-template <core::MPMode mpmode = core::MPMode::NONE, typename in_t,
-          typename p_indices_t, typename l_t, typename u_t>
-inline constexpr void lu_p_indices_to(in_t &&in, p_indices_t &&p_indices,
-                                      l_t &&l, u_t &&u) {
-    core::batch<mpmode>(
+template <core::Backend backend = core::Backend::AUTO>
+constexpr void lu_p_indices_to(auto &&in, auto &&p_indices, auto &&l,
+                               auto &&u) {
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::lu_p_indices_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::lu_p_indices_ufunc(std::forward<decltype(elems)>(elems)...);
         },
         std::index_sequence<2, 1, 2, 2>{},
-        std::integer_sequence<bool, false, true, true, true>{},
-        std::forward<in_t>(in), std::forward<p_indices_t>(p_indices),
-        std::forward<l_t>(l), std::forward<u_t>(u));
+        std::integer_sequence<bool, true, false, false, false>{},
+        std::forward<decltype(in)>(in),
+        std::forward<decltype(p_indices)>(p_indices),
+        std::forward<decltype(l)>(l), std::forward<decltype(u)>(u));
 }
 
-template <core::MPMode mpmode = core::MPMode::NONE, typename in_t, typename p_t,
-          typename l_t, typename u_t>
-inline constexpr void lu_full_to(in_t &&in, p_t &&p, l_t &&l, u_t &&u) {
-    core::batch<mpmode>(
+template <core::Backend backend = core::Backend::AUTO>
+constexpr void lu_full_to(auto &&in, auto &&p, auto &&l, auto &&u) {
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::lu_full_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::lu_full_ufunc(std::forward<decltype(elems)>(elems)...);
         },
         std::index_sequence<2, 2, 2, 2>{},
-        std::integer_sequence<bool, false, true, true, true>{},
-        std::forward<in_t>(in), std::forward<p_t>(p), std::forward<l_t>(l),
-        std::forward<u_t>(u));
+        std::integer_sequence<bool, true, false, false, false>{},
+        std::forward<decltype(in)>(in), std::forward<decltype(p)>(p),
+        std::forward<decltype(l)>(l), std::forward<decltype(u)>(u));
 }
 
-template <core::MPMode mpmode = core::MPMode::NONE, typename in_t,
-          typename pl_t, typename u_t>
-inline constexpr void lu_permute_l_to(in_t &&in, pl_t &&pl, u_t &&u) {
-    core::batch<mpmode>(
+template <core::Backend backend = core::Backend::AUTO>
+constexpr void lu_permute_l_to(auto &&in, auto &&pl, auto &&u) {
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::lu_permute_l_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::lu_permute_l_ufunc(std::forward<decltype(elems)>(elems)...);
         },
         std::index_sequence<2, 2, 2>{},
-        std::integer_sequence<bool, false, true, true>{},
-        std::forward<in_t>(in), std::forward<pl_t>(pl), std::forward<u_t>(u));
+        std::integer_sequence<bool, true, false, false>{},
+        std::forward<decltype(in)>(in), std::forward<decltype(pl)>(pl),
+        std::forward<decltype(u)>(u));
 }
 
-template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
-          typename in_t>
-[[nodiscard]] inline constexpr auto lu_p_indices(in_t &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto lu_p_indices(auto &&in) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
-
+    using in_mds_t = decltype(in_mds);
     using index_t = typename in_mds_t::index_type;
 
-    constexpr size_t rank = in_mds_t::rank();
+    constexpr std::size_t rank = in_mds_t::rank();
 
-    constexpr size_t m_s = in_mds_t::static_extent(rank - 2);
-    constexpr size_t n_s = in_mds_t::static_extent(rank - 1);
-    constexpr size_t k_s = [] {
+    constexpr std::size_t m_s = in_mds_t::static_extent(rank - 2);
+    constexpr std::size_t n_s = in_mds_t::static_extent(rank - 1);
+    constexpr std::size_t k_s = [] {
         if constexpr (m_s == dyn || n_s == dyn) {
             return dyn;
 
@@ -281,33 +251,31 @@ template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
     const index_t n = in_mds.extent(rank - 1);
     const index_t k = m < n ? m : n;
 
-    auto outs = core::create_outs<dtype>(
+    auto outs = core::make_outputs<dtype>(
         std::index_sequence<2>{},
         std::tuple{extents<index_t, m_s>{m},
                    core::extents<index_t, m_s, k_s>{m, k},
                    core::extents<index_t, k_s, n_s>{k, n}},
         in_mds);
 
-    lu_p_indices_to<mpmode>(in_mds, std::get<0>(outs), std::get<1>(outs),
-                            std::get<2>(outs));
+    lu_p_indices_to<backend>(in_mds, std::get<0>(outs), std::get<1>(outs),
+                             std::get<2>(outs));
 
     return outs;
 }
 
-template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
-          typename in_t>
-[[nodiscard]] inline constexpr auto lu_full(in_t &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto lu_full(auto &&in) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
-
+    using in_mds_t = decltype(in_mds);
     using index_t = typename in_mds_t::index_type;
 
-    constexpr size_t rank = in_mds_t::rank();
+    constexpr std::size_t rank = in_mds_t::rank();
 
-    constexpr size_t m_s = in_mds_t::static_extent(rank - 2);
-    constexpr size_t n_s = in_mds_t::static_extent(rank - 1);
-    constexpr size_t k_s = [] {
+    constexpr std::size_t m_s = in_mds_t::static_extent(rank - 2);
+    constexpr std::size_t n_s = in_mds_t::static_extent(rank - 1);
+    constexpr std::size_t k_s = [] {
         if constexpr (m_s == dyn || n_s == dyn) {
             return dyn;
 
@@ -320,33 +288,31 @@ template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
     const index_t n = in_mds.extent(rank - 1);
     const index_t k = m < n ? m : n;
 
-    auto outs = core::create_outs<dtype>(
+    auto outs = core::make_outputs<dtype>(
         std::index_sequence<2>{},
         std::tuple{extents<index_t, m_s, m_s>{m, m},
                    core::extents<index_t, m_s, k_s>{m, k},
                    core::extents<index_t, k_s, n_s>{k, n}},
         in_mds);
 
-    lu_full_to<mpmode>(in_mds, std::get<0>(outs), std::get<1>(outs),
-                       std::get<2>(outs));
+    lu_full_to<backend>(in_mds, std::get<0>(outs), std::get<1>(outs),
+                        std::get<2>(outs));
 
     return outs;
 }
 
-template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
-          typename in_t>
-[[nodiscard]] inline constexpr auto lu_permute_l(in_t &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto lu_permute_l(auto &&in) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
-
+    using in_mds_t = decltype(in_mds);
     using index_t = typename in_mds_t::index_type;
 
-    constexpr size_t rank = in_mds_t::rank();
+    constexpr std::size_t rank = in_mds_t::rank();
 
-    constexpr size_t m_s = in_mds_t::static_extent(rank - 2);
-    constexpr size_t n_s = in_mds_t::static_extent(rank - 1);
-    constexpr size_t k_s = [] {
+    constexpr std::size_t m_s = in_mds_t::static_extent(rank - 2);
+    constexpr std::size_t n_s = in_mds_t::static_extent(rank - 1);
+    constexpr std::size_t k_s = [] {
         if constexpr (m_s == dyn || n_s == dyn) {
             return dyn;
 
@@ -359,33 +325,32 @@ template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
     const index_t n = in_mds.extent(rank - 1);
     const index_t k = m < n ? m : n;
 
-    auto outs = core::create_outs<dtype>(
+    auto outs = core::make_outputs<dtype>(
         std::index_sequence<2>{},
         std::tuple{extents<index_t, m_s, k_s>{m, k},
                    core::extents<index_t, k_s, n_s>{k, n}},
         in_mds);
 
-    lu_permute_l_to<mpmode>(in_mds, std::get<0>(outs), std::get<1>(outs));
+    lu_permute_l_to<backend>(in_mds, std::get<0>(outs), std::get<1>(outs));
 
     return outs;
 }
 
 template <bool permute_l = false, bool p_indices = false, typename dtype = void,
-          core::MPMode mpmode = core::MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto lu(in_t &&in) {
+          core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto lu(auto &&in) {
     static_assert(!(permute_l && p_indices),
                   "lu cannot return both permuted L and P indices.");
 
     if constexpr (permute_l) {
-        return lu_permute_l<dtype, mpmode>(std::forward<in_t>(in));
+        return lu_permute_l<dtype, backend>(std::forward<decltype(in)>(in));
 
     } else if constexpr (p_indices) {
-        return lu_p_indices<dtype, mpmode>(std::forward<in_t>(in));
+        return lu_p_indices<dtype, backend>(std::forward<decltype(in)>(in));
 
     } else {
-        return lu_full<dtype, mpmode>(std::forward<in_t>(in));
+        return lu_full<dtype, backend>(std::forward<decltype(in)>(in));
     }
 }
 
-} // namespace linalg
-} // namespace mdtensor
+} // namespace mdtensor::linalg

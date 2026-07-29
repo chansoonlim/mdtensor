@@ -14,13 +14,15 @@
 
 namespace mdtensor {
 
-template <core::MPMode mpmode = core::MPMode::NONE, typename in1_t,
-          typename in2_t>
-[[nodiscard]] inline constexpr bool allclose(in1_t &&in1, in2_t &&in2,
-                                             const double &rtol = 1e-05,
-                                             const double &atol = 1e-08) {
-    return all(isclose<int8_t, mpmode>(std::forward<in1_t>(in1),
-                                       std::forward<in2_t>(in2), rtol, atol));
+template <core::Backend backend = core::Backend::AUTO, typename rtol_t = double,
+          typename atol_t = double>
+[[nodiscard]] constexpr bool
+allclose(auto &&in1, auto &&in2, rtol_t &&rtol = rtol_t{1e-05},
+         atol_t &&atol = atol_t{1e-08}, const bool equal_nan = false) {
+    return all<void, false, core::Backend::NATIVE>(isclose<bool, backend>(
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        std::forward<decltype(rtol)>(rtol), std::forward<decltype(atol)>(atol),
+        std::nullopt, equal_nan));
 }
 
 } // namespace mdtensor

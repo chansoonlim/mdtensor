@@ -9,38 +9,38 @@
 
 #pragma once
 
-#include "../core/core.hpp"
+#include "empty_like.hpp"
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in_t, typename out_t>
-inline constexpr void copy_impl(in_t &&in, out_t &&out) {
-    out() = in();
-}
+constexpr void copy_ufunc(auto &&in, auto &&out) { out() = in(); }
 
-} // namespace detail
+} // namespace ufunc
 
-template <core::MPMode mpmode = core::MPMode::NONE, typename in_t,
-          typename out_t>
-inline constexpr void copy_to(in_t &&in, out_t &&out) {
-    core::batch<mpmode>(
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto copy(auto &&in,
+                                  out_t &&out = out_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return empty_like<dtype>(in_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::copy_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::copy_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, false, true>{}, std::forward<in_t>(in),
-        std::forward<out_t>(out));
-}
+        std::integer_sequence<bool, true, false>{},
+        std::forward<decltype(in)>(in), out_md);
 
-template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
-          typename in_t>
-[[nodiscard]] inline constexpr auto copy(in_t &&in) {
-    auto out = core::create_out<dtype>(core::extents<uint8_t>{},
-                                       std::forward<in_t>(in));
-
-    copy_to<mpmode>(std::forward<in_t>(in), out);
-
-    return out;
+    return out_md;
 }
 
 } // namespace mdtensor

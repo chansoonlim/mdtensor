@@ -13,9 +13,10 @@
 
 namespace mdtensor {
 
-template <typename dtype, core::extents_c exts_t = core::extents<uint8_t>>
-[[nodiscard]] inline constexpr auto empty(exts_t &&exts = exts_t{}) noexcept {
-    return core::make_container<dtype>(std::forward<exts_t>(exts));
+template <typename dtype = double>
+[[nodiscard]] constexpr auto empty(auto &&shape) {
+    return core::make_container<dtype>(
+        core::to_extents(std::forward<decltype(shape)>(shape)));
 }
 
 } // namespace mdtensor

@@ -1,60 +1,125 @@
+/**
+ * @file
+ * @brief test
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
 #include <gtest/gtest.h>
 
-#include "mdtensor/creation/arange.hpp"
-#include "mdtensor/creation/ones.hpp"
-#include "mdtensor/logic/array_equal.hpp"
-#include "mdtensor/manipulation/reshape.hpp"
-#include "mdtensor/manipulation/transpose.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
 namespace md = mdtensor;
 
-TEST(test, 1) {
-    using T = double;
+TEST(run_time, 1) {
+    using value_t = double;
+    using index_t = std::size_t;
 
-    constexpr auto a = md::container<T, md::extents<size_t, 2, 2>>{
-        {1, 2, 3, 4}, md::extents<size_t, 2, 2>{}};
+    const auto a =
+        md::container<value_t, md::dims<2>>{{1, 2, 3, 4}, md::dims<2>{2, 2}};
+
+    const auto a_t = md::transpose(a);
+
+    EXPECT_TRUE(md::array_equal(
+        a_t, md::container<value_t, md::extents<index_t, 2, 2>>{{1, 3, 2, 4}}));
+}
+
+TEST(run_time, 2) {
+    using value_t = double;
+    using index_t = std::size_t;
+
+    const auto a =
+        md::container<value_t, md::dims<1>>{{1, 2, 3, 4}, md::dims<1>{4}};
+    const auto a_t = md::transpose(a);
+
+    EXPECT_TRUE(md::array_equal(
+        a_t, md::container<value_t, md::extents<index_t, 4>>{{1, 2, 3, 4}}));
+}
+
+TEST(run_time, 3) {
+    using index_t = std::size_t;
+
+    const auto a = md::ones(md::dims<3>{1, 2, 3});
+    const auto a_t = md::transpose<1, 0, 2>(a);
+
+    EXPECT_TRUE(
+        md::is_same_extents(a_t.extents(), md::extents<index_t, 2, 1, 3>{}));
+}
+
+TEST(run_time, 4) {
+    using index_t = std::size_t;
+
+    const auto a = md::ones(md::dims<4>{2, 3, 4, 5});
+    const auto a_t = md::transpose(a);
+
+    EXPECT_TRUE(
+        md::is_same_extents(a_t.extents(), md::extents<index_t, 5, 4, 3, 2>{}));
+}
+
+TEST(run_time, 5) {
+    using index_t = std::size_t;
+
+    const auto a = md::reshape(md::arange(3 * 4 * 5), md::dims<3>{3, 4, 5});
+    const auto a_t = md::transpose<-1, 0, -2>(a);
+
+    EXPECT_TRUE(
+        md::is_same_extents(a_t.extents(), md::extents<index_t, 5, 3, 4>{}));
+}
+
+TEST(compile_time, 1) {
+    using value_t = double;
+    using index_t = std::size_t;
+
+    constexpr auto a =
+        md::container<value_t, md::extents<index_t, 2, 2>>{{1, 2, 3, 4}};
 
     static_assert(md::array_equal(
-        md::transpose(a), md::container<T, md::extents<size_t, 2, 2>>{
-                              {1, 3, 2, 4}, md::extents<size_t, 2, 2>{}}));
+        md::transpose(a),
+        md::container<value_t, md::extents<index_t, 2, 2>>{{1, 3, 2, 4}}));
 }
 
-TEST(test, 2) {
-    using T = double;
+TEST(compile_time, 2) {
+    using value_t = double;
+    using index_t = std::size_t;
 
-    constexpr auto a = md::container<T, md::extents<size_t, 4>>{
-        {1, 2, 3, 4}, md::extents<size_t, 4>{}};
+    constexpr auto a =
+        md::container<value_t, md::extents<index_t, 4>>{{1, 2, 3, 4}};
 
-    static_assert(md::array_equal(md::transpose(a), a));
+    static_assert(md::array_equal(
+        md::transpose(a),
+        md::container<value_t, md::extents<index_t, 4>>{{1, 2, 3, 4}}));
 }
 
-TEST(test, 3) {
-    using T = double;
+TEST(compile_time, 3) {
+    using index_t = std::size_t;
 
-    constexpr auto a = md::ones<T>(md::extents<size_t, 1, 2, 3>{});
+    constexpr auto a = md::ones(md::extents<index_t, 1, 2, 3>{});
 
-    static_assert(md::core::same_extents(
-        md::transpose(a, std::integer_sequence<size_t, 1, 0, 2>{}).extents(),
-        md::extents<size_t, 2, 1, 3>{}));
+    static_assert(md::is_same_extents(md::transpose<1, 0, 2>(a).extents(),
+                                      md::extents<index_t, 2, 1, 3>{}));
 }
 
-TEST(test, 4) {
-    using T = double;
+TEST(compile_time, 4) {
+    using index_t = std::size_t;
 
-    constexpr auto a = md::ones<T>(md::extents<size_t, 2, 3, 4, 5>{});
+    constexpr auto a = md::ones(md::extents<index_t, 2, 3, 4, 5>{});
 
-    static_assert(md::core::same_extents(md::transpose(a).extents(),
-                                         md::extents<size_t, 5, 4, 3, 2>{}));
+    static_assert(md::is_same_extents(md::transpose(a).extents(),
+                                      md::extents<index_t, 5, 4, 3, 2>{}));
 }
 
-TEST(test, 5) {
-    using T = double;
+TEST(compile_time, 5) {
+    using index_t = std::size_t;
 
-    const auto a = md::arange<T>(60);
+    constexpr auto a =
+        md::reshape(md::arange<3 * 4 * 5>(), md::extents<index_t, 3, 4, 5>{});
 
-    ASSERT_TRUE(md::core::same_extents(
-        md::transpose(md::reshape(a, md::extents<size_t, 3, 4, 5>{}),
-                      std::integer_sequence<int, -1, 0, -2>{})
-            .extents(),
-        md::extents<size_t, 5, 3, 4>{}));
+    static_assert(md::is_same_extents(md::transpose<-1, 0, -2>(a).extents(),
+                                      md::extents<index_t, 5, 3, 4>{}));
 }

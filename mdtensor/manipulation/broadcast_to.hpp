@@ -13,11 +13,9 @@
 
 namespace mdtensor {
 
-template <typename in_t, core::extents_c new_extents_t>
-[[nodiscard]] inline constexpr auto
-broadcast_to(in_t &&in, new_extents_t &&new_extents) noexcept {
-    return core::broadcast_to(std::forward<in_t>(in),
-                              std::forward<new_extents_t>(new_extents));
+[[nodiscard]] constexpr auto broadcast_to(auto &&in, auto &&shape) {
+    return core::broadcast_to(std::forward<decltype(in)>(in),
+                              std::forward<decltype(shape)>(shape));
 }
 
 } // namespace mdtensor

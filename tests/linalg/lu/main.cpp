@@ -1,16 +1,25 @@
+/**
+ * @file
+ * @brief test
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
 #include <gtest/gtest.h>
 
-#include "mdtensor/linalg/lu.hpp"
-#include "mdtensor/linalg/matmul.hpp"
-#include "mdtensor/logic/allclose.hpp"
-#include "mdtensor/logic/array_equal.hpp"
-#include "mdtensor/random/uniform.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
 namespace md = mdtensor;
 
-TEST(test, 1) {
+TEST(compile_time, 1) {
     using value_t = double;
-    using index_t = uint8_t;
+    using index_t = std::size_t;
 
     constexpr auto a = md::container<value_t, md::extents<index_t, 4, 4>>{
         {2, 5, 8, 7, 5, 2, 2, 8, 7, 5, 6, 6, 5, 4, 4, 8}};
@@ -43,24 +52,26 @@ TEST(test, 1) {
     static_assert(md::allclose(a, md::linalg::matmul(pl, u1)));
 }
 
-TEST(test, 2) {
+TEST(compile_time, 2) {
     using value_t = double;
-    using index_t = uint8_t;
+    using index_t = std::size_t;
 
     constexpr auto a =
-        md::random::uniform<value_t>(md::extents<index_t, 3, 2, 4, 8>{}, -4, 4);
+        md::random::uniform<value_t, md::random::generator::SplitMix64>(
+            md::extents<index_t, 3, 2, 4, 8>{}, -4, 4, std::nullopt,
+            md::random::seed_t{0});
 
     constexpr auto out1 = md::linalg::lu(a);
     constexpr auto p1 = std::get<0>(out1);
     constexpr auto l1 = std::get<1>(out1);
     constexpr auto u1 = std::get<2>(out1);
 
-    static_assert(md::core::same_extents(p1.extents(),
-                                         md::extents<index_t, 3, 2, 4, 4>{}));
-    static_assert(md::core::same_extents(l1.extents(),
-                                         md::extents<index_t, 3, 2, 4, 4>{}));
-    static_assert(md::core::same_extents(u1.extents(),
-                                         md::extents<index_t, 3, 2, 4, 8>{}));
+    static_assert(
+        md::is_same_extents(p1.extents(), md::extents<index_t, 3, 2, 4, 4>{}));
+    static_assert(
+        md::is_same_extents(l1.extents(), md::extents<index_t, 3, 2, 4, 4>{}));
+    static_assert(
+        md::is_same_extents(u1.extents(), md::extents<index_t, 3, 2, 4, 8>{}));
 
     static_assert(md::allclose(
         a, md::linalg::matmul(p1, md::linalg::matmul(l1, u1)), 0, 1e-5));

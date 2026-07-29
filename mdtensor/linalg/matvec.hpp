@@ -12,36 +12,45 @@
 #include "../creation/copy.hpp"
 #include "../creation/empty_like.hpp"
 
-namespace mdtensor {
-namespace linalg {
-namespace detail {
+#ifdef MDTENSOR_USE_EIGEN
+#include "../core/eigen/eigen.hpp"
+#endif
 
-template <core::md_c in1_t, core::md_c in2_t, core::md_c out_t>
-inline constexpr void matvec_naive_noalias(in1_t &&in1, in2_t &&in2,
-                                           out_t &&out) noexcept {
-    using out_index_t = typename std::remove_cvref_t<out_t>::index_type;
-    using in1_index_t = typename std::remove_cvref_t<in1_t>::index_type;
+namespace mdtensor::linalg {
+namespace ufunc {
 
-    for (out_index_t i = 0; i < out.extent(0); i++) {
-        out(i) = 0;
+constexpr void matvec_native_noalias(auto &&in1, auto &&in2, auto &&out) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
 
-        for (in1_index_t j = 0; j < in1.extent(1); j++) {
-            out(i) += in1(i, j) * in2(j);
+    using out_index_t = typename decltype(out_mds)::index_type;
+    using in1_index_t = typename decltype(in1_mds)::index_type;
+
+    for (out_index_t i = 0; i < out_mds.extent(0); i++) {
+        out_mds(i) = 0;
+
+        for (in1_index_t j = 0; j < in1_mds.extent(1); j++) {
+            out_mds(i) += in1_mds(i, j) * in2_mds(j);
         }
     }
 }
 
-template <core::md_c in1_t, core::md_c in2_t, core::md_c out_t>
-inline constexpr void matvec_naive(in1_t &&in1, in2_t &&in2,
-                                   out_t &&out) noexcept {
-    const auto in1_mds = core::to_const_mdspan(std::forward<in1_t>(in1));
-    const auto in2_mds = core::to_const_mdspan(std::forward<in2_t>(in2));
-    auto out_mds = core::to_mdspan(std::forward<out_t>(out));
+constexpr void matvec_naive(auto &&in1, auto &&in2, auto &&out) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
 
     if (std::is_constant_evaluated()) {
         auto out_tmp = empty_like(out_mds);
-        matvec_naive_noalias(in1_mds, in2_mds, out_tmp.to_mdspan());
-        copy_to(out_tmp, out_mds);
+        matvec_native_noalias(in1_mds, in2_mds, out_tmp);
+        static_cast<void>(copy(out_tmp, out_mds));
         return;
     }
 
@@ -50,7 +59,7 @@ inline constexpr void matvec_naive(in1_t &&in1, in2_t &&in2,
     if constexpr (requires {
                       in1_mds.data_handle() == out_mds.data_handle();
                   }) {
-        if (in1_mds.data_handle() == out_mds.data_handle()) [[unlikely]] {
+        if (in1_mds.data_handle() == out_mds.data_handle()) {
             need_copy = true;
         }
     }
@@ -58,44 +67,54 @@ inline constexpr void matvec_naive(in1_t &&in1, in2_t &&in2,
     if constexpr (requires {
                       in2_mds.data_handle() == out_mds.data_handle();
                   }) {
-        if (in2_mds.data_handle() == out_mds.data_handle()) [[unlikely]] {
+        if (in2_mds.data_handle() == out_mds.data_handle()) {
             need_copy = true;
         }
     }
 
-    if (!need_copy) [[likely]] {
-        matvec_naive_noalias(in1_mds, in2_mds, out_mds);
+    if (!need_copy) {
+        matvec_native_noalias(in1_mds, in2_mds, out_mds);
 
-    } else [[unlikely]] {
+    } else {
         auto out_tmp = empty_like(out_mds);
-        matvec_naive_noalias(in1_mds, in2_mds, out_tmp.to_mdspan());
-        copy_to(out_tmp, out_mds);
+        matvec_native_noalias(in1_mds, in2_mds, out_tmp);
+        static_cast<void>(copy(out_tmp, out_mds));
     }
 }
 
-template <core::md_c in1_t, core::md_c in2_t, core::md_c out_t>
-inline constexpr void matvec_impl(in1_t &&in1, in2_t &&in2,
-                                  out_t &&out) noexcept {
+constexpr void matvec_ufunc(auto &&in1, auto &&in2, auto &&out) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
+
 #ifdef MDTENSOR_USE_EIGEN
 #if __cplusplus >= 202302L // TODO: Impliement for C++20
-    if constexpr (core::eigen::eigen_mappable_mdspan_c<in1_t> &&
-                  core::eigen::eigen_mappable_mdspan_c<in2_t> &&
-                  core::eigen::eigen_mappable_mdspan_c<out_t>) {
-        if (!std::is_constant_evaluated() && 8 <= out.extent(0) + out.extent(1))
-            [[likely]] {
+    using in1_mds_t = decltype(in1_mds);
+    using in2_mds_t = decltype(in2_mds);
+    using out_mds_t = decltype(out_mds);
+
+    if constexpr (core::eigen::eigen_mappable_c<in1_mds_t> &&
+                  core::eigen::eigen_mappable_c<in2_mds_t> &&
+                  core::eigen::eigen_mappable_c<out_mds_t>) {
+        if (!std::is_constant_evaluated() &&
+            8 <= out_mds.extent(0) + out_mds.extent(1)) {
             using value_t = core::common_data_type_t<
-                typename std::remove_cvref_t<in1_t>::value_type,
-                typename std::remove_cvref_t<in2_t>::value_type>;
+                typename std::remove_cvref_t<in1_mds_t>::value_type,
+                typename std::remove_cvref_t<in2_mds_t>::value_type>;
 
             const auto ein1 =
-                core::eigen::to_eigen(in1).template cast<value_t>();
+                core::eigen::to_eigen(in1_mds).template cast<value_t>();
             const auto ein2 =
-                core::eigen::to_eigen(in2).template cast<value_t>();
-            auto eout = core::eigen::to_eigen(out);
+                core::eigen::to_eigen(in2_mds).template cast<value_t>();
+            auto eout = core::eigen::to_eigen(out_mds);
 
-            eout = (ein1 * ein2)
-                       .template cast<
-                           typename std::remove_cvref_t<out_t>::value_type>();
+            eout =
+                (ein1 * ein2)
+                    .template cast<
+                        typename std::remove_cvref_t<out_mds_t>::value_type>();
 
             return;
         }
@@ -107,30 +126,29 @@ inline constexpr void matvec_impl(in1_t &&in1, in2_t &&in2,
 #endif
 #endif
 
-    matvec_naive(in1, in2, out);
+    matvec_naive(in1_mds, in2_mds, out_mds);
 }
 
-} // namespace detail
+} // namespace ufunc
 
-template <core::MPMode mpmode = core::MPMode::NONE, typename in1_t,
-          typename in2_t, typename out_t>
-inline constexpr void matvec_to(in1_t &&in1, in2_t &&in2,
-                                out_t &&out) noexcept {
-    core::batch<mpmode>(
+template <core::Backend backend = core::Backend::AUTO>
+constexpr void matvec_to(auto &&in1, auto &&in2, auto &&out) {
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::matvec_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::matvec_ufunc(std::forward<decltype(elems)>(elems)...);
         },
         std::index_sequence<2, 1, 1>{},
-        std::integer_sequence<bool, false, false, true>{},
-        std::forward<in1_t>(in1), std::forward<in2_t>(in2),
-        std::forward<out_t>(out));
+        std::integer_sequence<bool, true, true, false>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        std::forward<decltype(out)>(out));
 }
 
-template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
-          typename in1_t, typename in2_t>
-[[nodiscard]] inline constexpr auto matvec(in1_t &&in1, in2_t &&in2) noexcept {
-    const auto in1_mds = core::to_const_mdspan(std::forward<in1_t>(in1));
-    const auto in2_mds = core::to_const_mdspan(std::forward<in2_t>(in2));
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto matvec(auto &&in1, auto &&in2) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
     const auto uin1_exts = core::slice_extents_from_right<2>(in1_mds.extents());
     const auto uin2_exts = core::slice_extents_from_right<2>(in2_mds.extents());
@@ -139,13 +157,12 @@ template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
                                   typename decltype(uin2_exts)::index_type>,
         decltype(uin1_exts)::static_extent(0)>{uin1_exts.extent(0)};
 
-    auto out = core::create_out<dtype>(std::index_sequence<2, 1>{}, uout_exts,
-                                       in1_mds, in2_mds);
+    auto out = core::make_output<dtype>(std::index_sequence<2, 1>{}, uout_exts,
+                                        in1_mds, in2_mds);
 
-    matvec_to<mpmode>(in1_mds, in2_mds, out);
+    matvec_to<backend>(in1_mds, in2_mds, out);
 
     return out;
 }
 
-} // namespace linalg
-} // namespace mdtensor
+} // namespace mdtensor::linalg

@@ -1,36 +1,44 @@
+/**
+ * @file
+ * @brief test
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
 #include <gtest/gtest.h>
 
-#include "mdtensor/logic/array_equal.hpp"
-#include "mdtensor/math/negative.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
 namespace md = mdtensor;
 
-TEST(stack, negative) {
-    using T = double;
+TEST(run_time, 1) {
+    using value_t = double;
+    using index_t = std::size_t;
 
-    constexpr auto a =
-        md::container<T, md::extents<size_t, 2, 1, 2>>{{1, 2, 3, 4}};
-    constexpr auto b = md::negative(a);
+    const auto x = md::container<value_t, md::dims<1>>{{1, -1}, md::dims<1>{2}};
+    const auto out = md::negative(x);
 
-    constexpr auto b_expect =
-        md::container<T, md::extents<size_t, 2, 1, 2>>{{-1, -2, -3, -4}};
+    std::cout << "out: " << md::to_string(out) << std::endl;
 
-    constexpr bool array_equal = md::array_equal(b, b_expect);
-
-    ASSERT_TRUE(array_equal);
+    ASSERT_TRUE(md::array_equal(
+        out, md::container<value_t, md::extents<index_t, 2>>{{-1, 1}}));
 }
 
-TEST(heap, negative) {
-    using T = double;
+TEST(run_time, 2) {
+    using value_t = double;
+    using index_t = std::size_t;
 
-    const auto a =
-        md::container<T, md::dims<3>>{{1, 2, 3, 4}, md::dims<3>{2, 1, 2}};
-    const auto b = md::negative(a);
+    constexpr auto x = md::container<value_t, md::extents<index_t, 2>>{{1, -1}};
+    constexpr auto out = md::negative(x);
 
-    const auto b_expect =
-        md::container<T, md::dims<3>>{{-1, -2, -3, -4}, md::dims<3>{2, 1, 2}};
+    std::cout << "out: " << md::to_string(out) << std::endl;
 
-    const bool array_equal = md::array_equal(b, b_expect);
-
-    ASSERT_TRUE(array_equal);
+    static_assert(md::array_equal(
+        out, md::container<value_t, md::extents<index_t, 2>>{{-1, 1}}));
 }

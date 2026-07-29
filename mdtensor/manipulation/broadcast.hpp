@@ -9,18 +9,17 @@
 
 #pragma once
 
-#include "../core/broadcast.hpp"
+#include "../core/core.hpp"
 
 namespace mdtensor {
 
-template <typename... ins_t>
-[[nodiscard]] inline constexpr auto broadcast(ins_t &&...ins) noexcept {
-    return std::get<0>([&]<size_t... Is>(std::index_sequence<Is...>) {
+[[nodiscard]] constexpr auto broadcast(auto &&...ins) {
+    return std::get<0>([&]<std::size_t... Is>(std::index_sequence<Is...>) {
         return core::broadcast(
             std::index_sequence<((void)Is, 0)...>{},
-            std::integer_sequence<bool, (void(Is), false)...>{},
-            std::forward<ins_t>(ins)...);
-    }(std::make_index_sequence<sizeof...(ins_t)>{}));
+            std::integer_sequence<bool, (void(Is), true)...>{},
+            std::forward<decltype(ins)>(ins)...);
+    }(std::make_index_sequence<sizeof...(ins)>{}));
 }
 
 } // namespace mdtensor

@@ -13,10 +13,9 @@
 
 namespace mdtensor {
 
-template <typename index_t, typename... exts_t>
-[[nodiscard]] inline constexpr index_t
-broadcast_extents(exts_t... exts) noexcept {
-    return core::broadcast_extents<index_t>(std::forward<exts_t>(exts)...);
+template <core::extents_c... ins_t>
+[[nodiscard]] constexpr auto broadcast_extents(ins_t &&...ins) {
+    return core::broadcast_extents(std::forward<ins_t>(ins)...);
 }
 
 } // namespace mdtensor

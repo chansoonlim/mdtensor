@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Tests
+ * @brief test
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -9,33 +9,34 @@
 
 #include <gtest/gtest.h>
 
-#include "mdtensor/core/broadcast.hpp"
-#include "mdtensor/core/container.hpp"
-#include "mdtensor/core/extents.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
-namespace stdex = std::experimental;
 namespace md = mdtensor;
 
 TEST(broadcast_to, 1) {
     using value_t = int;
-    using index_t = size_t;
+    using index_t = std::size_t;
 
     constexpr auto a =
-        md::core::container<value_t, stdex::extents<index_t, 3>>{{1, 2, 3}};
+        md::core::container<value_t, md::core::extents<index_t, 3>>{{1, 2, 3}};
     constexpr auto b =
-        md::core::container<value_t, stdex::extents<index_t, 3, 3>>{
+        md::core::container<value_t, md::core::extents<index_t, 3, 3>>{
             {1, 2, 3, 1, 2, 3, 1, 2, 3}};
 
     static_assert([&] {
         const auto c =
-            md::core::broadcast_to(a, stdex::extents<index_t, 3, 3>{});
+            md::core::broadcast_to(a, md::core::extents<index_t, 3, 3>{});
 
-        if (!md::core::same_extents(b.extents(), c.extents())) {
+        if (!md::core::is_same_extents(b.extents(), c.extents())) {
             return false;
         }
 
-        for (size_t i = 0; i < b.extent(0); i++) {
-            for (size_t j = 0; j < b.extent(1); j++) {
+        for (std::size_t i = 0; i < b.extent(0); i++) {
+            for (std::size_t j = 0; j < b.extent(1); j++) {
                 if (b(i, j) != c(i, j)) {
                     return false;
                 }

@@ -9,38 +9,50 @@
 
 #pragma once
 
-#include "../core/core.hpp"
+#include "../creation/empty_like.hpp"
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in_t, typename out_t>
-inline constexpr void sign_impl(in_t &&in, out_t &&out) {
+constexpr void sign_ufunc(auto &&in, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
     out() = (in() > 0) - (in() < 0);
 }
 
-} // namespace detail
+} // namespace ufunc
 
-template <core::MPMode mpmode = core::MPMode::NONE, typename in_t,
-          typename out_t>
-inline constexpr void sign_to(in_t &&in, out_t &&out) {
-    core::batch<mpmode>(
+template <typename dtype = std::int8_t,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto sign(auto &&in, out_t &&out = out_t{std::nullopt},
+                                  where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return empty_like<dtype>(in_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::sign_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::sign_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, false, true>{}, std::forward<in_t>(in),
-        std::forward<out_t>(out));
-}
+        std::integer_sequence<bool, true, false, true>{},
+        std::forward<decltype(in)>(in), out_md,
+        std::forward<decltype(where)>(where));
 
-template <typename dtype = int8_t, core::MPMode mpmode = core::MPMode::NONE,
-          typename in_t>
-[[nodiscard]] inline constexpr auto sign(in_t &&in) {
-    auto out = core::create_out<dtype>(core::extents<uint8_t>{},
-                                       std::forward<in_t>(in));
-
-    sign_to<mpmode>(std::forward<in_t>(in), out);
-
-    return out;
+    return out_md;
 }
 
 } // namespace mdtensor

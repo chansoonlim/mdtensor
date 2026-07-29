@@ -9,62 +9,102 @@
 
 #pragma once
 
-#include "../core/core.hpp"
+#include "../creation/empty_like.hpp"
 
 namespace mdtensor {
-namespace detail {
-
-#ifndef REAL_GCC
+namespace ufunc {
 
 template <std::floating_point dtype>
-[[nodiscard]] inline constexpr dtype
-sqrt_newton_raphson(dtype &&x, dtype &&curr, dtype &&prev) {
+[[nodiscard]] constexpr dtype
+sqrt_newton_raphson(const dtype &x, const dtype &curr, const dtype &prev) {
     return (curr == prev)
                ? curr
                : sqrt_newton_raphson(x, (curr + x / curr) / (dtype)2, curr);
 }
 
-#endif
+constexpr void sqrt_ufunc_native(auto &&in, auto &&out) {
+    using calc_t = core::common_data_type_t<decltype(in()), float>;
 
-template <typename in_t, typename out_t>
-inline constexpr void sqrt_impl(in_t &&in, out_t &&out) {
+    if constexpr (requires {
+                      { std::isnan(in()) } -> std::convertible_to<bool>;
+                  }) {
+        if (std::isnan(in())) {
+            out() = in();
+            return;
+        }
+    }
+
+    if constexpr (requires {
+                      { std::isinf(in()) } -> std::convertible_to<bool>;
+                  }) {
+        if (std::isinf(in())) {
+            out() = in();
+            return;
+        }
+    }
+
+    if constexpr (std::is_same_v<std::remove_cvref_t<decltype(in())>, bool>) {
+        out() = static_cast<calc_t>(in());
+        return;
+
+    } else {
+        out() = (in() >= 0 && in() < std::numeric_limits<calc_t>::infinity())
+                    ? sqrt_newton_raphson(static_cast<calc_t>(in()),
+                                          static_cast<calc_t>(in()),
+                                          static_cast<calc_t>(0))
+                    : std::numeric_limits<calc_t>::quiet_NaN();
+    }
+}
+
+constexpr void sqrt_ufunc(auto &&in, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
 #ifdef REAL_GCC
-    out() = std::sqrt(in());
-
-#else
-    using value_t = core::common_data_type_t<decltype(in()), float>;
-
-    out() = (in() >= 0 && in() < std::numeric_limits<value_t>::infinity())
-                ? sqrt_newton_raphson(static_cast<value_t>(in()),
-                                      static_cast<value_t>(in()),
-                                      static_cast<value_t>(0))
-                : std::numeric_limits<value_t>::quiet_NaN();
+    if (!std::is_constant_evaluated()) {
+        if constexpr (requires { out() = std::sqrt(in()); }) {
+            out() = std::sqrt(in());
+            return;
+        }
+    }
 
 #endif
+
+    sqrt_ufunc_native(std::forward<decltype(in)>(in),
+                      std::forward<decltype(out)>(out));
 }
 
-} // namespace detail
+} // namespace ufunc
 
-template <core::MPMode mpmode = core::MPMode::NONE, typename in_t,
-          typename out_t>
-inline constexpr void sqrt_to(in_t &&in, out_t &&out) {
-    core::batch<mpmode>(
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto sqrt(auto &&in, out_t &&out = out_t{std::nullopt},
+                                  where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return empty_like<dtype>(in_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::sqrt_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::sqrt_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, false, true>{}, std::forward<in_t>(in),
-        std::forward<out_t>(out));
-}
+        std::integer_sequence<bool, true, false, true>{},
+        std::forward<decltype(in)>(in), out_md,
+        std::forward<decltype(where)>(where));
 
-template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
-          typename in_t>
-[[nodiscard]] inline constexpr auto sqrt(in_t &&in) {
-    auto out = core::create_out<dtype>(core::extents<uint8_t>{},
-                                       std::forward<in_t>(in));
-
-    sqrt_to<mpmode>(std::forward<in_t>(in), out);
-
-    return out;
+    return out_md;
 }
 
 } // namespace mdtensor

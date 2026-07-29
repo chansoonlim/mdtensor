@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Linear system solve utilities for mdtensor (linalg).
+ * @brief Cholesky decomposition utilities for mdtensor (linalg).
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -10,24 +10,19 @@
 #pragma once
 
 #include "../creation/empty_like.hpp"
-#include "../creation/fill.hpp"
 #include "../math/sqrt.hpp"
+#include "../util/fill.hpp"
 
-namespace mdtensor {
-namespace linalg {
-namespace detail {
+namespace mdtensor::linalg {
+namespace ufunc {
 
-template <core::md_c in_t, core::md_c out_t>
-[[nodiscard]] inline constexpr bool cholesky_upper_impl(in_t &&in,
-                                                        out_t &&out) {
-    auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-    auto out_mds = core::to_mdspan(std::forward<out_t>(out));
+[[nodiscard]] constexpr bool cholesky_upper_ufunc(auto &&in, auto &&out) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
 
-    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
-    using out_mds_t = std::remove_cvref_t<decltype(out_mds)>;
-
-    using index_t = typename in_mds_t::index_type;
-    using value_t = typename out_mds_t::value_type;
+    using index_t = typename decltype(in_mds)::index_type;
+    using value_t = typename decltype(out_mds)::value_type;
 
     const index_t n = in_mds.extent(0);
 
@@ -65,17 +60,13 @@ template <core::md_c in_t, core::md_c out_t>
     return true;
 }
 
-template <core::md_c in_t, core::md_c out_t>
-[[nodiscard]] inline constexpr bool cholesky_lower_impl(in_t &&in,
-                                                        out_t &&out) {
-    auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-    auto out_mds = core::to_mdspan(std::forward<out_t>(out));
+[[nodiscard]] constexpr bool cholesky_lower_ufunc(auto &&in, auto &&out) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
 
-    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
-    using out_mds_t = std::remove_cvref_t<decltype(out_mds)>;
-
-    using index_t = typename in_mds_t::index_type;
-    using value_t = typename out_mds_t::value_type;
+    using index_t = typename decltype(in_mds)::index_type;
+    using value_t = typename decltype(out_mds)::value_type;
 
     const index_t n = in_mds.extent(0);
 
@@ -113,35 +104,34 @@ template <core::md_c in_t, core::md_c out_t>
     return true;
 }
 
-template <bool upper, core::md_c in_t, core::md_c out_t>
-[[nodiscard]] inline constexpr bool cholesky_impl(in_t &&in, out_t &&out) {
+template <bool upper>
+[[nodiscard]] constexpr bool cholesky_ufunc(auto &&in, auto &&out) {
     if constexpr (upper) {
-        return cholesky_upper_impl(std::forward<in_t>(in),
-                                   std::forward<out_t>(out));
+        return cholesky_upper_ufunc(std::forward<decltype(in)>(in),
+                                    std::forward<decltype(out)>(out));
 
     } else {
-        return cholesky_lower_impl(std::forward<in_t>(in),
-                                   std::forward<out_t>(out));
+        return cholesky_lower_ufunc(std::forward<decltype(in)>(in),
+                                    std::forward<decltype(out)>(out));
     }
 }
 
-} // namespace detail
+} // namespace ufunc
 
-template <core::MPMode mpmode = core::MPMode::NONE, typename in_t,
-          typename out_t, typename valid_t>
-inline constexpr void cholesky_to(in_t &&in, out_t &&out, valid_t &&valid,
-                                  const bool upper = false) {
+template <core::Backend backend = core::Backend::AUTO>
+constexpr void cholesky_to(auto &&in, auto &&out, auto &&valid,
+                           const bool upper = false) {
     const auto run_batch = [&]<bool upper_v>() {
-        core::batch<mpmode>(
+        core::batch_with_broadcast<backend>(
             [](auto &&in, auto &&out, auto &&valid) {
-                valid() = detail::cholesky_impl<upper_v>(
+                valid() = ufunc::cholesky_ufunc<upper_v>(
                     std::forward<decltype(in)>(in),
                     std::forward<decltype(out)>(out));
             },
             std::index_sequence<2, 2, 0>{},
-            std::integer_sequence<bool, false, true, true>{},
-            std::forward<in_t>(in), std::forward<out_t>(out),
-            std::forward<valid_t>(valid));
+            std::integer_sequence<bool, true, false, false>{},
+            std::forward<decltype(in)>(in), std::forward<decltype(out)>(out),
+            std::forward<decltype(valid)>(valid));
     };
 
     if (upper) {
@@ -152,20 +142,17 @@ inline constexpr void cholesky_to(in_t &&in, out_t &&out, valid_t &&valid,
     }
 }
 
-template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
-          typename in_t>
-[[nodiscard]] inline constexpr auto cholesky(in_t &&in,
-                                             const bool upper = false) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto cholesky(auto &&in, const bool upper = false) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out = empty_like(in_mds);
-    auto valid = core::create_out<bool>(std::index_sequence<2>{},
-                                        core::extents<uint8_t>{}, in_mds);
+    auto valid = core::make_output<bool>(std::index_sequence<2>{},
+                                         core::extents<std::uint8_t>{}, in_mds);
 
-    cholesky_to<mpmode>(in_mds, out, valid, upper);
+    cholesky_to<backend>(in_mds, out, valid, upper);
 
     return std::pair{out, valid};
 }
 
-} // namespace linalg
-} // namespace mdtensor
+} // namespace mdtensor::linalg

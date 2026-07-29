@@ -1,3 +1,5 @@
+load("@rules_cc//cc:defs.bzl", "cc_test")
+
 cc_test(
     name = "main",
     srcs = [
@@ -11,7 +13,7 @@ cc_test(
         "-march=native",
     ],
     deps = [
-        "@gtest//:gtest_main",
+        "@googletest//:gtest_main",
         "//:mdtensor",
     ],
 )

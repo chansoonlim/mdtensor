@@ -13,5 +13,6 @@
 #include "broadcast_to.hpp"
 #include "concatenate.hpp"
 #include "expand_dims.hpp"
+#include "flatten.hpp"
 #include "reshape.hpp"
 #include "transpose.hpp"

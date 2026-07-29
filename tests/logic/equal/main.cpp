@@ -1,39 +1,68 @@
+/**
+ * @file
+ * @brief test
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
 #include <gtest/gtest.h>
 
-#include "mdtensor/logic/array_equal.hpp"
-#include "mdtensor/logic/equal.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
 namespace md = mdtensor;
 
-TEST(stack, equal) {
-    using T = double;
-
-    constexpr auto a =
-        md::container<T, md::extents<size_t, 2, 1, 2>>{{1, 2, 3, 4}};
-    constexpr auto b = md::container<T, md::extents<size_t, 2, 1>>{{2, 3}};
-    constexpr auto c = md::equal(a, b);
-
-    constexpr auto c_expect =
-        md::container<uint8_t, md::extents<size_t, 2, 2, 2>>{
-            {0, 1, 0, 0, 0, 0, 1, 0}};
-
-    constexpr auto is_array_equal = md::array_equal(c, c_expect);
-
-    ASSERT_TRUE(is_array_equal);
-}
-
-TEST(heap, equal) {
-    using T = double;
+TEST(run_time, 1) {
+    using value_t = int;
+    using index_t = std::size_t;
 
     const auto a =
-        md::container<T, md::dims<3>>{{1, 2, 3, 4}, md::dims<3>{2, 1, 2}};
-    const auto b = md::container<T, md::dims<2>>{{2, 3}, md::dims<2>{2, 1}};
+        md::container<value_t, md::dims<1>>{{0, 1, 3}, md::dims<1>{3}};
+    const auto b = md::arange<value_t>(3);
     const auto c = md::equal(a, b);
 
-    const auto c_expect = md::container<uint8_t, md::dims<3>>{
-        {0, 1, 0, 0, 0, 0, 1, 0}, md::dims<3>{2, 2, 2}};
+    EXPECT_TRUE(md::array_equal(
+        c, md::container<bool, md::extents<index_t, 3>>{{true, true, false}}));
+}
 
-    const auto is_array_equal = md::array_equal(c, c_expect);
+TEST(run_time, 2) {
+    using value_t = int;
+    using index_t = std::size_t;
 
-    ASSERT_TRUE(is_array_equal);
+    const auto a = 1;
+    const auto b = md::ones<value_t>(1);
+    const auto c = md::equal(a, b);
+
+    EXPECT_TRUE(md::array_equal(
+        c, md::container<bool, md::extents<index_t, 1>>{{true}}));
+}
+
+TEST(compile_time, 1) {
+    using value_t = int;
+    using index_t = std::size_t;
+
+    constexpr auto a =
+        md::container<value_t, md::extents<index_t, 3>>{{0, 1, 3}};
+    constexpr auto b = md::arange<3, value_t>();
+    constexpr auto c = md::equal(a, b);
+
+    static_assert(md::array_equal(
+        c, md::container<bool, md::extents<index_t, 3>>{{true, true, false}}));
+}
+
+TEST(compile_time, 2) {
+    using value_t = int;
+    using index_t = std::size_t;
+
+    constexpr auto a = 1;
+    constexpr auto b = md::ones<value_t>(md::extents<index_t, 1>{});
+    constexpr auto c = md::equal(a, b);
+
+    static_assert(md::array_equal(
+        c, md::container<bool, md::extents<index_t, 1>>{{true}}));
 }

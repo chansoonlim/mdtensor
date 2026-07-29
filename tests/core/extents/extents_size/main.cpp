@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Tests
+ * @brief test
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -9,23 +9,26 @@
 
 #include <gtest/gtest.h>
 
-#include "mdtensor/core/extents.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
-namespace stdex = std::experimental;
 namespace md = mdtensor;
 
 TEST(extents_size, 1) {
-    using index_t = size_t;
+    using index_t = std::size_t;
 
-    constexpr auto exts = stdex::extents<index_t, 2, 3, 4>{};
+    constexpr auto exts = md::core::extents<index_t, 2, 3, 4>{};
 
     static_assert(md::core::extents_size(exts) == 24);
 }
 
 TEST(extents_size, 2) {
-    using index_t = size_t;
+    using index_t = std::size_t;
 
-    constexpr auto exts = stdex::dextents<index_t, 3>{2, 3, 4};
+    constexpr auto exts = md::core::dextents<index_t, 3>{2, 3, 4};
 
-    ASSERT_EQ(md::core::extents_size(exts), 24);
+    EXPECT_EQ(md::core::extents_size(exts), 24);
 }

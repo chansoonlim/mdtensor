@@ -1,15 +1,42 @@
+/**
+ * @file
+ * @brief test
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
 #include <gtest/gtest.h>
 
-#include "mdtensor/logic/array_equal.hpp"
-#include "mdtensor/logic/less.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
 namespace md = mdtensor;
 
-TEST(test, 1) {
-    using T = double;
+TEST(run_time, 1) {
+    using value_t = int;
+    using index_t = std::size_t;
+
+    const auto a = md::container<value_t, md::dims<1>>{{1, 2}, md::dims<1>{2}};
+    const auto b = md::container<value_t, md::dims<1>>{{2, 2}, md::dims<1>{2}};
+    const auto c = md::less(a, b);
+
+    EXPECT_TRUE(md::array_equal(
+        c, md::container<bool, md::extents<index_t, 2>>{{true, false}}));
+}
+
+TEST(compile_time, 1) {
+    using value_t = int;
+    using index_t = std::size_t;
+
+    constexpr auto a = md::container<value_t, md::extents<index_t, 2>>{{1, 2}};
+    constexpr auto b = md::container<value_t, md::extents<index_t, 2>>{{2, 2}};
+    constexpr auto c = md::less(a, b);
 
     static_assert(md::array_equal(
-        md::less(md::container<T, md::extents<size_t, 2>>{{1, 2}},
-                 md::container<T, md::extents<size_t, 2>>{{2, 2}}),
-        md::container<uint8_t, md::extents<size_t, 2>>{{true, false}}));
+        c, md::container<bool, md::extents<index_t, 2>>{{true, false}}));
 }

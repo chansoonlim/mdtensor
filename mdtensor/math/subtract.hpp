@@ -12,38 +12,52 @@
 #include "../core/core.hpp"
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in1_t, typename in2_t, typename out_t>
-inline constexpr void subtract_impl(in1_t &&in1, in2_t &&in2, out_t &&out) {
+constexpr void subtract_ufunc(auto &&in1, auto &&in2, auto &&out,
+                              auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
     out() = in1() - in2();
 }
 
-} // namespace detail
+} // namespace ufunc
 
-template <core::MPMode mpmode = core::MPMode::NONE, typename in1_t,
-          typename in2_t, typename out_t>
-inline constexpr void subtract_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
-    core::batch<mpmode>(
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto subtract(auto &&in1, auto &&in2,
+                                      out_t &&out = out_t{std::nullopt},
+                                      where_t &&where = where_t{std::nullopt}) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
+
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_output<dtype>(core::extents<std::uint8_t>{},
+                                            in1_mds, in2_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::subtract_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::subtract_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, false, false, true>{},
-        std::forward<in1_t>(in1), std::forward<in2_t>(in2),
-        std::forward<out_t>(out));
-}
+        std::integer_sequence<bool, true, true, false, true>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        out_md, std::forward<decltype(where)>(where));
 
-template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
-          typename in1_t, typename in2_t>
-[[nodiscard]] inline constexpr auto subtract(in1_t &&in1, in2_t &&in2) {
-    auto out = core::create_out<dtype>(core::extents<uint8_t>{},
-                                       std::forward<in1_t>(in1),
-                                       std::forward<in2_t>(in2));
-
-    subtract_to<mpmode>(std::forward<in1_t>(in1), std::forward<in2_t>(in2),
-                        out);
-
-    return out;
+    return out_md;
 }
 
 } // namespace mdtensor

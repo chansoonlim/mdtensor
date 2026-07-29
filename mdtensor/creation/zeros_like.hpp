@@ -13,10 +13,9 @@
 
 namespace mdtensor {
 
-template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
-          typename in_t>
-[[nodiscard]] inline constexpr auto zeros_like(in_t &&in) {
-    return full_like<dtype, mpmode>(std::forward<in_t>(in), 0);
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto zeros_like(auto &&in) {
+    return full_like<dtype, backend>(std::forward<decltype(in)>(in), 0);
 }
 
 } // namespace mdtensor

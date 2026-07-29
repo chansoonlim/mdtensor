@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "core/core.hpp"
 #include "creation/creation.hpp"
 #include "linalg/linalg.hpp"
 #include "logic/logic.hpp"

@@ -9,19 +9,16 @@
 
 #pragma once
 
-#ifdef MDTENSOR_USE_EIGEN
-#include "eigen/eigen.hpp"
-#endif
-
 #include "batch.hpp"
 #include "broadcast.hpp"
 #include "container.hpp"
 #include "extents.hpp"
+#include "manipulation.hpp"
 #include "mdspan.hpp"
-#include "submdspan.hpp"
+#include "output.hpp"
 #include "type.hpp"
-
-#include <cmath>
+#include "ufunc.hpp"
+#include "util.hpp"
 
 namespace mdtensor {
 
@@ -36,20 +33,18 @@ concept mdspan_c = core::mdspan_c<T>;
 template <typename T>
 concept mdarray_c = core::mdarray_c<T>;
 
-template <typename T>
-concept md_c = core::md_c<T>;
+template <std::size_t start, std::size_t end>
+using slice = core::slice<start, end>;
 
-template <size_t start, size_t end> using slice = core::slice<start, end>;
-
-template <typename IndexType, size_t... Extents>
+template <typename IndexType, std::size_t... Extents>
 using extents = core::extents<IndexType, Extents...>;
 
-template <typename IndexType, size_t Rank>
+template <typename IndexType, std::size_t Rank>
 using dextents = core::dextents<IndexType, Rank>;
 
 // dims: will be included in C++23
 // (https://en.cppreference.com/w/cpp/container/mdspan/extents)
-template <size_t Rank, class IndexType = size_t>
+template <std::size_t Rank, class IndexType = std::size_t>
 using dims = core::dims<Rank, IndexType>;
 
 template <typename ElementType, typename Extents,
@@ -62,6 +57,63 @@ constexpr auto full_extent = core::full_extent;
 template <typename value_t, extents_c extent_t>
 using container = core::container<value_t, extent_t>;
 
-using MPMode = core::MPMode;
+using Backend = core::Backend;
+
+template <extents_c... ins_t>
+[[nodiscard]] constexpr bool is_always_same_extents() noexcept {
+    return core::is_always_same_extents<ins_t...>();
+}
+
+template <extents_c... ins_t>
+[[nodiscard]] constexpr bool is_same_extents(ins_t &&...ins) noexcept {
+    return core::is_same_extents(std::forward<ins_t>(ins)...);
+}
+
+[[nodiscard]] constexpr auto to_mdspan(auto &&io) {
+    return core::to_mdspan(std::forward<decltype(io)>(io));
+}
+
+[[nodiscard]] constexpr auto to_const_mdspan(auto &&in) {
+    return core::to_const_mdspan(std::forward<decltype(in)>(in));
+}
+
+[[nodiscard]] constexpr auto to_output_mdspan(auto &&out) {
+    return core::to_output_mdspan(std::forward<decltype(out)>(out));
+}
+
+[[nodiscard]] constexpr auto submdspan(auto &&io, auto &&...slices) {
+    return core::submdspan(std::forward<decltype(io)>(io),
+                           std::forward<decltype(slices)>(slices)...);
+}
+
+template <std::size_t lspace = 0, std::size_t rspace = 0>
+[[nodiscard]] constexpr auto submdspan_with_space(auto &&io, auto &&...slices) {
+    return core::submdspan_with_space<lspace, rspace>(
+        std::forward<decltype(io)>(io),
+        std::forward<decltype(slices)>(slices)...);
+}
+
+template <std::size_t lspace = 0>
+[[nodiscard]] constexpr auto submdspan_from_left(auto &&io, auto &&...slices) {
+    return core::submdspan_from_left<lspace>(
+        std::forward<decltype(io)>(io),
+        std::forward<decltype(slices)>(slices)...);
+}
+
+template <std::size_t rspace = 0>
+[[nodiscard]] constexpr auto submdspan_from_right(auto &&io, auto &&...slices) {
+    return core::submdspan_from_right<rspace>(
+        std::forward<decltype(io)>(io),
+        std::forward<decltype(slices)>(slices)...);
+}
+
+template <extents_c exts_t>
+[[nodiscard]] constexpr std::string to_string(exts_t &&exts) {
+    return core::to_string(std::forward<exts_t>(exts));
+}
+
+[[nodiscard]] constexpr std::string to_string(auto &&in) {
+    return core::to_string(std::forward<decltype(in)>(in));
+}
 
 } // namespace mdtensor

@@ -9,16 +9,22 @@
 
 #pragma once
 
-#include "all.hpp"
-#include "equal.hpp"
+#include "array_equal.hpp"
 
 namespace mdtensor {
 
-template <core::MPMode mpmode = core::MPMode::NONE, typename in1_t,
-          typename in2_t>
-[[nodiscard]] inline constexpr bool array_equiv(in1_t &&in1, in2_t &&in2) {
-    return all(equal<int8_t, mpmode>(std::forward<in1_t>(in1),
-                                     std::forward<in2_t>(in2)));
+[[nodiscard]] constexpr bool array_equiv(auto &&in1, auto &&in2) {
+    try {
+        const auto [in1_bcast, in2_bcast] = std::get<0>(
+            core::broadcast(std::index_sequence<0, 0>{},
+                            std::integer_sequence<bool, true, true>{},
+                            std::forward<decltype(in1)>(in1),
+                            std::forward<decltype(in2)>(in2)));
+        return array_equal(in1_bcast, in2_bcast);
+
+    } catch (const std::exception &e) {
+        return false;
+    }
 }
 
 } // namespace mdtensor

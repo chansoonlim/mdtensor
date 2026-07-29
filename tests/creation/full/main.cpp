@@ -1,30 +1,106 @@
+/**
+ * @file
+ * @brief test
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
 #include <gtest/gtest.h>
 
-#include "mdtensor/creation/full.hpp"
-#include "mdtensor/logic/array_equal.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
 namespace md = mdtensor;
 
-TEST(stack, full) {
-    using T = double;
+TEST(run_time, 1) {
+    using value_t = float;
+    using index_t = std::size_t;
 
-    constexpr auto a = md::full<T>(1, md::extents<size_t, 2, 1, 2>{});
-    constexpr auto a_expect =
-        md::container<T, md::extents<size_t, 2, 1, 2>>{{1, 1, 1, 1}};
+    const auto x =
+        md::full(md::dims<2>{2, 2}, std::numeric_limits<value_t>::infinity());
 
-    constexpr bool array_equal = md::array_equal(a, a_expect);
+    std::cout << "x: " << md::to_string(x) << std::endl;
 
-    ASSERT_TRUE(array_equal);
+    EXPECT_TRUE(
+        md::array_equal(x, md::container<value_t, md::extents<index_t, 2, 2>>{
+                               {std::numeric_limits<value_t>::infinity(),
+                                std::numeric_limits<value_t>::infinity(),
+                                std::numeric_limits<value_t>::infinity(),
+                                std::numeric_limits<value_t>::infinity()}}));
 }
 
-TEST(heap, full) {
-    using T = double;
+TEST(run_time, 2) {
+    using value_t = int;
+    using index_t = std::size_t;
 
-    const auto a = md::full<T>(1, md::dims<3>{2, 1, 2});
-    const auto a_expect =
-        md::container<T, md::dims<3>>{{1, 1, 1, 1}, md::dims<3>{2, 1, 2}};
+    const auto x = md::full(md::dims<2>{2, 2}, 10);
 
-    const bool array_equal = md::array_equal(a, a_expect);
+    std::cout << "x: " << md::to_string(x) << std::endl;
 
-    ASSERT_TRUE(array_equal);
+    EXPECT_TRUE(md::array_equal(
+        x,
+        md::container<value_t, md::extents<index_t, 2, 2>>{{10, 10, 10, 10}}));
+}
+
+TEST(run_time, 3) {
+    using value_t = int;
+    using index_t = std::size_t;
+
+    const auto x =
+        md::full(md::dims<2>{2, 2},
+                 md::container<value_t, md::dims<1>>{{1, 2}, md::dims<1>{2}});
+
+    std::cout << "x: " << md::to_string(x) << std::endl;
+
+    EXPECT_TRUE(md::array_equal(
+        x, md::container<value_t, md::extents<index_t, 2, 2>>{{1, 2, 1, 2}}));
+}
+
+TEST(compile_time, 1) {
+    using value_t = float;
+    using index_t = std::size_t;
+
+    constexpr auto x = md::full(md::extents<index_t, 2, 2>{},
+                                std::numeric_limits<value_t>::infinity());
+
+    std::cout << "x: " << md::to_string(x) << std::endl;
+
+    static_assert(
+        md::array_equal(x, md::container<value_t, md::extents<index_t, 2, 2>>{
+                               {std::numeric_limits<value_t>::infinity(),
+                                std::numeric_limits<value_t>::infinity(),
+                                std::numeric_limits<value_t>::infinity(),
+                                std::numeric_limits<value_t>::infinity()}}));
+}
+
+TEST(compile_time, 2) {
+    using value_t = int;
+    using index_t = std::size_t;
+
+    constexpr auto x = md::full(md::extents<index_t, 2, 2>{}, 10);
+
+    std::cout << "x: " << md::to_string(x) << std::endl;
+
+    static_assert(md::array_equal(
+        x,
+        md::container<value_t, md::extents<index_t, 2, 2>>{{10, 10, 10, 10}}));
+}
+
+TEST(compile_time, 3) {
+    using value_t = int;
+    using index_t = std::size_t;
+
+    constexpr auto x =
+        md::full(md::extents<index_t, 2, 2>{},
+                 md::container<value_t, md::extents<index_t, 2>>{{1, 2}});
+
+    std::cout << "x: " << md::to_string(x) << std::endl;
+
+    static_assert(md::array_equal(
+        x, md::container<value_t, md::extents<index_t, 2, 2>>{{1, 2, 1, 2}}));
 }

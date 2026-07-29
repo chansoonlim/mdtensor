@@ -1,15 +1,46 @@
+/**
+ * @file
+ * @brief test
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
 #include <gtest/gtest.h>
 
-#include "mdtensor/logic/array_equal.hpp"
-#include "mdtensor/logic/greater_equal.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
 namespace md = mdtensor;
 
-TEST(test, 1) {
-    using T = double;
+TEST(run_time, 1) {
+    using value_t = int;
+    using index_t = std::size_t;
+
+    const auto a =
+        md::container<value_t, md::dims<1>>{{4, 2, 1}, md::dims<1>{3}};
+    const auto b =
+        md::container<value_t, md::dims<1>>{{2, 2, 2}, md::dims<1>{3}};
+    const auto c = md::greater_equal(a, b);
+
+    EXPECT_TRUE(md::array_equal(
+        c, md::container<bool, md::extents<index_t, 3>>{{true, true, false}}));
+}
+
+TEST(compile_time, 1) {
+    using value_t = int;
+    using index_t = std::size_t;
+
+    constexpr auto a =
+        md::container<value_t, md::extents<index_t, 3>>{{4, 2, 1}};
+    constexpr auto b =
+        md::container<value_t, md::extents<index_t, 3>>{{2, 2, 2}};
+    constexpr auto c = md::greater_equal(a, b);
 
     static_assert(md::array_equal(
-        md::greater_equal(md::container<T, md::extents<size_t, 3>>{{4, 2, 1}},
-                          md::container<T, md::extents<size_t, 3>>{{2, 2, 2}}),
-        md::container<uint8_t, md::extents<size_t, 3>>{{true, true, false}}));
+        c, md::container<bool, md::extents<index_t, 3>>{{true, true, false}}));
 }

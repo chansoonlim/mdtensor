@@ -11,17 +11,19 @@
 
 #include "extents.hpp"
 #include "mdspan.hpp"
-#include "type.hpp"
 
-namespace mdtensor {
-namespace core {
+namespace mdtensor::core {
 namespace detail {
 
-template <size_t I, size_t brank, extents_c in_t>
-[[nodiscard]] inline constexpr size_t aligned_static_extent() noexcept {
+template <std::size_t I, std::size_t brank, extents_c in_t>
+[[nodiscard]] consteval std::size_t aligned_static_extent() noexcept {
     using base_t = std::remove_cvref_t<in_t>;
 
-    constexpr size_t rank = base_t::rank();
+    constexpr std::size_t rank = base_t::rank();
+
+    static_assert(I < brank, "Index I must be less than broadcast rank brank.");
+    static_assert(rank <= brank,
+                  "Input rank must be less than or equal to broadcast rank.");
 
     if constexpr (I < brank - rank) {
         return 1;
@@ -31,93 +33,98 @@ template <size_t I, size_t brank, extents_c in_t>
     }
 }
 
-template <size_t... Exts>
-[[nodiscard]] inline constexpr size_t broadcast_static_extent() noexcept {
-    static_assert(
-        [&] {
-            constexpr auto exts_arr = std::array{Exts...};
+template <std::size_t... Extents>
+[[nodiscard]] consteval std::size_t broadcast_static_extent() noexcept {
+    static_assert(sizeof...(Extents) > 0,
+                  "At least one extent must be provided for broadcasting.");
 
-            for (size_t i = 0; i < exts_arr.size(); i++) {
-                for (size_t j = i + 1; j < exts_arr.size(); j++) {
-                    const size_t ei = exts_arr[i];
-                    const size_t ej = exts_arr[j];
+    if constexpr (((Extents == 1 || Extents == core::dyn) && ...)) {
+        // return dyn if any extent is dyn, else return 1
+        return std::max({Extents...});
 
-                    if (ei != ej &&                               //
-                        ei != 1 && ei != stdex::dynamic_extent && //
-                        ej != 1 && ej != stdex::dynamic_extent) {
-                        return false;
-                    }
-                }
-            }
-            return true;
-        }(),
-        "Incompatible static extents for broadcasting.");
+    } else {
+        // select the extent that is not 1 or dyn
+        constexpr std::size_t bext = std::max(
+            {((Extents != 1 && Extents != core::dyn) ? Extents : 0)...});
 
-    return std::max({Exts...});
+        static_assert(
+            ((Extents == bext || Extents == 1 || Extents == core::dyn) && ...),
+            "Incompatible static extents for broadcasting.");
+
+        return bext;
+    }
 }
 
-template <size_t I, size_t brank, extents_c in_t>
-[[nodiscard]] inline constexpr auto aligned_extent(in_t &&in) noexcept {
-    using base_t = std::remove_cvref_t<in_t>;
+template <std::size_t I, std::size_t brank, extents_c in_t>
+[[nodiscard]] constexpr auto aligned_extent(in_t &&in) noexcept {
+    using index_t = typename std::remove_cvref_t<in_t>::index_type;
 
-    constexpr size_t rank = base_t::rank();
+    constexpr std::size_t rank = in.rank();
+
+    static_assert(I < brank, "Index I must be less than broadcast rank brank.");
+    static_assert(rank <= brank,
+                  "Input rank must be less than or equal to broadcast rank.");
 
     if constexpr (I < brank - rank) {
-        return typename base_t::index_type{1};
+        return index_t{1};
 
     } else {
         return in.extent(I - (brank - rank));
     }
 }
 
-template <typename index_t, typename... exts_t>
-[[nodiscard]] inline constexpr index_t
-broadcast_extent(exts_t... exts) noexcept {
-    assert([&] {
-        const auto exts_arr = std::array{static_cast<index_t>(exts)...};
+template <typename index_t, std::convertible_to<index_t>... exts_t>
+[[nodiscard]] constexpr index_t broadcast_extent(exts_t &&...exts) {
+    static_assert(sizeof...(exts) > 0,
+                  "At least one extent must be provided for broadcasting.");
 
-        for (size_t i = 0; i < exts_arr.size(); i++) {
-            for (size_t j = i + 1; j < exts_arr.size(); j++) {
-                const index_t ei = exts_arr[i];
-                const index_t ej = exts_arr[j];
+    index_t bext = 1;
 
-                if (ei != ej && ei != 1 && ej != 1) {
-                    return false;
-                }
-            }
+    for (const index_t &ext : {static_cast<index_t>(exts)...}) {
+        if (ext == 1) {
+            continue;
+
+        } else if (bext == 1) {
+            bext = ext;
+
+        } else if (ext != bext) {
+            throw std::invalid_argument(
+                "Incompatible extents for broadcasting.");
         }
-        return true;
-    }());
+    }
 
-    return std::max({static_cast<index_t>(exts)...});
+    return bext;
 }
 
 } // namespace detail
 
 template <extents_c... ins_t>
-[[nodiscard]] inline constexpr auto broadcast_extents(ins_t &&...ins) noexcept {
+[[nodiscard]] constexpr auto broadcast_extents(ins_t &&...ins) {
+    static_assert(sizeof...(ins) > 0,
+                  "At least one extents must be provided for broadcasting.");
+
     using index_t =
         common_index_type_t<typename std::remove_cvref_t<ins_t>::index_type...>;
 
-    constexpr size_t brank = std::max({std::remove_cvref_t<ins_t>::rank()...});
+    constexpr std::size_t brank = std::max({ins.rank()...});
 
     if constexpr (brank == 0) {
-        return stdex::extents<index_t>{};
+        return core::extents<index_t>{};
 
     } else {
-        return [&]<size_t... Is>(std::index_sequence<Is...>) {
-            const auto static_extent_at = [&]<size_t I>() {
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            const auto static_extent_at = [&]<std::size_t I>() {
                 return detail::broadcast_static_extent<
                     detail::aligned_static_extent<I, brank, ins_t>()...>();
             };
 
-            const auto extent_at = [&]<size_t I>() {
+            const auto extent_at = [&]<std::size_t I>() {
                 return detail::broadcast_extent<index_t>(
                     detail::aligned_extent<I, brank>(
                         std::forward<ins_t>(ins))...);
             };
 
-            return stdex::extents<
+            return core::extents<
                 index_t, static_extent_at.template operator()<Is>()...> {
                 extent_at.template operator()<Is>()...
             };
@@ -125,56 +132,58 @@ template <extents_c... ins_t>
     }
 }
 
-template <typename in_t, extents_c new_extents_t>
-[[nodiscard]] inline constexpr auto
-broadcast_to(in_t &&in, new_extents_t &&new_extents) noexcept {
-    const auto in_mds = to_const_mdspan(std::forward<in_t>(in));
+[[nodiscard]] constexpr auto broadcast_to(auto &&in, auto &&shape) {
+    const auto in_mds = to_const_mdspan(std::forward<decltype(in)>(in));
+    const auto exts = core::to_extents(std::forward<decltype(shape)>(shape));
 
-    using in_mds_base_t = std::remove_cvref_t<decltype(in_mds)>;
-    using new_extents_base_t = std::remove_cvref_t<new_extents_t>;
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
+    using exts_t = std::remove_cvref_t<decltype(exts)>;
 
-    constexpr size_t org_rank = in_mds_base_t::rank();
-    constexpr size_t new_rank = new_extents_base_t::rank();
+    constexpr std::size_t org_rank = in_mds_t::rank();
+    constexpr std::size_t new_rank = exts_t::rank();
 
     static_assert(org_rank <= new_rank, "Incompatible ranks for broadcasting.");
 
-    if constexpr (in_mds_base_t::rank_dynamic() == 0 &&
-                  new_extents_base_t::rank_dynamic() == 0 &&
-                  same_extents(typename in_mds_base_t::extents_type{},
-                               new_extents_base_t{})) {
-        return in_mds;
+    if constexpr (is_always_same_extents<typename in_mds_t::extents_type,
+                                         exts_t>()) {
+        return in_mds; // change to const mdspan
 
     } else if constexpr (org_rank == 0) {
-        using index_t = typename new_extents_base_t::index_type;
+        using index_t = typename exts_t::index_type;
 
         auto new_strides = std::array<index_t, new_rank>{};
 
-        for (size_t i = 0; i < new_rank; i++) {
+        for (std::size_t i = 0; i < new_rank; i++) {
             new_strides[i] = 0;
         }
 
-        return stdex::mdspan<typename in_mds_base_t::element_type,
-                             new_extents_base_t, stdex::layout_stride,
-                             typename in_mds_base_t::accessor_type>{
+        return core::mdspan<typename in_mds_t::element_type, exts_t,
+                            stdex::layout_stride,
+                            typename in_mds_t::accessor_type>{
             in_mds.data_handle(),
-            stdex::layout_stride::mapping{
-                std::forward<new_extents_t>(new_extents), new_strides}};
+            stdex::layout_stride::mapping{exts, new_strides}};
 
     } else {
-        using index_t = typename new_extents_base_t::index_type;
+        using index_t = typename exts_t::index_type;
+        using cindex_t =
+            common_index_type_t<typename in_mds_t::index_type, index_t>;
 
         // ni = new_rank - org_rank + oi
-        const auto get_ni = [](size_t i) { return new_rank - org_rank + i; };
+        const auto get_ni = [](std::size_t i) {
+            return new_rank - org_rank + i;
+        };
 
         // assertion
         static_assert(
             [&] {
-                for (size_t i = 0; i < org_rank; i++) {
-                    if (in_mds_base_t::static_extent(i) !=
-                            new_extents_base_t::static_extent(get_ni(i)) &&
-                        in_mds_base_t::static_extent(i) != 1 &&
-                        new_extents_base_t::static_extent(get_ni(i)) !=
-                            stdex::dynamic_extent) {
+                for (std::size_t i = 0; i < org_rank; i++) {
+                    const auto src = in_mds_t::static_extent(i);
+                    const auto dst = exts_t::static_extent(get_ni(i));
+
+                    if (src != core::dyn && //
+                        dst != core::dyn && //
+                        src != dst &&       //
+                        src != 1) {
                         return false;
                     }
                 }
@@ -182,22 +191,25 @@ broadcast_to(in_t &&in, new_extents_t &&new_extents) noexcept {
             }(),
             "Incompatible extents for broadcasting.");
 
-        for (size_t i = 0; i < org_rank; i++) {
-            assert(static_cast<size_t>(in_mds.extent(i)) ==
-                       static_cast<size_t>(new_extents.extent(get_ni(i))) ||
-                   static_cast<size_t>(in_mds.extent(i)) == 1);
+        for (std::size_t i = 0; i < org_rank; i++) {
+            if (static_cast<cindex_t>(in_mds.extent(i)) !=
+                    static_cast<cindex_t>(exts.extent(get_ni(i))) &&
+                static_cast<cindex_t>(in_mds.extent(i)) != cindex_t{1}) {
+                throw std::invalid_argument(
+                    "Incompatible extents for broadcasting.");
+            }
         }
 
         // calculation
         auto new_strides = std::array<index_t, new_rank>{};
 
-        for (size_t i = 0; i < new_rank - org_rank; i++) {
+        for (std::size_t i = 0; i < new_rank - org_rank; i++) {
             new_strides[i] = 0;
         }
 
-        for (size_t i = 0; i < org_rank; i++) {
-            if (static_cast<size_t>(in_mds.extent(i)) ==
-                static_cast<size_t>(new_extents.extent(get_ni(i)))) {
+        for (std::size_t i = 0; i < org_rank; i++) {
+            if (static_cast<cindex_t>(in_mds.extent(i)) ==
+                static_cast<cindex_t>(exts.extent(get_ni(i)))) {
                 new_strides[get_ni(i)] = static_cast<index_t>(in_mds.stride(i));
 
             } else {
@@ -205,88 +217,77 @@ broadcast_to(in_t &&in, new_extents_t &&new_extents) noexcept {
             }
         }
 
-        return stdex::mdspan<typename in_mds_base_t::element_type,
-                             new_extents_base_t, stdex::layout_stride,
-                             typename in_mds_base_t::accessor_type>{
+        return core::mdspan<typename in_mds_t::element_type, exts_t,
+                            stdex::layout_stride,
+                            typename in_mds_t::accessor_type>{
             in_mds.data_handle(),
-            stdex::layout_stride::mapping{
-                std::forward<new_extents_t>(new_extents), new_strides}};
+            stdex::layout_stride::mapping{exts, new_strides}};
     }
 }
 
 namespace detail {
 
-template <size_t... uranks, typename ios_mds_t>
-[[nodiscard]] inline constexpr auto
-get_broadcast_extents(std::index_sequence<uranks...>,
-                      ios_mds_t &&ios_mds) noexcept {
-    constexpr size_t ios_num =
-        std::tuple_size_v<std::remove_cvref_t<ios_mds_t>>;
+template <std::size_t... uranks, core::mdspan_c... ios_t>
+[[nodiscard]] constexpr auto
+get_broadcast_extents(std::index_sequence<uranks...>, ios_t &&...ios) {
+    static_assert(sizeof...(uranks) == sizeof...(ios_t),
+                  "Number of uranks must match number of inputs.");
+    static_assert(((ios.rank() >= uranks) && ...),
+                  "Input rank must be greater than or equal to urank.");
 
-    // calculate ranks
-    constexpr auto fr = [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return std::array{
-            std::tuple_element_t<Is,
-                                 std::remove_cvref_t<ios_mds_t>>::rank()...};
-    }(std::make_index_sequence<ios_num>{});
-
-    constexpr auto ur = std::array{uranks...};
-
-    constexpr auto br = [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return std::array{(fr[Is] - ur[Is])...};
-    }(std::make_index_sequence<ios_num>{});
-
-    // calculate broadcasted extents
-    const auto bexts = [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return broadcast_extents(slice_extents_from_left<br[Is]>(
-            std::get<Is>(ios_mds).extents())...);
-    }(std::make_index_sequence<ios_num>{});
-
-    return bexts;
+    return broadcast_extents(
+        slice_extents_from_left<ios.rank() - uranks>(ios.extents())...);
 }
 
 } // namespace detail
 
-template <size_t... uranks, bool... writable, typename... ios_t>
-[[nodiscard]] inline constexpr auto
-broadcast(std::index_sequence<uranks...>,
-          std::integer_sequence<bool, writable...>, ios_t &&...ios) noexcept {
-    static_assert(sizeof...(uranks) == sizeof...(ios_t));
-    static_assert(sizeof...(writable) == sizeof...(ios_t));
+template <std::size_t... uranks, bool... bcast>
+[[nodiscard]] constexpr auto broadcast(std::index_sequence<uranks...>,
+                                       std::integer_sequence<bool, bcast...>,
+                                       auto &&...ios) {
+    static_assert(sizeof...(uranks) == sizeof...(ios));
+    static_assert(sizeof...(bcast) == sizeof...(ios));
 
     // calculate mdspans for inputs and outputs
-    constexpr size_t ios_num = sizeof...(ios_t);
     const auto ios_mds =
-        std::make_tuple(to_mdspan(std::forward<ios_t>(ios))...);
+        std::make_tuple(to_mdspan(std::forward<decltype(ios)>(ios))...);
 
     // calculate broadcasted extents
     constexpr auto ur = std::array{uranks...};
-    constexpr auto wa = std::array{writable...};
-    const auto bexts = detail::get_broadcast_extents(
-        std::index_sequence<uranks...>{}, ios_mds);
+
+    const auto bexts = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return detail::get_broadcast_extents(std::index_sequence<ur[Is]...>{},
+                                             std::get<Is>(ios_mds)...);
+    }(std::make_index_sequence<sizeof...(ios)>{});
 
     // calculate broadcasted mdspans
-    auto get_broadcasted = [&]<size_t I>() {
-        if constexpr (wa[I]) {
-            // writable elements does not apply broadcasting.
-            return std::get<I>(ios_mds);
-
-        } else {
-            // read-only elements apply broadcasting.
-            return broadcast_to(
-                std::get<I>(ios_mds),
-                compose_extents(bexts, slice_extents_from_right<ur[I]>(
-                                           std::get<I>(ios_mds).extents())));
-        }
-    };
+    constexpr auto bc = std::array{bcast...};
 
     return std::make_tuple(
-        [&]<size_t... Is>(std::index_sequence<Is...>) {
+        [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            const auto get_broadcasted = [&]<std::size_t I>() {
+                if constexpr (!bc[I]) {
+                    // change to mdspan without broadcasting
+                    return std::get<I>(ios_mds);
+
+                } else if constexpr (bexts.rank() == 0) {
+                    // change to const mdspan without broadcasting
+                    return core::to_const_mdspan(std::get<I>(ios_mds));
+
+                } else {
+                    // broadcast to const mdspan
+                    return broadcast_to(
+                        std::get<I>(ios_mds),
+                        compose_extents(bexts,
+                                        slice_extents_from_right<ur[I]>(
+                                            std::get<I>(ios_mds).extents())));
+                }
+            };
+
             return std::make_tuple(
                 get_broadcasted.template operator()<Is>()...);
-        }(std::make_index_sequence<ios_num>{}),
+        }(std::make_index_sequence<sizeof...(ios)>{}),
         bexts);
 }
 
-} // namespace core
-} // namespace mdtensor
+} // namespace mdtensor::core

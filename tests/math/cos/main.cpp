@@ -1,14 +1,53 @@
+/**
+ * @file
+ * @brief test
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
 #include <gtest/gtest.h>
 
-#include "mdtensor/logic/allclose.hpp"
-#include "mdtensor/math/cos.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
 namespace md = mdtensor;
 
-TEST(test, 1) {
-    using T = double;
+TEST(run_time, 1) {
+    using value_t = double;
+    using index_t = std::size_t;
 
-    static_assert(md::allclose(
-        md::cos(md::container<T, md::extents<size_t, 3>>{{0, M_PI / 2., M_PI}}),
-        md::container<T, md::extents<size_t, 3>>{{1, 6.12303177e-17, -1}}));
+    const auto x = md::container<value_t, md::dims<1>>{
+        {0, std::numbers::pi_v<value_t> / 2., std::numbers::pi_v<value_t>},
+        md::dims<1>{3}};
+    const auto x_cos = md::cos(x);
+
+    std::cout << "x_cos: " << md::to_string(x_cos) << std::endl;
+
+    ASSERT_TRUE(
+        md::allclose(x_cos, md::container<value_t, md::extents<index_t, 3>>{
+                                {1, 6.12303177e-17, -1}}));
 }
+
+#ifdef REAL_GCC // NOTE: std::cos is not constexpr in clang 16.
+
+TEST(compile_time, 1) {
+    using value_t = double;
+    using index_t = std::size_t;
+
+    constexpr auto x = md::container<value_t, md::extents<index_t, 3>>{
+        {0, std::numbers::pi_v<value_t> / 2., std::numbers::pi_v<value_t>}};
+    constexpr auto x_cos = md::cos(x);
+
+    std::cout << "x_cos: " << md::to_string(x_cos) << std::endl;
+
+    static_assert(
+        md::allclose(x_cos, md::container<value_t, md::extents<index_t, 3>>{
+                                {1, 6.12303177e-17, -1}}));
+}
+
+#endif

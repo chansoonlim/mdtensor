@@ -1,12 +1,40 @@
+/**
+ * @file
+ * @brief test
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
 #include <gtest/gtest.h>
 
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
 #include "mdtensor/mdtensor.hpp"
+#endif
 
 namespace md = mdtensor;
 
-TEST(test, 1) {
+TEST(run_time, 1) {
     using value_t = double;
-    using index_t = size_t;
+    using index_t = std::size_t;
+
+    const auto a =
+        md::container<value_t, md::extents<index_t, 2, 2>>{{1, 2, 3, 5}};
+    const auto b = md::container<value_t, md::extents<index_t, 2>>{{1, 2}};
+    const auto [x, valid] = md::linalg::solve(a, b);
+
+    EXPECT_TRUE(md::allclose(
+        x, md::container<value_t, md::extents<index_t, 2>>{{-1, 1}}));
+
+    EXPECT_TRUE(md::allclose(md::linalg::matvec(a, x), b));
+}
+
+TEST(compile_time, 1) {
+    using value_t = double;
+    using index_t = std::size_t;
 
     constexpr auto a =
         md::container<value_t, md::extents<index_t, 2, 2>>{{1, 2, 3, 5}};
@@ -16,21 +44,5 @@ TEST(test, 1) {
     static_assert(md::allclose(
         x, md::container<value_t, md::extents<index_t, 2>>{{-1, 1}}));
 
-    static_assert(md::allclose(md::matvec(a, x), b));
-}
-
-TEST(test, 2) {
-    using value_t = double;
-    using index_t = size_t;
-
-    constexpr auto a =
-        md::container<value_t, md::extents<index_t, 2, 2>>{{1, 2, 3, 5}};
-    constexpr auto b =
-        md::container<value_t, md::extents<index_t, 2, 1>>{{1, 2}};
-    constexpr auto x = std::get<0>(md::linalg::solve(a, b));
-
-    static_assert(md::allclose(
-        x, md::container<value_t, md::extents<index_t, 2, 1>>{{-1, 1}}));
-
-    static_assert(md::allclose(md::matmul(a, x), b));
+    static_assert(md::allclose(md::linalg::matvec(a, x), b));
 }

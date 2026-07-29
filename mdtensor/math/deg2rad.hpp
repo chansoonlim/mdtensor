@@ -9,36 +9,45 @@
 
 #pragma once
 
-#include <numbers>
-
 #include "multiply.hpp"
 
 namespace mdtensor {
 
-template <core::MPMode mpmode = core::MPMode::NONE, typename in_t,
-          typename out_t>
-inline constexpr void deg2rad_to(in_t &&in, out_t &&out) {
-    using value_t =
-        core::common_data_type_t<typename decltype(core::to_mdspan(
-                                     std::forward<in_t>(in)))::value_type,
-                                 float>;
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto deg2rad(auto &&in,
+                                     out_t &&out = out_t{std::nullopt},
+                                     where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    constexpr value_t D2R = std::numbers::pi_v<value_t> / value_t(180);
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            // NOTE: ensure that the output type is at least float precision
+            using value_t = core::output_value_t<
+                dtype, typename decltype(in_mds)::value_type, float>;
 
-    multiply_to<mpmode>(std::forward<in_t>(in), D2R, std::forward<out_t>(out));
-}
+            return core::make_output<value_t>(core::extents<std::uint8_t>{},
+                                              in_mds);
 
-template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
-          typename in_t>
-[[nodiscard]] inline constexpr auto deg2rad(in_t &&in) {
-    using value_t =
-        core::common_data_type_t<typename decltype(core::to_mdspan(
-                                     std::forward<in_t>(in)))::value_type,
-                                 float>;
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
 
-    constexpr value_t D2R = std::numbers::pi_v<value_t> / value_t(180);
+    using calc_t = core::common_data_type_t<
+        typename decltype(in_mds)::value_type,
+        typename core::to_mdspan_t<decltype(out_md)>::value_type>;
 
-    return multiply<dtype, mpmode>(std::forward<in_t>(in), D2R);
+    static_assert(std::is_floating_point_v<calc_t> &&
+                  "deg2rad conversion requires at least float precision.");
+
+    constexpr calc_t D2R = std::numbers::pi_v<calc_t> / calc_t{180};
+
+    static_cast<void>(
+        multiply<void, backend>(std::forward<decltype(in)>(in), D2R, out_md,
+                                std::forward<decltype(where)>(where)));
+
+    return out_md;
 }
 
 } // namespace mdtensor

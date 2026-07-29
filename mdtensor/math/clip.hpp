@@ -9,64 +9,57 @@
 
 #pragma once
 
-#include "../core/core.hpp"
+#include "../creation/empty_like.hpp"
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in_t, typename min_t, typename max_t, typename out_t>
-inline constexpr void clip_impl(in_t &&in, min_t &&min, max_t &&max,
-                                out_t &&out) {
+constexpr void clip_ufunc(auto &&in, auto &&min, auto &&max, auto &&out) {
     // NOTE: std::clamp is not used to match the behavior with original np.clip
+    // when min > max, np.clip returns max, and std::clamp returns min.
+    // mdtensor.clip is designed to match the behavior of np.clip.
+
+    using value_t = std::remove_cvref_t<decltype(in())>;
+
     out() = in();
 
-    if constexpr (!std::is_same_v<std::remove_cvref_t<decltype(min())>,
-                                  std::nullopt_t>) {
-        using value_t =
-            core::common_data_type_t<std::remove_cvref_t<decltype(out())>,
-                                     std::remove_cvref_t<decltype(min())>>;
-
-        out() =
-            std::max(static_cast<value_t>(out()), static_cast<value_t>(min()));
+    if constexpr (!core::is_nullopt_t_c<decltype(min())>) {
+        out() = std::max(out(), static_cast<value_t>(min()));
     }
 
-    if constexpr (!std::is_same_v<std::remove_cvref_t<decltype(max())>,
-                                  std::nullopt_t>) {
-        using value_t =
-            core::common_data_type_t<std::remove_cvref_t<decltype(out())>,
-                                     std::remove_cvref_t<decltype(max())>>;
-
-        out() =
-            std::min(static_cast<value_t>(out()), static_cast<value_t>(max()));
+    if constexpr (!core::is_nullopt_t_c<decltype(max())>) {
+        out() = std::min(out(), static_cast<value_t>(max()));
     }
 }
 
-} // namespace detail
+} // namespace ufunc
 
-template <core::MPMode mpmode = core::MPMode::NONE, typename in_t,
-          typename min_t, typename max_t, typename out_t>
-inline constexpr void clip_to(in_t &&in, min_t &&min, max_t &&max,
-                              out_t &&out) {
-    core::batch<mpmode>(
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename min_t = std::nullopt_t, typename max_t = std::nullopt_t,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto clip(auto &&in, min_t &&min = min_t{std::nullopt},
+                                  max_t &&max = max_t{std::nullopt},
+                                  out_t &&out = out_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return empty_like<dtype>(in_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::clip_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::clip_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, false, false, false, true>{},
-        std::forward<in_t>(in), std::forward<min_t>(min),
-        std::forward<max_t>(max), std::forward<out_t>(out));
-}
+        std::integer_sequence<bool, true, true, true, false>{},
+        std::forward<decltype(in)>(in), std::forward<decltype(min)>(min),
+        std::forward<decltype(max)>(max), out_md);
 
-template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
-          typename in_t, typename min_t, typename max_t>
-[[nodiscard]] inline constexpr auto clip(in_t &&in, min_t &&min, max_t &&max) {
-    auto out = core::create_out<dtype>(
-        core::extents<uint8_t>{}, std::forward<in_t>(in),
-        std::forward<min_t>(min), std::forward<max_t>(max));
-
-    clip_to<mpmode>(std::forward<in_t>(in), std::forward<min_t>(min),
-                    std::forward<max_t>(max), out);
-
-    return out;
+    return out_md;
 }
 
 } // namespace mdtensor

@@ -1,111 +1,121 @@
+/**
+ * @file
+ * @brief test
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
 #include <gtest/gtest.h>
 
-#include "mdtensor/logic/array_equal.hpp"
-#include "mdtensor/math/clip.hpp"
-#include "mdtensor/random/rand.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
 namespace md = mdtensor;
 
-TEST(test, 1) {
-    using T = double;
+TEST(run_time, 1) {
+    using value_t = int;
+    using index_t = std::size_t;
 
-    constexpr T in = 1.5;
+    const auto a = md::arange(10);
+    const auto out1 = md::clip(a, 1, 8);
+    const auto out2 = md::clip(a, 8, 1);
 
-    static_assert(md::clip(in, 1, 2) == 1.5);
-    static_assert(md::clip(in, 2, 3) == 2);
-    static_assert(md::clip(in, 0, 1) == 1);
-    static_assert(md::clip(in, 2, std::nullopt) == 2);
-    static_assert(md::clip(in, std::nullopt, 1) == 1);
-    static_assert(md::clip(in, std::nullopt, std::nullopt) == 1.5);
+    std::cout << "out1: " << md::to_string(out1) << std::endl;
+    std::cout << "out2: " << md::to_string(out2) << std::endl;
+
+    ASSERT_TRUE(
+        md::array_equal(out1, md::container<value_t, md::extents<index_t, 10>>{
+                                  {1, 1, 2, 3, 4, 5, 6, 7, 8, 8}}));
+    ASSERT_TRUE(
+        md::array_equal(out2, md::container<value_t, md::extents<index_t, 10>>{
+                                  {1, 1, 1, 1, 1, 1, 1, 1, 1, 1}}));
 }
 
-TEST(test, 2) {
-    using T = double;
+TEST(run_time, 2) {
+    using value_t = int;
+    using index_t = std::size_t;
 
-    constexpr auto in = md::container<T, md::extents<size_t, 10>>{
-        {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}};
+    auto a = md::arange(10);
 
-    static_assert(md::array_equal(md::clip(in, 1, 8),
-                                  md::container<T, md::extents<size_t, 10>>{
-                                      {1, 1, 2, 3, 4, 5, 6, 7, 8, 8}}));
+    static_cast<void>(md::clip(a, 3, 6, a));
 
-    static_assert(md::array_equal(md::clip(in, 8, 1),
-                                  md::container<T, md::extents<size_t, 10>>{
-                                      {1, 1, 1, 1, 1, 1, 1, 1, 1, 1}}));
+    std::cout << "a: " << md::to_string(a) << std::endl;
+
+    ASSERT_TRUE(
+        md::array_equal(a, md::container<value_t, md::extents<index_t, 10>>{
+                               {3, 3, 3, 3, 4, 5, 6, 6, 6, 6}}));
 }
 
-TEST(stack, clip) {
-    using T = double;
+TEST(run_time, 3) {
+    using value_t = int;
+    using index_t = std::size_t;
 
-    constexpr auto a = md::random::rand<T>(md::extents<size_t, 2, 1, 2>{});
-    constexpr auto a_min = md::container<T, md::extents<size_t, 1>>{{0.4}};
-    constexpr auto a_max = md::container<T, md::extents<size_t, 1>>{{0.6}};
+    const auto a = md::arange(10);
+    const auto out = md::clip(a,
+                              md::container<value_t, md::extents<index_t, 10>>{
+                                  {3, 4, 1, 1, 1, 4, 4, 4, 4, 4}},
+                              8);
 
-    constexpr auto a_clip = md::clip(a, a_min, a_max);
+    std::cout << "out: " << md::to_string(out) << std::endl;
 
-    for (size_t i = 0; i < a.extent(0); i++) {
-        for (size_t j = 0; j < a.extent(1); j++) {
-            for (size_t k = 0; k < a.extent(2); k++) {
-                ASSERT_TRUE((a_min(0) <= a_clip(i, j, k) &&
-                             a_clip(i, j, k) <= a_max(0)));
-            }
-        }
-    }
+    ASSERT_TRUE(
+        md::array_equal(out, md::container<value_t, md::extents<index_t, 10>>{
+                                 {3, 4, 2, 3, 4, 5, 6, 7, 8, 8}}));
 }
 
-TEST(stack, clip_scalar) {
-    using T = double;
+TEST(compile_time, 1) {
+    using value_t = int;
+    using index_t = std::size_t;
 
-    constexpr auto a = md::random::rand<T>(md::extents<size_t, 2, 1, 2>{});
-    constexpr T a_min = 0.4;
-    constexpr T a_max = 0.6;
+    constexpr auto a = md::arange<10>();
+    constexpr auto out1 = md::clip(a, 1, 8);
+    constexpr auto out2 = md::clip(a, 8, 1);
 
-    constexpr auto a_clip = md::clip(a, a_min, a_max);
+    std::cout << "out1: " << md::to_string(out1) << std::endl;
+    std::cout << "out2: " << md::to_string(out2) << std::endl;
 
-    for (size_t i = 0; i < a.extent(0); i++) {
-        for (size_t j = 0; j < a.extent(1); j++) {
-            for (size_t k = 0; k < a.extent(2); k++) {
-                ASSERT_TRUE(
-                    (a_min <= a_clip(i, j, k) && a_clip(i, j, k) <= a_max));
-            }
-        }
-    }
+    static_assert(
+        md::array_equal(out1, md::container<value_t, md::extents<index_t, 10>>{
+                                  {1, 1, 2, 3, 4, 5, 6, 7, 8, 8}}));
+    static_assert(
+        md::array_equal(out2, md::container<value_t, md::extents<index_t, 10>>{
+                                  {1, 1, 1, 1, 1, 1, 1, 1, 1, 1}}));
 }
 
-TEST(heap, clip) {
-    using T = double;
+TEST(compile_time, 2) {
+    using value_t = int;
+    using index_t = std::size_t;
 
-    const auto a = md::random::rand<T>(md::dims<3>{2, 1, 2});
-    const auto a_min = md::container<T, md::dims<1>>{{0.4}, md::dims<1>{1}};
-    const auto a_max = md::container<T, md::dims<1>>{{0.6}, md::dims<1>{1}};
+    static_assert([&]() {
+        auto a = md::arange<10>();
 
-    const auto a_clip = md::clip(a, a_min, a_max);
+        static_cast<void>(md::clip(a, 3, 6, a));
 
-    for (size_t i = 0; i < a.extent(0); i++) {
-        for (size_t j = 0; j < a.extent(1); j++) {
-            for (size_t k = 0; k < a.extent(2); k++) {
-                ASSERT_TRUE((a_min(0) <= a_clip(i, j, k) &&
-                             a_clip(i, j, k) <= a_max(0)));
-            }
-        }
-    }
+        return md::array_equal(a,
+                               md::container<value_t, md::extents<index_t, 10>>{
+                                   {3, 3, 3, 3, 4, 5, 6, 6, 6, 6}});
+    }());
 }
 
-TEST(heap, clip_scalar) {
-    using T = double;
+TEST(compile_time, 3) {
+    using value_t = int;
+    using index_t = std::size_t;
 
-    const auto a = md::random::rand<T>(md::dims<3>{2, 1, 2});
-    const T a_min = 0.4;
-    const T a_max = 0.6;
+    constexpr auto a = md::arange<10>();
+    constexpr auto out =
+        md::clip(a,
+                 md::container<value_t, md::extents<index_t, 10>>{
+                     {3, 4, 1, 1, 1, 4, 4, 4, 4, 4}},
+                 8);
 
-    const auto a_clip = md::clip(a, a_min, a_max);
+    std::cout << "out: " << md::to_string(out) << std::endl;
 
-    for (size_t i = 0; i < a.extent(0); i++) {
-        for (size_t j = 0; j < a.extent(1); j++) {
-            for (size_t k = 0; k < a.extent(2); k++) {
-                ASSERT_TRUE(
-                    (a_min <= a_clip(i, j, k) && a_clip(i, j, k) <= a_max));
-            }
-        }
-    }
+    static_assert(
+        md::array_equal(out, md::container<value_t, md::extents<index_t, 10>>{
+                                 {3, 4, 2, 3, 4, 5, 6, 7, 8, 8}}));
 }
