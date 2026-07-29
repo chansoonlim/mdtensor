@@ -14,7 +14,7 @@
 namespace mdtensor {
 namespace detail {
 
-template <md_c in_t, md_c out_t>
+template <core::md_c in_t, core::md_c out_t>
     requires(std::remove_cvref_t<out_t>::rank() == 0)
 inline constexpr void any_impl(in_t &&in, out_t &&out) {
     using in_base_t = std::remove_cvref_t<in_t>;
@@ -30,7 +30,7 @@ inline constexpr void any_impl(in_t &&in, out_t &&out) {
     out() = false;
 }
 
-template <md_c in_t, md_c out_t>
+template <core::md_c in_t, core::md_c out_t>
     requires(std::remove_cvref_t<out_t>::rank() > 0)
 inline constexpr void any_impl(in_t &&in, out_t &&out) {
     using in_base_t = std::remove_cvref_t<in_t>;
@@ -44,7 +44,7 @@ inline constexpr void any_impl(in_t &&in, out_t &&out) {
 
 } // namespace detail
 
-template <int64_t Axis, MPMode mpmode = MPMode::NONE, typename in_t,
+template <int64_t Axis, core::MPMode mpmode = core::MPMode::NONE, typename in_t,
           typename out_t>
 inline constexpr void any(in_t &&in, out_t &&out) {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
@@ -64,8 +64,8 @@ inline constexpr void any(in_t &&in, out_t &&out) {
         std::integer_sequence<bool, false, true>{}, in_mds, out_mds);
 }
 
-template <int64_t Axis, MPMode mpmode = MPMode::NONE, typename dtype = bool,
-          typename in_t>
+template <int64_t Axis, core::MPMode mpmode = core::MPMode::NONE,
+          typename dtype = bool, typename in_t>
 [[nodiscard]] inline constexpr auto any(in_t &&in) {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
 

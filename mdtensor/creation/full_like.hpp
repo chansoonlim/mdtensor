@@ -14,8 +14,8 @@
 
 namespace mdtensor {
 
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t,
-          typename val_t>
+template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
+          typename in_t, typename val_t>
 [[nodiscard]] inline constexpr auto full_like(in_t &&in, val_t &&val) {
     auto out = empty_like<dtype>(std::forward<in_t>(in));
     fill<mpmode>(out, std::forward<val_t>(val));

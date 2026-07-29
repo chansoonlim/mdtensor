@@ -31,7 +31,8 @@ constexpr size_t concatenate_static_extent() {
     }
 }
 
-template <int64_t Axis, extents_c in1_t, extents_c in2_t, extents_c... ins_t>
+template <int64_t Axis, core::extents_c in1_t, core::extents_c in2_t,
+          core::extents_c... ins_t>
     requires(in1_t::rank() == in2_t::rank())
 [[nodiscard]] inline constexpr auto
 concatenate_extents(const in1_t &in1 = in1_t{}, const in2_t &in2 = in2_t{},
@@ -77,7 +78,7 @@ concatenate_extents(const in1_t &in1 = in1_t{}, const in2_t &in2 = in2_t{},
     }
 }
 
-template <int64_t Axis, extents_c... ins_t>
+template <int64_t Axis, core::extents_c... ins_t>
 [[nodiscard]] inline constexpr auto
 concatenate_extents(std::tuple<ins_t...> &&ins) noexcept {
     constexpr size_t ins_num =

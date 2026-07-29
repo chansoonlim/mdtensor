@@ -16,7 +16,7 @@
 namespace mdtensor {
 namespace random {
 
-template <MPMode mpmode = MPMode::NONE, typename in_t>
+template <core::MPMode mpmode = core::MPMode::NONE, typename in_t>
 inline constexpr void uniform_to(in_t &&in, const double &low = 0,
                                  const double &high = 1) noexcept {
     const auto in_mds = core::to_mdspan(std::forward<in_t>(in));
@@ -25,7 +25,7 @@ inline constexpr void uniform_to(in_t &&in, const double &low = 0,
 
     random::rand_to(in_mds);
 
-    if constexpr (mpmode == MPMode::SIMD) {
+    if constexpr (mpmode == core::MPMode::SIMD) {
         multiply_to<mpmode>(in_mds, static_cast<const T>(high - low), in_mds);
         add_to<mpmode>(in_mds, static_cast<const T>(low), in_mds);
         return;
@@ -40,8 +40,9 @@ inline constexpr void uniform_to(in_t &&in, const double &low = 0,
     }
 }
 
-template <std::floating_point dtype = float, MPMode mpmode = MPMode::NONE,
-          extents_c exts_t = extents<uint8_t>>
+template <std::floating_point dtype = float,
+          core::MPMode mpmode = core::MPMode::NONE,
+          core::extents_c exts_t = core::stdex::extents<uint8_t>>
 [[nodiscard]] inline constexpr auto uniform(exts_t &&exts = exts_t{},
                                             const double &low = 0,
                                             const double &high = 1) noexcept {

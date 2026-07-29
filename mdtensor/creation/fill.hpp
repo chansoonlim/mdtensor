@@ -21,7 +21,8 @@ inline constexpr void fill_impl(in_t &&in, val_t &&val) {
 
 } // namespace detail
 
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename val_t>
+template <core::MPMode mpmode = core::MPMode::NONE, typename in_t,
+          typename val_t>
 inline constexpr void fill(in_t &&in, val_t &&val) {
     core::batch<mpmode>(
         [&](auto &&...elems) {

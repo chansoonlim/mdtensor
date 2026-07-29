@@ -17,7 +17,7 @@ namespace mdtensor {
 namespace linalg {
 namespace detail {
 
-template <md_c in_t, md_c out_t>
+template <core::md_c in_t, core::md_c out_t>
 inline constexpr void norm_impl(in_t &&in, out_t &&out) noexcept {
     static_assert(std::remove_cvref_t<in_t>::rank() == 1);
     static_assert(std::remove_cvref_t<out_t>::rank() == 0);
@@ -36,12 +36,13 @@ inline constexpr void norm_impl(in_t &&in, out_t &&out) noexcept {
 
 } // namespace detail
 
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
+template <core::MPMode mpmode = core::MPMode::NONE, typename in_t,
+          typename out_t>
 inline constexpr void norm_to(in_t &&in, out_t &&out) noexcept {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
     const auto out_mds = core::to_mdspan(std::forward<out_t>(out));
 
-    if constexpr (mpmode == MPMode::SIMD) [[unlikely]] {
+    if constexpr (mpmode == core::MPMode::SIMD) [[unlikely]] {
         sum_to<-1, mpmode>(multiply<void, mpmode>(in_mds, in_mds), out_mds);
         sqrt_to<mpmode>(out_mds, out_mds);
 
@@ -55,12 +56,13 @@ inline constexpr void norm_to(in_t &&in, out_t &&out) noexcept {
     }
 }
 
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
+template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
+          typename in_t>
 [[nodiscard]] inline constexpr auto norm(in_t &&in) noexcept {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
 
     auto out = core::create_out<dtype>(std::index_sequence<1>{},
-                                       extents<uint8_t>{}, in_mds);
+                                       core::stdex::extents<uint8_t>{}, in_mds);
 
     norm_to<mpmode>(in_mds, out);
 

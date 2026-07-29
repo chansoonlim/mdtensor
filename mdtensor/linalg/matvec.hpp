@@ -16,7 +16,7 @@ namespace mdtensor {
 namespace linalg {
 namespace detail {
 
-template <md_c in1_t, md_c in2_t, md_c out_t>
+template <core::md_c in1_t, core::md_c in2_t, core::md_c out_t>
 inline constexpr void matvec_naive_noalias(in1_t &&in1, in2_t &&in2,
                                            out_t &&out) noexcept {
     using out_index_t = typename std::remove_cvref_t<out_t>::index_type;
@@ -31,7 +31,7 @@ inline constexpr void matvec_naive_noalias(in1_t &&in1, in2_t &&in2,
     }
 }
 
-template <md_c in1_t, md_c in2_t, md_c out_t>
+template <core::md_c in1_t, core::md_c in2_t, core::md_c out_t>
 inline constexpr void matvec_naive(in1_t &&in1, in2_t &&in2,
                                    out_t &&out) noexcept {
     const auto in1_mds = core::to_const_mdspan(std::forward<in1_t>(in1));
@@ -73,7 +73,7 @@ inline constexpr void matvec_naive(in1_t &&in1, in2_t &&in2,
     }
 }
 
-template <md_c in1_t, md_c in2_t, md_c out_t>
+template <core::md_c in1_t, core::md_c in2_t, core::md_c out_t>
 inline constexpr void matvec_impl(in1_t &&in1, in2_t &&in2,
                                   out_t &&out) noexcept {
 #ifdef MDTENSOR_USE_EIGEN
@@ -112,8 +112,8 @@ inline constexpr void matvec_impl(in1_t &&in1, in2_t &&in2,
 
 } // namespace detail
 
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
-          typename out_t>
+template <core::MPMode mpmode = core::MPMode::NONE, typename in1_t,
+          typename in2_t, typename out_t>
 inline constexpr void matvec_to(in1_t &&in1, in2_t &&in2,
                                 out_t &&out) noexcept {
     core::batch<mpmode>(
@@ -126,15 +126,15 @@ inline constexpr void matvec_to(in1_t &&in1, in2_t &&in2,
         std::forward<out_t>(out));
 }
 
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
+template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
+          typename in1_t, typename in2_t>
 [[nodiscard]] inline constexpr auto matvec(in1_t &&in1, in2_t &&in2) noexcept {
     const auto in1_mds = core::to_const_mdspan(std::forward<in1_t>(in1));
     const auto in2_mds = core::to_const_mdspan(std::forward<in2_t>(in2));
 
     const auto uin1_exts = core::slice_extents_from_right<2>(in1_mds.extents());
     const auto uin2_exts = core::slice_extents_from_right<2>(in2_mds.extents());
-    const auto uout_exts = extents<
+    const auto uout_exts = core::stdex::extents<
         core::common_index_type_t<typename decltype(uin1_exts)::index_type,
                                   typename decltype(uin2_exts)::index_type>,
         decltype(uin1_exts)::static_extent(0)>{uin1_exts.extent(0)};

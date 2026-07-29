@@ -23,8 +23,8 @@ inline constexpr void maximum_impl(in1_t &&in1, in2_t &&in2, out_t &&out) {
 
 } // namespace detail
 
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
-          typename out_t>
+template <core::MPMode mpmode = core::MPMode::NONE, typename in1_t,
+          typename in2_t, typename out_t>
 inline constexpr void maximum_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
     core::batch<mpmode>(
         [](auto &&...elems) {
@@ -35,11 +35,12 @@ inline constexpr void maximum_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
         std::forward<out_t>(out));
 }
 
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
+template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
+          typename in1_t, typename in2_t>
 [[nodiscard]] inline constexpr auto maximum(in1_t &&in1, in2_t &&in2) {
-    auto out = core::create_out<dtype>(
-        extents<uint8_t>{}, std::forward<in1_t>(in1), std::forward<in2_t>(in2));
+    auto out = core::create_out<dtype>(core::stdex::extents<uint8_t>{},
+                                       std::forward<in1_t>(in1),
+                                       std::forward<in2_t>(in2));
 
     maximum_to<mpmode>(std::forward<in1_t>(in1), std::forward<in2_t>(in2), out);
 

@@ -13,13 +13,13 @@
 
 namespace mdtensor {
 
-template <typename dtype, MPMode mpmode = MPMode::NONE,
-          extents_c exts_t = extents<uint8_t>>
+template <typename dtype, core::MPMode mpmode = core::MPMode::NONE,
+          core::extents_c exts_t = core::stdex::extents<uint8_t>>
 [[nodiscard]] inline constexpr auto ones(exts_t &&exts = exts_t{}) {
     return full<dtype, mpmode, exts_t>(1, std::forward<exts_t>(exts));
 }
 
-template <typename dtype, MPMode mpmode = MPMode::NONE>
+template <typename dtype, core::MPMode mpmode = core::MPMode::NONE>
 [[nodiscard]] inline constexpr auto ones(const size_t &len) {
     return full<dtype, mpmode>(1, dims<1>{len});
 }

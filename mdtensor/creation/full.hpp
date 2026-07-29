@@ -14,8 +14,8 @@
 
 namespace mdtensor {
 
-template <typename dtype, MPMode mpmode = MPMode::NONE,
-          extents_c exts_t = extents<uint8_t>>
+template <typename dtype, core::MPMode mpmode = core::MPMode::NONE,
+          core::extents_c exts_t = core::stdex::extents<uint8_t>>
 [[nodiscard]] inline constexpr auto full(dtype &&val,
                                          exts_t &&exts = exts_t{}) {
     auto out = empty<dtype>(std::forward<exts_t>(exts));

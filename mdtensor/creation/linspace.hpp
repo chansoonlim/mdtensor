@@ -14,7 +14,7 @@
 namespace mdtensor {
 namespace detail {
 
-template <md_c start_t, md_c stop_t, md_c out_t>
+template <core::md_c start_t, core::md_c stop_t, core::md_c out_t>
     requires(std::remove_cvref_t<start_t>::rank() == 0 &&
              std::remove_cvref_t<stop_t>::rank() == 0 &&
              std::remove_cvref_t<out_t>::rank() == 1)
@@ -85,7 +85,8 @@ inline constexpr void linspace_to(start_t &&start, stop_t &&stop, out_t &&out,
     }
 }
 
-template <int64_t Axis = 0, extents_c exts_t = extents<uint8_t, 50>,
+template <int64_t Axis = 0,
+          core::extents_c exts_t = core::stdex::extents<uint8_t, 50>,
           typename dtype = void, typename start_t, typename stop_t>
     requires(exts_t::rank() == 1)
 [[nodiscard]] inline constexpr auto

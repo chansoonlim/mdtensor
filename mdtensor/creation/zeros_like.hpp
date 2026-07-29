@@ -13,7 +13,8 @@
 
 namespace mdtensor {
 
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
+template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
+          typename in_t>
 [[nodiscard]] inline constexpr auto zeros_like(in_t &&in) {
     return full_like<dtype, mpmode>(std::forward<in_t>(in), 0);
 }

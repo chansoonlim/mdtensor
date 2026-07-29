@@ -22,8 +22,8 @@ inline constexpr void greater_equal_impl(in1_t &&in1, in2_t &&in2,
 
 } // namespace detail
 
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
-          typename out_t>
+template <core::MPMode mpmode = core::MPMode::NONE, typename in1_t,
+          typename in2_t, typename out_t>
 inline constexpr void greater_equal_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
     core::batch<mpmode>(
         [](auto &&...elems) {
@@ -34,11 +34,12 @@ inline constexpr void greater_equal_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
         std::forward<out_t>(out));
 }
 
-template <typename dtype = bool, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
+template <typename dtype = bool, core::MPMode mpmode = core::MPMode::NONE,
+          typename in1_t, typename in2_t>
 [[nodiscard]] inline constexpr auto greater_equal(in1_t &&in1, in2_t &&in2) {
-    auto out = core::create_out<dtype>(
-        extents<uint8_t>{}, std::forward<in1_t>(in1), std::forward<in2_t>(in2));
+    auto out = core::create_out<dtype>(core::stdex::extents<uint8_t>{},
+                                       std::forward<in1_t>(in1),
+                                       std::forward<in2_t>(in2));
 
     greater_equal_to<mpmode>(std::forward<in1_t>(in1), std::forward<in2_t>(in2),
                              out);

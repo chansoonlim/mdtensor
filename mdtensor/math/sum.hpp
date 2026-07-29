@@ -30,7 +30,7 @@ inline constexpr void sum_impl(in_t &&in, out_t &&out) {
 
 } // namespace detail
 
-template <int64_t Axis, MPMode mpmode = MPMode::NONE, typename in_t,
+template <int64_t Axis, core::MPMode mpmode = core::MPMode::NONE, typename in_t,
           typename out_t>
 inline constexpr void sum_to(in_t &&in, out_t &&out) {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
@@ -50,8 +50,8 @@ inline constexpr void sum_to(in_t &&in, out_t &&out) {
         std::integer_sequence<bool, false, true>{}, in_mds, out_mds);
 }
 
-template <int64_t Axis, MPMode mpmode = MPMode::NONE, typename dtype = void,
-          typename in_t>
+template <int64_t Axis, core::MPMode mpmode = core::MPMode::NONE,
+          typename dtype = void, typename in_t>
 [[nodiscard]] inline constexpr auto sum(in_t &&in) {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
 

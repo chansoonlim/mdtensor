@@ -27,7 +27,7 @@ template <typename in_t> inline constexpr void eye_impl(in_t &&in) {
 
 } // namespace detail
 
-template <MPMode mpmode = MPMode::NONE, typename in_t>
+template <core::MPMode mpmode = core::MPMode::NONE, typename in_t>
 inline constexpr void eye_to(in_t &&in) {
     core::batch<mpmode>(
         [](auto &&...elems) {
@@ -37,8 +37,8 @@ inline constexpr void eye_to(in_t &&in) {
         std::forward<in_t>(in));
 }
 
-template <typename dtype, MPMode mpmode = MPMode::NONE,
-          extents_c exts_t = extents<uint8_t>>
+template <typename dtype, core::MPMode mpmode = core::MPMode::NONE,
+          core::extents_c exts_t = core::stdex::extents<uint8_t>>
 [[nodiscard]] inline constexpr auto eye(exts_t &&exts = exts_t{}) {
     auto out = empty<dtype>(std::forward<exts_t>(exts));
     eye_to<mpmode>(out);

@@ -43,8 +43,8 @@ inline constexpr void clip_impl(in_t &&in, min_t &&min, max_t &&max,
 
 } // namespace detail
 
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename min_t,
-          typename max_t, typename out_t>
+template <core::MPMode mpmode = core::MPMode::NONE, typename in_t,
+          typename min_t, typename max_t, typename out_t>
 inline constexpr void clip_to(in_t &&in, min_t &&min, max_t &&max,
                               out_t &&out) {
     core::batch<mpmode>(
@@ -56,12 +56,12 @@ inline constexpr void clip_to(in_t &&in, min_t &&min, max_t &&max,
         std::forward<max_t>(max), std::forward<out_t>(out));
 }
 
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t,
-          typename min_t, typename max_t>
+template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
+          typename in_t, typename min_t, typename max_t>
 [[nodiscard]] inline constexpr auto clip(in_t &&in, min_t &&min, max_t &&max) {
     auto out = core::create_out<dtype>(
-        extents<uint8_t>{}, std::forward<in_t>(in), std::forward<min_t>(min),
-        std::forward<max_t>(max));
+        core::stdex::extents<uint8_t>{}, std::forward<in_t>(in),
+        std::forward<min_t>(min), std::forward<max_t>(max));
 
     clip_to<mpmode>(std::forward<in_t>(in), std::forward<min_t>(min),
                     std::forward<max_t>(max), out);

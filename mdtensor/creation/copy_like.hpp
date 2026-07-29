@@ -14,8 +14,8 @@
 
 namespace mdtensor {
 
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
+template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
+          typename in1_t, typename in2_t>
 [[nodiscard]] inline constexpr auto copy_like(in1_t &&in1, in2_t &&in2) {
     auto out = empty_like<dtype>(std::forward<in1_t>(in1));
     copy_to<mpmode>(std::forward<in2_t>(in2), out);

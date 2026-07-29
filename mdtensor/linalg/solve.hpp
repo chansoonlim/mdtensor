@@ -15,7 +15,7 @@ namespace mdtensor {
 namespace linalg {
 namespace detail {
 
-template <md_c a_t, md_c b_t, md_c x_t>
+template <core::md_c a_t, core::md_c b_t, core::md_c x_t>
 [[nodiscard]] inline constexpr bool solve_impl(a_t &&a, b_t &&b,
                                                x_t &&x) noexcept {
     auto a_mds = core::to_const_mdspan(std::forward<a_t>(a));
@@ -116,7 +116,7 @@ template <md_c a_t, md_c b_t, md_c x_t>
 
 } // namespace detail
 
-template <MPMode mpmode = MPMode::NONE, typename a_t, typename b_t,
+template <core::MPMode mpmode = core::MPMode::NONE, typename a_t, typename b_t,
           typename x_t, typename valid_t>
 inline constexpr void solve_to(a_t &&a, b_t &&b, x_t &&x, valid_t &&valid) {
     const auto a_mds = core::to_const_mdspan(std::forward<a_t>(a));
@@ -135,8 +135,8 @@ inline constexpr void solve_to(a_t &&a, b_t &&b, x_t &&x, valid_t &&valid) {
         std::forward<x_t>(x), std::forward<valid_t>(valid));
 }
 
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename a_t,
-          typename b_t>
+template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
+          typename a_t, typename b_t>
 [[nodiscard]] inline constexpr auto solve(a_t &&a, b_t &&b) {
     const auto a_mds = core::to_const_mdspan(std::forward<a_t>(a));
     const auto b_mds = core::to_const_mdspan(std::forward<b_t>(b));
@@ -148,8 +148,9 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename a_t,
         core::slice_extents_from_right<rhs_rank>(b_mds.extents()), a_mds,
         b_mds);
 
-    auto valid = core::create_out<bool>(std::index_sequence<2, rhs_rank>{},
-                                        extents<uint8_t>{}, a_mds, b_mds);
+    auto valid =
+        core::create_out<bool>(std::index_sequence<2, rhs_rank>{},
+                               core::stdex::extents<uint8_t>{}, a_mds, b_mds);
 
     solve_to<mpmode>(a_mds, b_mds, x, valid);
 

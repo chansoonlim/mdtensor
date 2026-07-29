@@ -17,7 +17,7 @@ namespace mdtensor {
 namespace linalg {
 namespace detail {
 
-template <md_c in_t, md_c out_t>
+template <core::md_c in_t, core::md_c out_t>
 [[nodiscard]] inline constexpr bool cholesky_upper_impl(in_t &&in,
                                                         out_t &&out) {
     auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
@@ -65,7 +65,7 @@ template <md_c in_t, md_c out_t>
     return true;
 }
 
-template <md_c in_t, md_c out_t>
+template <core::md_c in_t, core::md_c out_t>
 [[nodiscard]] inline constexpr bool cholesky_lower_impl(in_t &&in,
                                                         out_t &&out) {
     auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
@@ -113,7 +113,7 @@ template <md_c in_t, md_c out_t>
     return true;
 }
 
-template <bool upper, md_c in_t, md_c out_t>
+template <bool upper, core::md_c in_t, core::md_c out_t>
 [[nodiscard]] inline constexpr bool cholesky_impl(in_t &&in, out_t &&out) {
     if constexpr (upper) {
         return cholesky_upper_impl(std::forward<in_t>(in),
@@ -127,8 +127,8 @@ template <bool upper, md_c in_t, md_c out_t>
 
 } // namespace detail
 
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t,
-          typename valid_t>
+template <core::MPMode mpmode = core::MPMode::NONE, typename in_t,
+          typename out_t, typename valid_t>
 inline constexpr void cholesky_to(in_t &&in, out_t &&out, valid_t &&valid,
                                   const bool upper = false) {
     const auto run_batch = [&]<bool upper_v>() {
@@ -152,14 +152,15 @@ inline constexpr void cholesky_to(in_t &&in, out_t &&out, valid_t &&valid,
     }
 }
 
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
+template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
+          typename in_t>
 [[nodiscard]] inline constexpr auto cholesky(in_t &&in,
                                              const bool upper = false) {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
 
     auto out = empty_like(in_mds);
-    auto valid = core::create_out<bool>(std::index_sequence<2>{},
-                                        extents<uint8_t>{}, in_mds);
+    auto valid = core::create_out<bool>(
+        std::index_sequence<2>{}, core::stdex::extents<uint8_t>{}, in_mds);
 
     cholesky_to<mpmode>(in_mds, out, valid, upper);
 

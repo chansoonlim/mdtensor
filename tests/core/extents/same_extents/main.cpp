@@ -100,8 +100,6 @@ TEST(same_extents, 1) {
 }
 
 TEST(same_extents, 2) {
-    using index_t = size_t;
-
     static_assert(!md::core::same_extents(stdex::extents<size_t, 2, 3>{},
                                           stdex::extents<size_t, 2, 3, 4>{}));
 

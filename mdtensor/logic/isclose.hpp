@@ -24,8 +24,8 @@ inline constexpr void isclose_impl(in1_t &&in1, in2_t &&in2, out_t &&out,
 
 } // namespace detail
 
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
-          typename out_t>
+template <core::MPMode mpmode = core::MPMode::NONE, typename in1_t,
+          typename in2_t, typename out_t>
 inline constexpr void isclose_to(in1_t &&in1, in2_t &&in2, out_t &&out,
                                  const double &rtol = 1e-05,
                                  const double &atol = 1e-08) {
@@ -39,13 +39,14 @@ inline constexpr void isclose_to(in1_t &&in1, in2_t &&in2, out_t &&out,
         std::forward<out_t>(out));
 }
 
-template <typename dtype = bool, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
+template <typename dtype = bool, core::MPMode mpmode = core::MPMode::NONE,
+          typename in1_t, typename in2_t>
 [[nodiscard]] inline constexpr auto isclose(in1_t &&in1, in2_t &&in2,
                                             const double &rtol = 1e-05,
                                             const double &atol = 1e-08) {
-    auto out = core::create_out<dtype>(
-        extents<uint8_t>{}, std::forward<in1_t>(in1), std::forward<in2_t>(in2));
+    auto out = core::create_out<dtype>(core::stdex::extents<uint8_t>{},
+                                       std::forward<in1_t>(in1),
+                                       std::forward<in2_t>(in2));
 
     isclose_to<mpmode>(std::forward<in1_t>(in1), std::forward<in2_t>(in2), out,
                        rtol, atol);

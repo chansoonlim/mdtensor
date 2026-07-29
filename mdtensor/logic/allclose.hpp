@@ -14,7 +14,8 @@
 
 namespace mdtensor {
 
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t>
+template <core::MPMode mpmode = core::MPMode::NONE, typename in1_t,
+          typename in2_t>
 [[nodiscard]] inline constexpr bool allclose(in1_t &&in1, in2_t &&in2,
                                              const double &rtol = 1e-05,
                                              const double &atol = 1e-08) {

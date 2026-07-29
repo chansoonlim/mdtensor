@@ -17,7 +17,8 @@ namespace mdtensor {
 namespace linalg {
 namespace detail {
 
-template <md_c in_t, md_c p_indices_t, md_c l_t, md_c u_t>
+template <core::md_c in_t, core::md_c p_indices_t, core::md_c l_t,
+          core::md_c u_t>
 inline constexpr void lu_p_indices_impl(in_t &&in, p_indices_t &&p_indices,
                                         l_t &&l, u_t &&u) {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
@@ -52,7 +53,8 @@ inline constexpr void lu_p_indices_impl(in_t &&in, p_indices_t &&p_indices,
 
     // initialize
     auto in_copy = copy(in_mds);
-    auto row_order = core::make_container<index_t>(extents<index_t, m_s>{m});
+    auto row_order =
+        core::make_container<index_t>(core::stdex::extents<index_t, m_s>{m});
     for (index_t i = 0; i < m; i++) {
         row_order(i) = i;
     }
@@ -130,7 +132,7 @@ inline constexpr void lu_p_indices_impl(in_t &&in, p_indices_t &&p_indices,
     }
 }
 
-template <md_c in_t, md_c p_t, md_c l_t, md_c u_t>
+template <core::md_c in_t, core::md_c p_t, core::md_c l_t, core::md_c u_t>
 inline constexpr void lu_full_impl(in_t &&in, p_t &&p, l_t &&l, u_t &&u) {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
     const auto p_mds = core::to_mdspan(std::forward<p_t>(p));
@@ -153,7 +155,8 @@ inline constexpr void lu_full_impl(in_t &&in, p_t &&p, l_t &&l, u_t &&u) {
 
     const index_t m = in_mds.extent(0);
 
-    auto p_indices = core::make_container<index_t>(extents<index_t, m_s>{m});
+    auto p_indices =
+        core::make_container<index_t>(core::stdex::extents<index_t, m_s>{m});
 
     lu_p_indices_impl(in_mds, p_indices, l_mds, u_mds);
 
@@ -164,7 +167,7 @@ inline constexpr void lu_full_impl(in_t &&in, p_t &&p, l_t &&l, u_t &&u) {
     }
 }
 
-template <md_c in_t, md_c pl_t, md_c u_t>
+template <core::md_c in_t, core::md_c pl_t, core::md_c u_t>
 inline constexpr void lu_permute_l_impl(in_t &&in, pl_t &&pl, u_t &&u) {
     auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
     auto pl_mds = core::to_mdspan(std::forward<pl_t>(pl));
@@ -196,8 +199,10 @@ inline constexpr void lu_permute_l_impl(in_t &&in, pl_t &&pl, u_t &&u) {
     const index_t n = in_mds.extent(1);
     const index_t k = m < n ? m : n;
 
-    auto p_indices = core::make_container<index_t>(extents<index_t, m_s>{m});
-    auto l = core::make_container<value_t>(extents<index_t, m_s, k_s>{m, k});
+    auto p_indices =
+        core::make_container<index_t>(core::stdex::extents<index_t, m_s>{m});
+    auto l = core::make_container<value_t>(
+        core::stdex::extents<index_t, m_s, k_s>{m, k});
 
     lu_p_indices_impl(in_mds, p_indices, l, u_mds);
 
@@ -211,8 +216,8 @@ inline constexpr void lu_permute_l_impl(in_t &&in, pl_t &&pl, u_t &&u) {
 
 } // namespace detail
 
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename p_indices_t,
-          typename l_t, typename u_t>
+template <core::MPMode mpmode = core::MPMode::NONE, typename in_t,
+          typename p_indices_t, typename l_t, typename u_t>
 inline constexpr void lu_p_indices_to(in_t &&in, p_indices_t &&p_indices,
                                       l_t &&l, u_t &&u) {
     core::batch<mpmode>(
@@ -225,7 +230,7 @@ inline constexpr void lu_p_indices_to(in_t &&in, p_indices_t &&p_indices,
         std::forward<l_t>(l), std::forward<u_t>(u));
 }
 
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename p_t,
+template <core::MPMode mpmode = core::MPMode::NONE, typename in_t, typename p_t,
           typename l_t, typename u_t>
 inline constexpr void lu_full_to(in_t &&in, p_t &&p, l_t &&l, u_t &&u) {
     core::batch<mpmode>(
@@ -238,8 +243,8 @@ inline constexpr void lu_full_to(in_t &&in, p_t &&p, l_t &&l, u_t &&u) {
         std::forward<u_t>(u));
 }
 
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename pl_t,
-          typename u_t>
+template <core::MPMode mpmode = core::MPMode::NONE, typename in_t,
+          typename pl_t, typename u_t>
 inline constexpr void lu_permute_l_to(in_t &&in, pl_t &&pl, u_t &&u) {
     core::batch<mpmode>(
         [](auto &&...elems) {
@@ -250,7 +255,8 @@ inline constexpr void lu_permute_l_to(in_t &&in, pl_t &&pl, u_t &&u) {
         std::forward<in_t>(in), std::forward<pl_t>(pl), std::forward<u_t>(u));
 }
 
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
+template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
+          typename in_t>
 [[nodiscard]] inline constexpr auto lu_p_indices(in_t &&in) {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
 
@@ -277,8 +283,9 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 
     auto outs = core::create_outs<dtype>(
         std::index_sequence<2>{},
-        std::tuple{extents<index_t, m_s>{m}, extents<index_t, m_s, k_s>{m, k},
-                   extents<index_t, k_s, n_s>{k, n}},
+        std::tuple{extents<index_t, m_s>{m},
+                   core::stdex::extents<index_t, m_s, k_s>{m, k},
+                   core::stdex::extents<index_t, k_s, n_s>{k, n}},
         in_mds);
 
     lu_p_indices_to<mpmode>(in_mds, std::get<0>(outs), std::get<1>(outs),
@@ -287,7 +294,8 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
     return outs;
 }
 
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
+template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
+          typename in_t>
 [[nodiscard]] inline constexpr auto lu_full(in_t &&in) {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
 
@@ -312,12 +320,12 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
     const index_t n = in_mds.extent(rank - 1);
     const index_t k = m < n ? m : n;
 
-    auto outs =
-        core::create_outs<dtype>(std::index_sequence<2>{},
-                                 std::tuple{extents<index_t, m_s, m_s>{m, m},
-                                            extents<index_t, m_s, k_s>{m, k},
-                                            extents<index_t, k_s, n_s>{k, n}},
-                                 in_mds);
+    auto outs = core::create_outs<dtype>(
+        std::index_sequence<2>{},
+        std::tuple{extents<index_t, m_s, m_s>{m, m},
+                   core::stdex::extents<index_t, m_s, k_s>{m, k},
+                   core::stdex::extents<index_t, k_s, n_s>{k, n}},
+        in_mds);
 
     lu_full_to<mpmode>(in_mds, std::get<0>(outs), std::get<1>(outs),
                        std::get<2>(outs));
@@ -325,7 +333,8 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
     return outs;
 }
 
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
+template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
+          typename in_t>
 [[nodiscard]] inline constexpr auto lu_permute_l(in_t &&in) {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
 
@@ -350,11 +359,11 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
     const index_t n = in_mds.extent(rank - 1);
     const index_t k = m < n ? m : n;
 
-    auto outs =
-        core::create_outs<dtype>(std::index_sequence<2>{},
-                                 std::tuple{extents<index_t, m_s, k_s>{m, k},
-                                            extents<index_t, k_s, n_s>{k, n}},
-                                 in_mds);
+    auto outs = core::create_outs<dtype>(
+        std::index_sequence<2>{},
+        std::tuple{extents<index_t, m_s, k_s>{m, k},
+                   core::stdex::extents<index_t, k_s, n_s>{k, n}},
+        in_mds);
 
     lu_permute_l_to<mpmode>(in_mds, std::get<0>(outs), std::get<1>(outs));
 
@@ -362,7 +371,7 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 }
 
 template <bool permute_l = false, bool p_indices = false, typename dtype = void,
-          MPMode mpmode = MPMode::NONE, typename in_t>
+          core::MPMode mpmode = core::MPMode::NONE, typename in_t>
 [[nodiscard]] inline constexpr auto lu(in_t &&in) {
     static_assert(!(permute_l && p_indices),
                   "lu cannot return both permuted L and P indices.");

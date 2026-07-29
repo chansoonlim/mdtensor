@@ -62,7 +62,7 @@ template <typename T, size_t sz>
     return dst;
 }
 
-template <md_c in_t>
+template <core::md_c in_t>
     requires(
         std::remove_cvref_t<in_t>::rank() == 0 &&
         std::floating_point<typename std::remove_cvref_t<in_t>::value_type>)
@@ -79,7 +79,7 @@ inline void rand_impl(in_t &&in) noexcept {
 
 } // namespace detail
 
-template <MPMode mpmode = MPMode::NONE, typename in_t>
+template <core::MPMode mpmode = core::MPMode::NONE, typename in_t>
 inline constexpr void rand_to(in_t &&in) noexcept {
     const auto in_mds = core::to_mdspan(std::forward<in_t>(in));
     using in_mds_t = decltype(in_mds);
@@ -117,8 +117,9 @@ inline constexpr void rand_to(in_t &&in) noexcept {
         std::integer_sequence<bool, true>{}, in_mds);
 }
 
-template <std::floating_point dtype = float, MPMode mpmode = MPMode::NONE,
-          extents_c exts_t = extents<uint8_t>>
+template <std::floating_point dtype = float,
+          core::MPMode mpmode = core::MPMode::NONE,
+          core::extents_c exts_t = core::stdex::extents<uint8_t>>
 [[nodiscard]] inline constexpr auto rand(exts_t &&exts = exts_t{}) noexcept {
     auto out = empty<dtype>(std::forward<exts_t>(exts));
     rand_to<mpmode>(out);

@@ -17,7 +17,7 @@ namespace mdtensor {
 namespace linalg {
 namespace detail {
 
-template <md_c in_t, md_c out_t>
+template <core::md_c in_t, core::md_c out_t>
 [[nodiscard]] inline constexpr bool inv_naive(in_t &&in, out_t &&out) {
     auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
     auto out_mds = core::to_mdspan(std::forward<out_t>(out));
@@ -91,7 +91,7 @@ template <md_c in_t, md_c out_t>
     return true;
 }
 
-template <md_c in_t, md_c out_t>
+template <core::md_c in_t, core::md_c out_t>
 [[nodiscard]] inline constexpr bool inv_impl(in_t &&in, out_t &&out) {
     static_assert(std::remove_cvref_t<in_t>::rank() == 2);
     static_assert(std::remove_cvref_t<out_t>::rank() == 2);
@@ -121,8 +121,8 @@ template <md_c in_t, md_c out_t>
 
 } // namespace detail
 
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t,
-          typename valid_t>
+template <core::MPMode mpmode = core::MPMode::NONE, typename in_t,
+          typename out_t, typename valid_t>
 inline constexpr void inv_to(in_t &&in, out_t &&out, valid_t &&valid) {
     core::batch<mpmode>(
         [](auto &&in, auto &&out, auto &&valid) {
@@ -135,15 +135,16 @@ inline constexpr void inv_to(in_t &&in, out_t &&out, valid_t &&valid) {
         std::forward<valid_t>(valid));
 }
 
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
+template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
+          typename in_t>
 [[nodiscard]] inline constexpr auto inv(in_t &&in) {
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
 
     auto out = core::create_out<dtype>(
         std::index_sequence<2>{},
         core::slice_extents_from_right<2>(in_mds.extents()), in_mds);
-    auto valid = core::create_out<bool>(std::index_sequence<2>{},
-                                        extents<uint8_t>{}, in_mds);
+    auto valid = core::create_out<bool>(
+        std::index_sequence<2>{}, core::stdex::extents<uint8_t>{}, in_mds);
 
     inv_to<mpmode>(in_mds, out, valid);
 

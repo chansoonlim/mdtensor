@@ -13,7 +13,8 @@
 
 namespace mdtensor {
 
-template <typename dtype, extents_c exts_t = extents<uint8_t>>
+template <typename dtype,
+          core::extents_c exts_t = core::stdex::extents<uint8_t>>
 [[nodiscard]] inline constexpr auto empty(exts_t &&exts = exts_t{}) noexcept {
     return core::make_container<dtype>(std::forward<exts_t>(exts));
 }

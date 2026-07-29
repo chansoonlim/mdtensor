@@ -13,7 +13,7 @@
 
 namespace mdtensor {
 
-template <typename in_t, extents_c new_extents_t>
+template <typename in_t, core::extents_c new_extents_t>
 [[nodiscard]] inline constexpr auto
 broadcast_to(in_t &&in, new_extents_t &&new_extents) noexcept {
     return core::broadcast_to(std::forward<in_t>(in),

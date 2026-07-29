@@ -35,8 +35,8 @@ transpose(in_t &&in, std::integer_sequence<AxesType, Axes...>) noexcept {
             ((Axes % static_cast<AxesType>(rank)) + (rank)) % rank)...};
 
         const auto new_extents = [&]<size_t... Is>(std::index_sequence<Is...>) {
-            return extents<typename in_mds_t::index_type,
-                           in_mds_t::static_extent(axes[Is])...>{
+            return core::stdex::extents<typename in_mds_t::index_type,
+                                        in_mds_t::static_extent(axes[Is])...>{
                 in_mds.extent(axes[Is])...};
         }(std::make_index_sequence<rank>{});
 
@@ -45,10 +45,10 @@ transpose(in_t &&in, std::integer_sequence<AxesType, Axes...>) noexcept {
                 in_mds.stride(axes[Is])...};
         }(std::make_index_sequence<rank>{});
 
-        return mdspan<typename in_mds_t::element_type,
-                      std::remove_cvref_t<decltype(new_extents)>,
-                      core::stdex::layout_stride,
-                      typename in_mds_t::accessor_type>{
+        return core::stdex::mdspan<typename in_mds_t::element_type,
+                                   std::remove_cvref_t<decltype(new_extents)>,
+                                   core::stdex::layout_stride,
+                                   typename in_mds_t::accessor_type>{
             in_mds.data_handle(),
             core::stdex::layout_stride::mapping{new_extents, new_strides}};
     }

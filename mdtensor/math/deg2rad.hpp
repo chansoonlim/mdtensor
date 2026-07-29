@@ -15,7 +15,8 @@
 
 namespace mdtensor {
 
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
+template <core::MPMode mpmode = core::MPMode::NONE, typename in_t,
+          typename out_t>
 inline constexpr void deg2rad_to(in_t &&in, out_t &&out) {
     using value_t =
         core::common_data_type_t<typename decltype(core::to_mdspan(
@@ -27,7 +28,8 @@ inline constexpr void deg2rad_to(in_t &&in, out_t &&out) {
     multiply_to<mpmode>(std::forward<in_t>(in), D2R, std::forward<out_t>(out));
 }
 
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
+template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
+          typename in_t>
 [[nodiscard]] inline constexpr auto deg2rad(in_t &&in) {
     using value_t =
         core::common_data_type_t<typename decltype(core::to_mdspan(

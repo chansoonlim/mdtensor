@@ -21,7 +21,8 @@ inline constexpr void sign_impl(in_t &&in, out_t &&out) {
 
 } // namespace detail
 
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
+template <core::MPMode mpmode = core::MPMode::NONE, typename in_t,
+          typename out_t>
 inline constexpr void sign_to(in_t &&in, out_t &&out) {
     core::batch<mpmode>(
         [](auto &&...elems) {
@@ -31,10 +32,11 @@ inline constexpr void sign_to(in_t &&in, out_t &&out) {
         std::forward<out_t>(out));
 }
 
-template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in_t>
+template <typename dtype = int8_t, core::MPMode mpmode = core::MPMode::NONE,
+          typename in_t>
 [[nodiscard]] inline constexpr auto sign(in_t &&in) {
-    auto out =
-        core::create_out<dtype>(extents<uint8_t>{}, std::forward<in_t>(in));
+    auto out = core::create_out<dtype>(core::stdex::extents<uint8_t>{},
+                                       std::forward<in_t>(in));
 
     sign_to<mpmode>(std::forward<in_t>(in), out);
 

@@ -38,7 +38,7 @@ template <core::mdspan_c in_t>
 
 } // namespace detail
 
-template <extents_c exts_t>
+template <core::extents_c exts_t>
 [[nodiscard]] inline std::string to_string(exts_t &&exts) {
     using exts_base_t = std::remove_cvref_t<exts_t>;
 
