@@ -30,6 +30,27 @@ namespace core {
 
 namespace stdex = std::experimental;
 
+constexpr auto dyn = stdex::dynamic_extent;
+
+template <typename IndexType, size_t... Extents>
+using extents = stdex::extents<IndexType, Extents...>;
+
+template <typename IndexType, size_t Rank>
+using dextents = stdex::dextents<IndexType, Rank>;
+
+// dims: will be included in C++23
+// (https://en.cppreference.com/w/cpp/container/mdspan/extents)
+template <size_t Rank, class IndexType = size_t>
+using dims = stdex::dextents<IndexType, Rank>;
+
+template <typename ElementType, typename Extents,
+          typename LayoutPolicy = stdex::layout_right,
+          typename AccessorPolicy = stdex::default_accessor<ElementType>>
+using mdspan =
+    stdex::mdspan<ElementType, Extents, LayoutPolicy, AccessorPolicy>;
+
+constexpr auto full_extent = stdex::full_extent;
+
 namespace detail {
 
 template <typename T> struct is_extents_impl : std::false_type {};

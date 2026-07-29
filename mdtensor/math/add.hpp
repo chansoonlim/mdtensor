@@ -36,7 +36,7 @@ inline constexpr void add_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
 template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
           typename in1_t, typename in2_t>
 [[nodiscard]] inline constexpr auto add(in1_t &&in1, in2_t &&in2) {
-    auto out = core::create_out<dtype>(core::stdex::extents<uint8_t>{},
+    auto out = core::create_out<dtype>(core::extents<uint8_t>{},
                                        std::forward<in1_t>(in1),
                                        std::forward<in2_t>(in2));
 

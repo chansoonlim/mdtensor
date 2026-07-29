@@ -37,15 +37,14 @@ static_reshape(in_t &&in, exts_t &&new_exts = exts_t{}) noexcept {
     static_assert(in_mds_t::rank_dynamic() == 0,
                   "static_reshape requires static mdspan.");
 
-    static_assert(
-        is_always_reshapable<in_mds_t>(),
-        "static_reshape requires always reshapable core::stdex::mdspan.");
+    static_assert(is_always_reshapable<in_mds_t>(),
+                  "static_reshape requires always reshapable mdspan.");
 
     static_assert(core::extents_size(typename in_mds_t::extents_type{}) ==
                       core::extents_size(exts_t{}),
                   "static_reshape requires same number of elements.");
 
-    return core::stdex::mdspan<typename in_mds_t::element_type, exts_t>{
+    return core::mdspan<typename in_mds_t::element_type, exts_t>{
         in_mds.data_handle()};
 }
 
@@ -61,8 +60,8 @@ reshape(in_t &&in, exts_t &&new_exts = exts_t{}) noexcept {
     assert(core::extents_size(in_mds.extents()) ==
            core::extents_size(std::forward<exts_t>(new_exts)));
 
-    return core::stdex::mdspan<typename in_mds_t::element_type,
-                               std::remove_cvref_t<exts_t>>{
+    return core::mdspan<typename in_mds_t::element_type,
+                        std::remove_cvref_t<exts_t>>{
         in_mds.data_handle(), std::forward<exts_t>(new_exts)};
 }
 

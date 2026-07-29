@@ -14,7 +14,7 @@
 namespace mdtensor {
 
 template <typename dtype, core::MPMode mpmode = core::MPMode::NONE,
-          core::extents_c exts_t = core::stdex::extents<uint8_t>>
+          core::extents_c exts_t = core::extents<uint8_t>>
 [[nodiscard]] inline constexpr auto ones(exts_t &&exts = exts_t{}) {
     return full<dtype, mpmode, exts_t>(1, std::forward<exts_t>(exts));
 }

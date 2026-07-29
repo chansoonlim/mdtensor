@@ -44,7 +44,7 @@ template <typename dtype = bool, core::MPMode mpmode = core::MPMode::NONE,
 [[nodiscard]] inline constexpr auto isclose(in1_t &&in1, in2_t &&in2,
                                             const double &rtol = 1e-05,
                                             const double &atol = 1e-08) {
-    auto out = core::create_out<dtype>(core::stdex::extents<uint8_t>{},
+    auto out = core::create_out<dtype>(core::extents<uint8_t>{},
                                        std::forward<in1_t>(in1),
                                        std::forward<in2_t>(in2));
 

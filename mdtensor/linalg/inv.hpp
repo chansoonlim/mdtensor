@@ -143,8 +143,8 @@ template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
     auto out = core::create_out<dtype>(
         std::index_sequence<2>{},
         core::slice_extents_from_right<2>(in_mds.extents()), in_mds);
-    auto valid = core::create_out<bool>(
-        std::index_sequence<2>{}, core::stdex::extents<uint8_t>{}, in_mds);
+    auto valid = core::create_out<bool>(std::index_sequence<2>{},
+                                        core::extents<uint8_t>{}, in_mds);
 
     inv_to<mpmode>(in_mds, out, valid);
 

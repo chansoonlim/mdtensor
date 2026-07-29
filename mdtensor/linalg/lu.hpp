@@ -54,7 +54,7 @@ inline constexpr void lu_p_indices_impl(in_t &&in, p_indices_t &&p_indices,
     // initialize
     auto in_copy = copy(in_mds);
     auto row_order =
-        core::make_container<index_t>(core::stdex::extents<index_t, m_s>{m});
+        core::make_container<index_t>(core::extents<index_t, m_s>{m});
     for (index_t i = 0; i < m; i++) {
         row_order(i) = i;
     }
@@ -156,7 +156,7 @@ inline constexpr void lu_full_impl(in_t &&in, p_t &&p, l_t &&l, u_t &&u) {
     const index_t m = in_mds.extent(0);
 
     auto p_indices =
-        core::make_container<index_t>(core::stdex::extents<index_t, m_s>{m});
+        core::make_container<index_t>(core::extents<index_t, m_s>{m});
 
     lu_p_indices_impl(in_mds, p_indices, l_mds, u_mds);
 
@@ -200,9 +200,9 @@ inline constexpr void lu_permute_l_impl(in_t &&in, pl_t &&pl, u_t &&u) {
     const index_t k = m < n ? m : n;
 
     auto p_indices =
-        core::make_container<index_t>(core::stdex::extents<index_t, m_s>{m});
-    auto l = core::make_container<value_t>(
-        core::stdex::extents<index_t, m_s, k_s>{m, k});
+        core::make_container<index_t>(core::extents<index_t, m_s>{m});
+    auto l =
+        core::make_container<value_t>(core::extents<index_t, m_s, k_s>{m, k});
 
     lu_p_indices_impl(in_mds, p_indices, l, u_mds);
 
@@ -284,8 +284,8 @@ template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
     auto outs = core::create_outs<dtype>(
         std::index_sequence<2>{},
         std::tuple{extents<index_t, m_s>{m},
-                   core::stdex::extents<index_t, m_s, k_s>{m, k},
-                   core::stdex::extents<index_t, k_s, n_s>{k, n}},
+                   core::extents<index_t, m_s, k_s>{m, k},
+                   core::extents<index_t, k_s, n_s>{k, n}},
         in_mds);
 
     lu_p_indices_to<mpmode>(in_mds, std::get<0>(outs), std::get<1>(outs),
@@ -323,8 +323,8 @@ template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
     auto outs = core::create_outs<dtype>(
         std::index_sequence<2>{},
         std::tuple{extents<index_t, m_s, m_s>{m, m},
-                   core::stdex::extents<index_t, m_s, k_s>{m, k},
-                   core::stdex::extents<index_t, k_s, n_s>{k, n}},
+                   core::extents<index_t, m_s, k_s>{m, k},
+                   core::extents<index_t, k_s, n_s>{k, n}},
         in_mds);
 
     lu_full_to<mpmode>(in_mds, std::get<0>(outs), std::get<1>(outs),
@@ -362,7 +362,7 @@ template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
     auto outs = core::create_outs<dtype>(
         std::index_sequence<2>{},
         std::tuple{extents<index_t, m_s, k_s>{m, k},
-                   core::stdex::extents<index_t, k_s, n_s>{k, n}},
+                   core::extents<index_t, k_s, n_s>{k, n}},
         in_mds);
 
     lu_permute_l_to<mpmode>(in_mds, std::get<0>(outs), std::get<1>(outs));

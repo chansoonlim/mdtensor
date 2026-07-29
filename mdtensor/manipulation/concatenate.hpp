@@ -154,8 +154,7 @@ template <int64_t Axis, typename... ins_t>
              copy_to(std::get<Is>(ins_mds), [&]<size_t... Js>(
                                                 std::index_sequence<Js...>) {
                  return core::submdspan_from_left(
-                     core::to_mdspan(out),
-                     ((void)Js, core::stdex::full_extent)...,
+                     core::to_mdspan(out), ((void)Js, core::full_extent)...,
                      core::stdex::strided_slice{offset, extent, stride});
              }(std::make_index_sequence<axis>{}));
          })(),

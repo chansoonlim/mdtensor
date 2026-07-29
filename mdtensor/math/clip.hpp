@@ -60,7 +60,7 @@ template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
           typename in_t, typename min_t, typename max_t>
 [[nodiscard]] inline constexpr auto clip(in_t &&in, min_t &&min, max_t &&max) {
     auto out = core::create_out<dtype>(
-        core::stdex::extents<uint8_t>{}, std::forward<in_t>(in),
+        core::extents<uint8_t>{}, std::forward<in_t>(in),
         std::forward<min_t>(min), std::forward<max_t>(max));
 
     clip_to<mpmode>(std::forward<in_t>(in), std::forward<min_t>(min),

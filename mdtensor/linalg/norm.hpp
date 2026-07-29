@@ -62,7 +62,7 @@ template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
 
     auto out = core::create_out<dtype>(std::index_sequence<1>{},
-                                       core::stdex::extents<uint8_t>{}, in_mds);
+                                       core::extents<uint8_t>{}, in_mds);
 
     norm_to<mpmode>(in_mds, out);
 

@@ -21,11 +21,10 @@ template <int64_t Axis, typename in_t>
     constexpr size_t rank = in_mds_t::rank();
 
     if constexpr (rank == 0) {
-        auto new_extents =
-            core::stdex::extents<typename in_mds_t::index_type, 1>{1};
-        return core::stdex::mdspan<typename in_mds_t::element_type,
-                                   decltype(new_extents)>{in_mds.data_handle(),
-                                                          new_extents};
+        auto new_extents = core::extents<typename in_mds_t::index_type, 1>{1};
+        return core::mdspan<typename in_mds_t::element_type,
+                            decltype(new_extents)>{in_mds.data_handle(),
+                                                   new_extents};
 
     } else {
         constexpr size_t axis = static_cast<size_t>(
@@ -34,7 +33,7 @@ template <int64_t Axis, typename in_t>
 
         const auto new_extents = [&in_mds]<size_t... Is>(
                                      std::index_sequence<Is...>) {
-            return core::stdex::extents<
+            return core::extents<
                 typename in_mds_t::index_type,
                 (Is < axis
                      ? in_mds_t::static_extent(Is)

@@ -119,7 +119,7 @@ inline constexpr void rand_to(in_t &&in) noexcept {
 
 template <std::floating_point dtype = float,
           core::MPMode mpmode = core::MPMode::NONE,
-          core::extents_c exts_t = core::stdex::extents<uint8_t>>
+          core::extents_c exts_t = core::extents<uint8_t>>
 [[nodiscard]] inline constexpr auto rand(exts_t &&exts = exts_t{}) noexcept {
     auto out = empty<dtype>(std::forward<exts_t>(exts));
     rand_to<mpmode>(out);

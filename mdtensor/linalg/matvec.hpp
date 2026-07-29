@@ -134,7 +134,7 @@ template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
 
     const auto uin1_exts = core::slice_extents_from_right<2>(in1_mds.extents());
     const auto uin2_exts = core::slice_extents_from_right<2>(in2_mds.extents());
-    const auto uout_exts = core::stdex::extents<
+    const auto uout_exts = core::extents<
         core::common_index_type_t<typename decltype(uin1_exts)::index_type,
                                   typename decltype(uin2_exts)::index_type>,
         decltype(uin1_exts)::static_extent(0)>{uin1_exts.extent(0)};

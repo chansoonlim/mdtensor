@@ -38,7 +38,7 @@ inline constexpr void eye_to(in_t &&in) {
 }
 
 template <typename dtype, core::MPMode mpmode = core::MPMode::NONE,
-          core::extents_c exts_t = core::stdex::extents<uint8_t>>
+          core::extents_c exts_t = core::extents<uint8_t>>
 [[nodiscard]] inline constexpr auto eye(exts_t &&exts = exts_t{}) {
     auto out = empty<dtype>(std::forward<exts_t>(exts));
     eye_to<mpmode>(out);

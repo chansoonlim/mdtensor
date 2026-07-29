@@ -85,8 +85,7 @@ inline constexpr void linspace_to(start_t &&start, stop_t &&stop, out_t &&out,
     }
 }
 
-template <int64_t Axis = 0,
-          core::extents_c exts_t = core::stdex::extents<uint8_t, 50>,
+template <int64_t Axis = 0, core::extents_c exts_t = core::extents<uint8_t, 50>,
           typename dtype = void, typename start_t, typename stop_t>
     requires(exts_t::rank() == 1)
 [[nodiscard]] inline constexpr auto

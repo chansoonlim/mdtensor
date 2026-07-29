@@ -148,9 +148,8 @@ template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
         core::slice_extents_from_right<rhs_rank>(b_mds.extents()), a_mds,
         b_mds);
 
-    auto valid =
-        core::create_out<bool>(std::index_sequence<2, rhs_rank>{},
-                               core::stdex::extents<uint8_t>{}, a_mds, b_mds);
+    auto valid = core::create_out<bool>(std::index_sequence<2, rhs_rank>{},
+                                        core::extents<uint8_t>{}, a_mds, b_mds);
 
     solve_to<mpmode>(a_mds, b_mds, x, valid);
 

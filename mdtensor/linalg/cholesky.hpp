@@ -159,8 +159,8 @@ template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
     const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
 
     auto out = empty_like(in_mds);
-    auto valid = core::create_out<bool>(
-        std::index_sequence<2>{}, core::stdex::extents<uint8_t>{}, in_mds);
+    auto valid = core::create_out<bool>(std::index_sequence<2>{},
+                                        core::extents<uint8_t>{}, in_mds);
 
     cholesky_to<mpmode>(in_mds, out, valid, upper);
 

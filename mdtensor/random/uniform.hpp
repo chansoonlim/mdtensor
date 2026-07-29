@@ -42,7 +42,7 @@ inline constexpr void uniform_to(in_t &&in, const double &low = 0,
 
 template <std::floating_point dtype = float,
           core::MPMode mpmode = core::MPMode::NONE,
-          core::extents_c exts_t = core::stdex::extents<uint8_t>>
+          core::extents_c exts_t = core::extents<uint8_t>>
 [[nodiscard]] inline constexpr auto uniform(exts_t &&exts = exts_t{},
                                             const double &low = 0,
                                             const double &high = 1) noexcept {

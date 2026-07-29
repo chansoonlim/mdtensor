@@ -59,7 +59,7 @@ inline constexpr void sqrt_to(in_t &&in, out_t &&out) {
 template <typename dtype = void, core::MPMode mpmode = core::MPMode::NONE,
           typename in_t>
 [[nodiscard]] inline constexpr auto sqrt(in_t &&in) {
-    auto out = core::create_out<dtype>(core::stdex::extents<uint8_t>{},
+    auto out = core::create_out<dtype>(core::extents<uint8_t>{},
                                        std::forward<in_t>(in));
 
     sqrt_to<mpmode>(std::forward<in_t>(in), out);
