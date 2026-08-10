@@ -173,7 +173,18 @@ using dims = stdex::dextents<IndexType, Rank>;
 
 #endif
 
-template <typename T> struct is_extents : stdex::detail::__is_extents<T> {};
+namespace detail {
+
+template <typename T> struct is_extents_impl : std::false_type {};
+
+template <typename IndexType, std::size_t... Extents>
+struct is_extents_impl<stdex::extents<IndexType, Extents...>> : std::true_type {
+};
+
+} // namespace detail
+
+// NOTE: stdex::detail::__is_extents is not used for godbolt test compatibility
+template <typename T> struct is_extents : detail::is_extents_impl<T> {};
 
 template <typename T> constexpr bool is_extents_v = is_extents<T>::value;
 
