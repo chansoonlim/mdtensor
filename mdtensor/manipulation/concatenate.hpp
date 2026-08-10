@@ -11,173 +11,146 @@
 
 #include "../creation/copy.hpp"
 #include "../creation/empty.hpp"
-#include "expand_dims.hpp"
 
 namespace mdtensor {
 namespace detail {
 
-template <typename in1_t, typename in2_t, size_t Is, size_t axis>
-constexpr size_t concatenate_static_extent() {
-    constexpr size_t e1 = in1_t::static_extent(Is);
-    constexpr size_t e2 = in2_t::static_extent(Is);
+template <bool concatenate, std::size_t... Extents>
+[[nodiscard]] consteval std::size_t concatenate_static_extent() noexcept {
+    static_assert(sizeof...(Extents) > 0,
+                  "At least one extent must be provided for concatenation.");
 
-    if constexpr (Is == axis) {
-        return (e1 != dyn && e2 != dyn) ? (e1 + e2) : dyn;
+    if constexpr (concatenate) {
+        if constexpr (((Extents == core::dyn) || ...)) {
+            return core::dyn;
+
+        } else {
+            return (Extents + ...);
+        }
 
     } else {
-        static_assert(e1 == e2 || e1 == dyn || e2 == dyn,
-                      "Incompatible extents for concatenate.");
-        return (e1 != dyn && e2 != dyn) ? e1 : dyn;
+        if constexpr (((Extents == core::dyn) && ...)) {
+            return core::dyn;
+
+        } else {
+            constexpr std::size_t cext =
+                std::max({((Extents != core::dyn) ? Extents : 0)...});
+
+            static_assert(((Extents == cext || Extents == core::dyn) && ...),
+                          "Incompatible static extents for concatenation.");
+
+            return cext;
+        }
     }
 }
 
-template <int64_t Axis, extents_c in1_t, extents_c in2_t, extents_c... ins_t>
-    requires(in1_t::rank() == in2_t::rank())
-[[nodiscard]] inline constexpr auto
-concatenate_extents(const in1_t &in1 = in1_t{}, const in2_t &in2 = in2_t{},
-                    const ins_t &...ins) noexcept {
-    constexpr size_t rank = in1_t::rank();
-    constexpr size_t axis = static_cast<size_t>(
-        ((Axis % static_cast<int64_t>(rank)) + (rank)) % rank);
+template <bool concatenate, typename index_t,
+          std::convertible_to<index_t>... exts_t>
+[[nodiscard]] constexpr index_t concatenate_extent(exts_t &&...exts) {
+    static_assert(sizeof...(exts) > 0,
+                  "At least one extent must be provided for concatenation.");
 
-    using index_t = core::common_index_type_t<typename in1_t::index_type,
-                                              typename in2_t::index_type>;
-
-    const auto exts = [&]<typename E1, typename E2>(const E1 &e1,
-                                                    const E2 &e2) {
-        static_assert(E1::rank() == E2::rank());
-
-        auto dyn_extent = [&]<std::size_t I>() -> index_t {
-            const index_t d1 = static_cast<index_t>(e1.extent(I));
-            const index_t d2 = static_cast<index_t>(e2.extent(I));
-
-            if constexpr (I == axis) {
-                return static_cast<index_t>(d1 + d2);
-
-            } else {
-                assert(d1 == d2);
-                return d1;
-            }
-        };
-
-        auto impl = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-            return extents<index_t,
-                           concatenate_static_extent<E1, E2, Is, axis>()...>{
-                dyn_extent.template operator()<Is>()...};
-        };
-
-        return impl(std::make_index_sequence<E1::rank()>{});
-    }(in1, in2);
-
-    if constexpr (sizeof...(ins_t) != 0) {
-        return concatenate_extents<axis>(exts, ins...);
+    if constexpr (concatenate) {
+        return (exts + ...);
 
     } else {
-        return exts;
+        const index_t cext = std::get<0>(std::forward_as_tuple(exts...));
+
+        if (((cext != static_cast<index_t>(exts)) && ...)) {
+            throw std::invalid_argument(
+                "Incompatible extents for concatenation.");
+        }
+
+        return cext;
     }
 }
 
-template <int64_t Axis, extents_c... ins_t>
-[[nodiscard]] inline constexpr auto
-concatenate_extents(std::tuple<ins_t...> &&ins) noexcept {
-    constexpr size_t ins_num =
-        std::tuple_size_v<std::remove_reference_t<decltype(ins)>>;
+template <std::int64_t axis, core::extents_c... ins_t>
+[[nodiscard]] constexpr auto concatenate_extents(ins_t &&...ins) {
+    static_assert(sizeof...(ins) > 0,
+                  "At least one extents must be provided for concatenation.");
 
-    static_assert(ins_num != 0, "concatenate requires at least one input.");
+    using index_t = core::common_index_type_t<
+        typename std::remove_cvref_t<ins_t>::index_type...>;
 
-    if constexpr (ins_num == 1) {
-        return std::get<0>(ins);
+    constexpr std::size_t rank = std::remove_cvref_t<
+        std::tuple_element_t<0, std::tuple<ins_t...>>>::rank();
+
+    static_assert(((ins.rank() == rank) && ...),
+                  "All input extents must have the same rank.");
+
+    if constexpr (rank == 0) {
+        return core::extents<index_t>{};
 
     } else {
-        return std::apply(
-            [&](auto &&...elems) {
-                return concatenate_extents<Axis>(
-                    std::forward<decltype(elems)>(elems)...);
-            },
-            ins);
+        constexpr std::size_t baxis =
+            static_cast<std::size_t>(core::bounding_index(axis, rank - 1));
+
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            const auto static_extent_at = [&]<std::size_t I>() {
+                return concatenate_static_extent<
+                    I == baxis,
+                    std::remove_cvref_t<ins_t>::static_extent(I)...>();
+            };
+
+            const auto extent_at = [&]<std::size_t I>() {
+                return concatenate_extent<I == baxis, index_t>(
+                    ins.extent(I)...);
+            };
+
+            return core::extents<
+                index_t, static_extent_at.template operator()<Is>()...> {
+                extent_at.template operator()<Is>()...
+            };
+        }(std::make_index_sequence<rank>{});
     }
 }
 
 } // namespace detail
 
-/**
- * @brief Concatenate multiple inputs along a specified axis (out-of-place).
- *
- * @tparam Axis Axis to concatenate. Negative values are supported and
- *         normalized by the input rank (NumPy-like semantics).
- * @tparam ins_t Input types (mdspan, mdarray, scalar, etc.).
- *
- * @param ins Input tensors to concatenate.
- *
- * @return Newly allocated mdarray containing the concatenation result.
- *
- * @note Rank-0 inputs (scalars) are expanded to rank-1 along the last axis
- *       using expand_dims<-1>.
- * @note All inputs must have the same rank after scalar expansion.
- * @note For dimensions other than Axis, extents must match.
- * @note The output dtype is the common_type of all input value types.
- */
-template <int64_t Axis, typename... ins_t>
-[[nodiscard]] inline constexpr auto concatenate(ins_t &&...ins) noexcept {
-    constexpr size_t num_ins = sizeof...(ins_t);
-    auto ins_tuple = std::forward_as_tuple(ins...);
+template <std::int64_t axis = 0, typename dtype = void>
+[[nodiscard]] constexpr auto concatenate(auto &&...ins) {
+    if constexpr ((!core::mdspan_c<decltype(ins)> || ...)) {
+        return concatenate<axis>(
+            core::to_const_mdspan(std::forward<decltype(ins)>(ins))...);
 
-    // generate input mdspans
-    const auto ins_mds = [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return std::make_tuple([&]() {
-            auto mds = core::to_const_mdspan(std::get<Is>(ins_tuple));
+    } else {
+        constexpr std::size_t rank = std::remove_cvref_t<
+            std::tuple_element_t<0, std::tuple<decltype(ins)...>>>::rank();
+        constexpr std::size_t baxis =
+            static_cast<std::size_t>(core::bounding_index(axis, rank - 1));
 
-            if constexpr (mds.rank() == 0) {
-                // if the input is a scalar, expand it to a 1D mdspan.
-                return expand_dims<-1>(mds);
+        // generate out extents
+        const auto out_extents =
+            detail::concatenate_extents<axis>(ins.extents()...);
 
-            } else {
-                return mds;
-            }
-        }()...);
-    }(std::make_index_sequence<num_ins>{});
+        // generate out
+        using value_t = core::output_value_t<
+            dtype, typename std::remove_cvref_t<decltype(ins)>::value_type...>;
+        auto out = empty<value_t>(out_extents);
 
-    using ins_mds_t = decltype(ins_mds);
+        // concatenate
+        using index_t = typename decltype(out_extents)::index_type;
+        index_t offset = 0;
 
-    // generate out extents
-    constexpr size_t rank = std::tuple_element_t<0, ins_mds_t>::rank();
-    constexpr size_t axis = static_cast<size_t>(
-        ((Axis % static_cast<int64_t>(rank)) + (rank)) % rank);
+        [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            (([&] {
+                 const auto in = std::get<Is>(std::forward_as_tuple(
+                     std::forward<decltype(ins)>(ins)...));
 
-    const auto out_extents =
-        [&ins_mds]<size_t... Is>(std::index_sequence<Is...>) {
-            return detail::concatenate_extents<axis>(
-                std::make_tuple(std::get<Is>(ins_mds).extents()...));
-        }(std::make_index_sequence<num_ins>{});
+                 const index_t extent = static_cast<index_t>(in.extent(baxis));
 
-    // generate out
-    using dtype = decltype([]<size_t... Is>(std::index_sequence<Is...>) {
-        return core::common_data_type_t<
-            core::value_type_t<std::tuple_element_t<Is, ins_mds_t>>...>{};
-    }(std::make_index_sequence<num_ins>{}));
-    auto out = empty<dtype>(out_extents);
+                 static_cast<void>(copy(in, core::submdspan_from_left<baxis>(
+                                                out, core::stdex::strided_slice{
+                                                         offset, extent, 1})));
 
-    // concatenate
-    [&ins_mds, &out]<size_t... Is>(std::index_sequence<Is...>) {
-        (([&] {
-             const size_t offset =
-                 [&]<size_t... Js>(std::index_sequence<Js...>) {
-                     return (0 + ... + std::get<Js>(ins_mds).extent(axis));
-                 }(std::make_index_sequence<Is>{});
-             const size_t extent = std::get<Is>(ins_mds).extent(axis);
-             constexpr size_t stride = 1;
+                 offset += extent;
+             })(),
+             ...);
+        }(std::make_index_sequence<sizeof...(ins)>{});
 
-             copy_to(std::get<Is>(ins_mds),
-                     [&]<size_t... Js>(std::index_sequence<Js...>) {
-                         return core::submdspan_from_left(
-                             core::to_mdspan(out), ((void)Js, full_extent)...,
-                             strided_slice{offset, extent, stride});
-                     }(std::make_index_sequence<axis>{}));
-         })(),
-         ...);
-    }(std::make_index_sequence<num_ins>{});
-
-    return out;
+        return out;
+    }
 }
 
 } // namespace mdtensor

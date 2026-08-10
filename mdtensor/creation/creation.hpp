@@ -11,11 +11,9 @@
 
 #include "arange.hpp"
 #include "copy.hpp"
-#include "copy_like.hpp"
 #include "empty.hpp"
 #include "empty_like.hpp"
 #include "eye.hpp"
-#include "fill.hpp"
 #include "full.hpp"
 #include "full_like.hpp"
 #include "linspace.hpp"

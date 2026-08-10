@@ -12,10 +12,17 @@
 #include "../core/core.hpp"
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in1_t, typename in2_t, typename out_t>
-inline constexpr void atan2_impl(in1_t &&in1, in2_t &&in2, out_t &&out) {
+constexpr void atan2_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
     using value_t = core::common_data_type_t<decltype(in1()), decltype(in2()),
                                              decltype(out())>;
 
@@ -23,60 +30,42 @@ inline constexpr void atan2_impl(in1_t &&in1, in2_t &&in2, out_t &&out) {
         std::atan2(static_cast<value_t>(in1()), static_cast<value_t>(in2()));
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compute atan2 element-wise (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc. (y-coordinate).
- * @param in2 Second input mdspan, mdarray, scalar, etc. (x-coordinate).
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note Equivalent to out = std::atan2(in1, in2) in terms of array
- *       broadcasting.
- *
- * @see mdtensor::atan2 for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
-          typename out_t>
-inline constexpr void atan2_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::atan2_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto atan2(auto &&in1, auto &&in2,
+                                   out_t &&out = out_t{std::nullopt},
+                                   where_t &&where = where_t{std::nullopt}) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-/**
- * @brief Compute atan2 element-wise (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- *         inputs.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc. (y-coordinate).
- * @param in2 Second input mdspan, mdarray, scalar, etc. (x-coordinate).
- *
- * @return mdarray or scalar.
- *
- * @note Equivalent to out = std::atan2(in1, in2) in terms of array
- *       broadcasting.
- *
- * @see mdtensor::atan2_to for the in-place version that writes into an output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
-[[nodiscard]] inline constexpr auto atan2(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<dtype, mpmode>(
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            // NOTE: ensure that the output type is at least float precision
+            using value_t = core::output_value_t<
+                dtype, typename decltype(in1_mds)::value_type,
+                typename decltype(in2_mds)::value_type, float>;
+
+            return core::make_output<value_t>(core::extents<std::uint8_t>{},
+                                              in1_mds, in2_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::atan2_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::atan2_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)));
+        std::integer_sequence<bool, true, true, false, true>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        out_md, std::forward<decltype(where)>(where));
+
+    return out_md;
 }
 
 } // namespace mdtensor

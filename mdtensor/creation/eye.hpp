@@ -12,67 +12,73 @@
 #include "empty.hpp"
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in_t> inline constexpr void eye_impl(in_t &&in) {
-    using in_base_t = std::remove_cvref_t<in_t>;
-    using index_t = typename in_base_t::index_type;
+constexpr void eye_ufunc(auto &&out, const int &k) {
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
 
-    for (index_t i = 0; i < in.extent(0); i++) {
-        for (index_t j = 0; j < in.extent(1); j++) {
-            in(i, j) = (i == j) ? 1 : 0;
+    using index_t = typename decltype(out_mds)::index_type;
+
+    for (index_t i = 0; i < out_mds.extent(0); i++) {
+        for (index_t j = 0; j < out_mds.extent(1); j++) {
+            out_mds(i, j) = (i + k == j) ? 1 : 0;
         }
     }
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Fill a 2D tensor with an identity matrix pattern (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Output matrix to fill (mdspan, mdarray, etc.). Rank must be greater
- *        than or equal to 2.
- *
- * @note This function writes `1` on the main diagonal and `0` elsewhere.
- *
- * @see mdtensor::eye for the out-of-place version that allocates and returns
- * an identity matrix.
- */
-template <MPMode mpmode = MPMode::NONE, typename in_t>
-inline constexpr void eye_to(in_t &&in) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::eye_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<2>{}, core::to_mdspan(std::forward<in_t>(in)));
+template <typename dtype = double, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto eye(auto &&shape, const int &k = 0,
+                                 out_t &&out = out_t{std::nullopt}) {
+    using shape_t = std::remove_cvref_t<decltype(shape)>;
+
+    if constexpr (core::extents_c<shape_t>) {
+        const auto exts =
+            core::to_extents(std::forward<decltype(shape)>(shape));
+
+        static_assert(exts.rank() >= 2, "eye requires rank >= 2");
+
+        auto out_md = [&]() {
+            if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+                return empty<dtype>(exts);
+
+            } else {
+                return core::to_output_mdspan(std::forward<decltype(out)>(out));
+            }
+        }();
+
+        core::batch<backend, exts.rank() - 2>(
+            [&](auto &&...elems) {
+                ufunc::eye_ufunc(std::forward<decltype(elems)>(elems)..., k);
+            },
+            out_md);
+
+        return out_md;
+
+    } else if constexpr (core::integral_c<shape_t>) {
+        if (shape < shape_t{0}) {
+            throw std::invalid_argument("exts must be non-negative");
+        }
+
+        using index_t = std::make_unsigned_t<shape_t>;
+
+        return eye<dtype, backend>(
+            core::dextents<index_t, 2>{static_cast<index_t>(shape),
+                                       static_cast<index_t>(shape)},
+            k);
+    }
 }
 
-/**
- * @brief Create an identity matrix (out-of-place).
- *
- * @tparam dtype Element type of the created matrix.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam exts_t (optional) Extents type describing the matrix shape. Default
- * is extents<uint8_t>.
- *
- * @param exts Output matrix extents (shape). Rank must be greater than or equal
- * to 2.
- *
- * @return A newly allocated matrix filled as an identity matrix.
- *
- * @note Equivalent to allocating `empty<dtype>(exts)` and then calling
- *       `eye_to` on it.
- *
- * @see mdtensor::eye_to for the in-place version that fills an existing output.
- */
-template <typename dtype, MPMode mpmode = MPMode::NONE,
-          extents_c exts_t = extents<uint8_t>>
-[[nodiscard]] inline constexpr auto eye(exts_t &&exts = exts_t{}) {
-    auto out = empty<dtype>(std::forward<exts_t>(exts));
-    eye_to<mpmode>(out);
-    return out;
+template <std::size_t N, typename dtype = double,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto eye(const int &k = 0,
+                                 out_t &&out = out_t{std::nullopt}) {
+    return eye<dtype, backend>(core::extents<std::size_t, N, N>{}, k,
+                               std::forward<out_t>(out));
 }
 
 } // namespace mdtensor

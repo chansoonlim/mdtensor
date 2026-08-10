@@ -1,62 +1,99 @@
+/**
+ * @file
+ * @brief test
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
 #include <gtest/gtest.h>
 
-#include "mdtensor/logic/all.hpp"
-#include "mdtensor/logic/array_equal.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
 namespace md = mdtensor;
 
-TEST(stack, 1) {
-    constexpr auto a =
-        md::mdarray<uint8_t, md::extents<uint8_t, 2, 1, 2>>{{1, 1, 1, 1}};
+TEST(run_time, 1) {
+    using value_t = bool;
 
-    constexpr bool b = md::all(a);
-    constexpr bool b_expect = true;
+    const auto a = md::container<value_t, md::dims<2>>{
+        {true, false, true, true}, md::dims<2>{2, 2}};
 
-    ASSERT_TRUE(b == b_expect);
+    EXPECT_FALSE(md::all(a));
 }
 
-TEST(stack, 2) {
-    constexpr auto a =
-        md::mdarray<uint8_t, md::extents<uint8_t, 2, 1, 2>>{{1, 0, 1, 1}};
+TEST(run_time, 2) {
+    using value_t = bool;
+    using index_t = std::size_t;
 
-    constexpr bool b = md::all(a);
-    constexpr bool b_expect = false;
+    const auto a = md::container<value_t, md::dims<2>>{
+        {true, false, true, true}, md::dims<2>{2, 2}};
 
-    ASSERT_TRUE(b == b_expect);
+    EXPECT_TRUE(md::array_equal(
+        md::all<0>(a),
+        md::container<value_t, md::extents<index_t, 2>>{{true, false}}));
 }
 
-TEST(heap, 1) {
+TEST(run_time, 3) {
+    using value_t = int;
+
     const auto a =
-        md::mdarray<uint8_t, md::dims<3>>{{1, 1, 1, 1}, md::dims<3>{2, 1, 2}};
+        md::container<value_t, md::dims<1>>{{-1, 4, 5}, md::dims<1>{3}};
 
-    const bool b = md::all(a);
-    const bool b_expect = true;
-
-    ASSERT_TRUE(b == b_expect);
+    EXPECT_TRUE(md::all(a));
 }
 
-TEST(heap, 2) {
-    const auto a =
-        md::mdarray<uint8_t, md::dims<3>>{{1, 0, 1, 1}, md::dims<3>{2, 1, 2}};
+TEST(run_time, 4) {
+    using value_t = double;
 
-    const bool b = md::all(a);
-    const bool b_expect = false;
+    const auto a = md::container<value_t, md::dims<1>>{
+        {1, std::numeric_limits<value_t>::quiet_NaN()}, md::dims<1>{2}};
 
-    ASSERT_TRUE(b == b_expect);
+    EXPECT_TRUE(md::all(a));
 }
 
-TEST(test, 1) {
-    static_assert(
-        md::array_equal(md::all(md::mdarray<int8_t, md::extents<uint8_t, 2, 2>>{
-                            {true, false, true, true}}),
-                        false));
+TEST(compile_time, 1) {
+    using value_t = bool;
+    using index_t = std::size_t;
+
+    constexpr auto a = md::container<value_t, md::extents<index_t, 2, 2>>{
+        {true, false, true, true}};
+
+    static_assert(!md::all(a));
+}
+
+TEST(compile_time, 2) {
+    using value_t = bool;
+    using index_t = std::size_t;
+
+    constexpr auto a = md::container<value_t, md::extents<index_t, 2, 2>>{
+        {true, false, true, true}};
 
     static_assert(md::array_equal(
-        md::all<0>(md::mdarray<int8_t, md::extents<uint8_t, 2, 2>>{
-            {true, false, true, true}}),
-        md::mdarray<int8_t, md::extents<uint8_t, 2>>{{true, false}}));
+        md::all<0>(a),
+        md::container<value_t, md::extents<index_t, 2>>{{true, false}}));
+}
 
-    static_assert(md::array_equal(
-        md::all(md::mdarray<int8_t, md::extents<uint8_t, 3>>{{-1, 4, 5}}),
-        true));
+TEST(compile_time, 3) {
+    using value_t = int;
+    using index_t = std::size_t;
+
+    constexpr auto a =
+        md::container<value_t, md::extents<index_t, 3>>{{-1, 4, 5}};
+
+    static_assert(md::all(a));
+}
+
+TEST(compile_time, 4) {
+    using value_t = double;
+    using index_t = std::size_t;
+
+    constexpr auto a = md::container<value_t, md::extents<index_t, 2>>{
+        {1, std::numeric_limits<value_t>::quiet_NaN()}};
+
+    static_assert(md::all(a));
 }

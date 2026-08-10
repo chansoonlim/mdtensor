@@ -1,91 +1,75 @@
+/**
+ * @file
+ * @brief test
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
 #include <gtest/gtest.h>
 
-#include "mdtensor/logic/allclose.hpp"
-#include "mdtensor/math/divide.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
 namespace md = mdtensor;
 
-TEST(stack, divide) {
-    using T = double;
+TEST(run_time, 1) {
+    const auto out = md::divide(2.0, 4.0);
 
-    constexpr auto a =
-        md::mdarray<T, md::extents<size_t, 2, 1, 2>>{{1, 2, 3, 4}};
-    constexpr auto b = md::mdarray<T, md::extents<size_t, 2, 1>>{{5, 6}};
-    constexpr auto c = md::divide(a, b);
+    std::cout << "out: " << out << std::endl;
 
-    constexpr auto c_expect = md::mdarray<T, md::extents<size_t, 2, 2, 2>>{
-        {1. / 5., 2. / 5., 1. / 6., 2. / 6., 3. / 5., 4. / 5., 3. / 6.,
-         4. / 6.}};
-
-    constexpr bool is_allclose = md::allclose(c, c_expect);
-
-    ASSERT_TRUE(is_allclose);
+    ASSERT_EQ(out, 0.5);
 }
 
-TEST(stack, divide_scalar) {
-    using T = double;
+TEST(run_time, 2) {
+    using value_t = double;
+    using index_t = std::size_t;
 
-    constexpr auto a =
-        md::mdarray<T, md::extents<size_t, 2, 1, 2>>{{1, 2, 3, 4}};
-    constexpr T b = 5;
-    constexpr auto c = md::divide(a, b);
+    const auto x1 = md::reshape(md::arange(9.0), md::dims<2>{3, 3});
+    const auto x2 = md::arange(3.0);
+    const auto out = md::divide(x1, x2);
 
-    constexpr auto c_expect = md::mdarray<T, md::extents<size_t, 2, 1, 2>>{
-        {1. / 5., 2. / 5., 3. / 5., 4. / 5.}};
+    std::cout << "out: " << md::to_string(out) << std::endl;
 
-    constexpr bool is_allclose = md::allclose(c, c_expect);
-
-    ASSERT_TRUE(is_allclose);
+    ASSERT_TRUE(
+        md::allclose(out,
+                     md::container<value_t, md::extents<index_t, 3, 3>>{
+                         {std::numeric_limits<double>::quiet_NaN(), 1., 1.,
+                          std::numeric_limits<double>::infinity(), 4., 2.5,
+                          std::numeric_limits<double>::infinity(), 7., 4.}},
+                     1e-05, 1e-08, true));
 }
 
-TEST(heap, divide) {
-    using T = double;
+TEST(compile_time, 1) {
+    constexpr auto out = md::divide(2.0, 4.0);
 
-    const auto a =
-        md::mdarray<T, md::dims<3>>{{1, 2, 3, 4}, md::dims<3>{2, 1, 2}};
-    const auto b = md::mdarray<T, md::dims<2>>{{5, 6}, md::dims<2>{2, 1}};
-    const auto c = md::divide(a, b);
+    std::cout << "out: " << out << std::endl;
 
-    const auto c_expect =
-        md::mdarray<T, md::dims<3>>{{1. / 5., 2. / 5., 1. / 6., 2. / 6.,
-                                     3. / 5., 4. / 5., 3. / 6., 4. / 6.},
-                                    md::dims<3>{2, 2, 2}};
-
-    const bool is_allclose = md::allclose(c, c_expect);
-
-    ASSERT_TRUE(is_allclose);
+    static_assert(out == 0.5);
 }
 
-TEST(heap, divide_scalar) {
-    using T = double;
+TEST(compile_time, 2) {
+    using value_t = double;
+    using index_t = std::size_t;
 
-    const auto a =
-        md::mdarray<T, md::dims<3>>{{1, 2, 3, 4}, md::dims<3>{2, 1, 2}};
-    const T b = 5;
-    const auto c = md::divide(a, b);
+    constexpr auto x1 =
+        md::reshape(md::arange<9, value_t>(), md::extents<index_t, 3, 3>{});
+    constexpr auto x2 = md::arange<3, value_t>();
 
-    const auto c_expect = md::mdarray<T, md::dims<3>>{
-        {1. / 5., 2. / 5., 3. / 5., 4. / 5.}, md::dims<3>{2, 1, 2}};
+    // NOTE: (0.0 / 0.0) is not a constant expression
+    const auto out = md::divide(x1, x2);
 
-    const bool is_allclose = md::allclose(c, c_expect);
+    std::cout << "out: " << md::to_string(out) << std::endl;
 
-    ASSERT_TRUE(is_allclose);
-}
-
-TEST(mix, divide) {
-    using T = double;
-
-    constexpr auto a =
-        md::mdarray<T, md::extents<size_t, 2, 1, 2>>{{1, 2, 3, 4}};
-    const auto b = md::mdarray<T, md::dims<2>>{{5, 6}, md::dims<2>{2, 1}};
-    const auto c = md::divide(a, b);
-
-    const auto c_expect =
-        md::mdarray<T, md::dims<3>>{{1. / 5., 2. / 5., 1. / 6., 2. / 6.,
-                                     3. / 5., 4. / 5., 3. / 6., 4. / 6.},
-                                    md::dims<3>{2, 2, 2}};
-
-    const bool is_allclose = md::allclose(c, c_expect);
-
-    ASSERT_TRUE(is_allclose);
+    ASSERT_TRUE(
+        md::allclose(out,
+                     md::container<value_t, md::extents<index_t, 3, 3>>{
+                         {std::numeric_limits<double>::quiet_NaN(), 1., 1.,
+                          std::numeric_limits<double>::infinity(), 4., 2.5,
+                          std::numeric_limits<double>::infinity(), 7., 4.}},
+                     1e-05, 1e-08, true));
 }

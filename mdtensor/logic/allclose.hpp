@@ -14,33 +14,15 @@
 
 namespace mdtensor {
 
-/**
- * @brief Return whether two inputs are element-wise close for all elements.
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam in1_t First input type (mdspan, mdarray, scalar, etc.).
- * @tparam in2_t Second input type (mdspan, mdarray, scalar, etc.).
- *
- * @param in1 First input tensor-like object.
- * @param in2 Second input tensor-like object.
- * @param rtol Relative tolerance.
- * @param atol Absolute tolerance.
- *
- * @return true if all elements satisfy isclose(in1, in2, rtol, atol),
- *         otherwise false.
- *
- * @note This is equivalent to all(isclose(in1, in2, rtol, atol)).
- * @note Broadcasting semantics follow those of mdtensor::isclose.
- *
- * @see mdtensor::isclose for the element-wise predicate.
- * @see mdtensor::all for logical reduction utilities.
- */
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t>
-[[nodiscard]] inline constexpr bool allclose(in1_t &&in1, in2_t &&in2,
-                                             const double &rtol = 1e-05,
-                                             const double &atol = 1e-08) {
-    return all(isclose<int8_t, mpmode>(std::forward<in1_t>(in1),
-                                       std::forward<in2_t>(in2), rtol, atol));
+template <core::Backend backend = core::Backend::AUTO, typename rtol_t = double,
+          typename atol_t = double>
+[[nodiscard]] constexpr bool
+allclose(auto &&in1, auto &&in2, rtol_t &&rtol = rtol_t{1e-05},
+         atol_t &&atol = atol_t{1e-08}, const bool equal_nan = false) {
+    return all<void, false, core::Backend::NATIVE>(isclose<bool, backend>(
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        std::forward<decltype(rtol)>(rtol), std::forward<decltype(atol)>(atol),
+        std::nullopt, equal_nan));
 }
 
 } // namespace mdtensor

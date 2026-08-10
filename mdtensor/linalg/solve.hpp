@@ -11,32 +11,17 @@
 
 #include "lu.hpp"
 
-namespace mdtensor {
-namespace linalg {
-namespace detail {
+namespace mdtensor::linalg {
+namespace ufunc {
 
-template <md_c a_t, md_c b_t, md_c x_t>
-[[nodiscard]] inline constexpr bool solve_impl(a_t &&a, b_t &&b,
-                                               x_t &&x) noexcept {
-    auto a_mds = core::to_const_mdspan(std::forward<a_t>(a));
-    auto b_mds = core::to_const_mdspan(std::forward<b_t>(b));
-    auto x_mds = core::to_mdspan(std::forward<x_t>(x));
+[[nodiscard]] constexpr bool solve_ufunc(auto &&a, auto &&b, auto &&x) {
+    const auto a_mds = core::to_const_mdspan(std::forward<decltype(a)>(a));
+    const auto b_mds = core::to_const_mdspan(std::forward<decltype(b)>(b));
+    const auto x_mds = core::to_output_mdspan(std::forward<decltype(x)>(x));
 
-    using a_mds_t = std::remove_cvref_t<decltype(a_mds)>;
-    using b_mds_t = std::remove_cvref_t<decltype(b_mds)>;
-    using x_mds_t = std::remove_cvref_t<decltype(x_mds)>;
-
-    static_assert(a_mds_t::rank() == 2);
-    static_assert(b_mds_t::rank() == 1 || b_mds_t::rank() == 2);
-    static_assert(x_mds_t::rank() == b_mds_t::rank());
-
-    using index_t = typename a_mds_t::index_type;
+    using index_t = typename decltype(a_mds)::index_type;
 
     const index_t n = a_mds.extent(0);
-
-    assert(a_mds.extent(1) == n);
-    assert(b_mds.extent(0) == n);
-    assert(x_mds.extent(0) == n);
 
     // LU decomposition of A
     const auto [p_indices, l, u] = lu_p_indices(a_mds);
@@ -48,7 +33,7 @@ template <md_c a_t, md_c b_t, md_c x_t>
         }
     }
 
-    if constexpr (b_mds_t::rank() == 1) {
+    if constexpr (b_mds.rank() == 1) {
         // initialize out
         for (index_t idx = 0; idx < n; idx++) {
             x_mds(p_indices(idx)) = b_mds(idx);
@@ -114,46 +99,45 @@ template <md_c a_t, md_c b_t, md_c x_t>
     return true;
 }
 
-} // namespace detail
+} // namespace ufunc
 
-template <MPMode mpmode = MPMode::NONE, typename a_t, typename b_t,
-          typename x_t, typename valid_t>
-inline constexpr void solve_to(a_t &&a, b_t &&b, x_t &&x, valid_t &&valid) {
-    const auto a_mds = core::to_const_mdspan(std::forward<a_t>(a));
-    const auto b_mds = core::to_const_mdspan(std::forward<b_t>(b));
+template <core::Backend backend = core::Backend::AUTO>
+constexpr void solve_to(auto &&a, auto &&b, auto &&x, auto &&valid) {
+    const auto b_mds = core::to_const_mdspan(std::forward<decltype(b)>(b));
 
-    constexpr size_t rhs_rank = decltype(b_mds)::rank() == 1 ? 1 : 2;
+    constexpr std::size_t rhs_rank = b_mds.rank() == 1 ? 1 : 2;
 
-    core::batch<mpmode>(
+    core::batch_with_broadcast<backend>(
         [](auto &&a, auto &&b, auto &&x, auto &&valid) {
-            valid() = detail::solve_impl(std::forward<decltype(a)>(a),
+            valid() = ufunc::solve_ufunc(std::forward<decltype(a)>(a),
                                          std::forward<decltype(b)>(b),
                                          std::forward<decltype(x)>(x));
         },
-        std::index_sequence<2, rhs_rank, rhs_rank, 0>{}, a_mds, b_mds,
-        core::to_mdspan(std::forward<x_t>(x)),
-        core::to_mdspan(std::forward<valid_t>(valid)));
+        std::index_sequence<2, rhs_rank, rhs_rank, 0>{},
+        std::integer_sequence<bool, true, true, false, false>{},
+        std::forward<decltype(a)>(a), b_mds, std::forward<decltype(x)>(x),
+        std::forward<decltype(valid)>(valid));
 }
 
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename a_t,
-          typename b_t>
-[[nodiscard]] inline constexpr auto solve(a_t &&a, b_t &&b) {
-    const auto a_mds = core::to_const_mdspan(std::forward<a_t>(a));
-    const auto b_mds = core::to_const_mdspan(std::forward<b_t>(b));
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto solve(auto &&a, auto &&b) {
+    const auto a_mds = core::to_const_mdspan(std::forward<decltype(a)>(a));
+    const auto b_mds = core::to_const_mdspan(std::forward<decltype(b)>(b));
 
-    constexpr size_t rhs_rank = decltype(b_mds)::rank() == 1 ? 1 : 2;
+    constexpr std::size_t rhs_rank = b_mds.rank() == 1 ? 1 : 2;
 
-    auto x = core::create_out<dtype>(
+    auto x = core::make_output<dtype>(
         std::index_sequence<2, rhs_rank>{},
-        core::slice_from_right<rhs_rank>(b_mds.extents()), a_mds, b_mds);
+        core::slice_extents_from_right<rhs_rank>(b_mds.extents()), a_mds,
+        b_mds);
 
-    auto valid = core::create_out<bool>(std::index_sequence<2, rhs_rank>{},
-                                        extents<uint8_t>{}, a_mds, b_mds);
+    auto valid =
+        core::make_output<bool>(std::index_sequence<2, rhs_rank>{},
+                                core::extents<std::uint8_t>{}, a_mds, b_mds);
 
-    solve_to<mpmode>(a_mds, b_mds, x, valid);
+    solve_to<backend>(a_mds, b_mds, x, valid);
 
     return std::pair{x, valid};
 }
 
-} // namespace linalg
-} // namespace mdtensor
+} // namespace mdtensor::linalg

@@ -1,34 +1,47 @@
+/**
+ * @file
+ * @brief test
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
 #include <gtest/gtest.h>
 
-#include "mdtensor/linalg/vecmat.hpp"
-#include "mdtensor/logic/allclose.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
 namespace md = mdtensor;
 
-TEST(stack, vecmat) {
-    using T = double;
+TEST(run_time, 1) {
+    using value_t = double;
+    using index_t = std::size_t;
 
-    constexpr auto a = md::mdarray<T, md::extents<size_t, 2>>{{1, 2}};
-    constexpr auto b = md::mdarray<T, md::extents<size_t, 2, 2>>{{5, 6, 7, 8}};
-    constexpr auto c = md::linalg::vecmat(a, b);
+    const auto v = md::container<value_t, md::extents<index_t, 3>>{{0, 4, 2}};
+    const auto a = md::container<value_t, md::extents<index_t, 3, 3>>{
+        {1, 0, 0, 0, 1, 0, 0, 0, 0}};
 
-    constexpr auto c_expect = md::mdarray<T, md::extents<size_t, 2>>{{19, 22}};
+    const auto c = md::linalg::vecmat(v, a);
 
-    constexpr bool allclose = md::allclose(c, c_expect);
-
-    ASSERT_TRUE(allclose);
+    EXPECT_TRUE(md::allclose(
+        c, md::container<value_t, md::extents<index_t, 3>>{{0, 4, 0}}));
 }
 
-TEST(heap, vecmat) {
-    using T = double;
+TEST(compile_time, 1) {
+    using value_t = double;
+    using index_t = std::size_t;
 
-    const auto a = md::mdarray<T, md::dims<1>>{{1, 2}, md::dims<1>{2}};
-    const auto b = md::mdarray<T, md::dims<2>>{{5, 6, 7, 8}, md::dims<2>{2, 2}};
-    const auto c = md::linalg::vecmat(a, b);
+    constexpr auto v =
+        md::container<value_t, md::extents<index_t, 3>>{{0, 4, 2}};
+    constexpr auto a = md::container<value_t, md::extents<index_t, 3, 3>>{
+        {1, 0, 0, 0, 1, 0, 0, 0, 0}};
 
-    const auto c_expect = md::mdarray<T, md::dims<1>>{{19, 22}, md::dims<1>{2}};
+    constexpr auto c = md::linalg::vecmat(v, a);
 
-    const bool allclose = md::allclose(c, c_expect);
-
-    ASSERT_TRUE(allclose);
+    static_assert(md::allclose(
+        c, md::container<value_t, md::extents<index_t, 3>>{{0, 4, 0}}));
 }

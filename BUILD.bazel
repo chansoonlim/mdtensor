@@ -1,3 +1,5 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
 cc_library(
     name = "mdtensor",
     hdrs = glob(["mdtensor/**/*.hpp"]),
@@ -7,15 +9,13 @@ cc_library(
     ],
     copts = [
         "-O3",
-        "-funroll-loops",
-        "-fno-exceptions",
         "-fno-rtti",
+        "-funroll-loops",
         "-Wall",
         "-march=native",
     ],
     defines = [
         # "MDTENSOR_USE_EIGEN",
-        # "MDTENSOR_USE_AUTOFLAT",
     ],
     visibility = ["//visibility:public"],
 )

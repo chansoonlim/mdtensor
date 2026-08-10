@@ -9,37 +9,22 @@
 
 #pragma once
 
-#include "all.hpp"
-#include "equal.hpp"
+#include "array_equal.hpp"
 
 namespace mdtensor {
 
-/**
- * @brief Return whether two inputs are element-wise equal for all elements,
- *        with broadcasting.
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam in1_t First input type (mdspan, mdarray, scalar, etc.).
- * @tparam in2_t Second input type (mdspan, mdarray, scalar, etc.).
- *
- * @param in1 First input tensor-like object.
- * @param in2 Second input tensor-like object.
- *
- * @return true if all elements satisfy equal(in1, in2) after broadcasting;
- *         otherwise false.
- *
- * @note This is equivalent to all(equal(in1, in2)).
- * @note Broadcasting semantics follow those of mdtensor::equal.
- *
- * @see mdtensor::equal for the element-wise predicate.
- * @see mdtensor::all for logical reduction utilities.
- * @see mdtensor::array_equal for exact shape-and-value equality without
- *      broadcasting.
- */
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t>
-[[nodiscard]] inline constexpr bool array_equiv(in1_t &&in1, in2_t &&in2) {
-    return all(equal<int8_t, mpmode>(std::forward<in1_t>(in1),
-                                     std::forward<in2_t>(in2)));
+[[nodiscard]] constexpr bool array_equiv(auto &&in1, auto &&in2) {
+    try {
+        const auto [in1_bcast, in2_bcast] = std::get<0>(
+            core::broadcast(std::index_sequence<0, 0>{},
+                            std::integer_sequence<bool, true, true>{},
+                            std::forward<decltype(in1)>(in1),
+                            std::forward<decltype(in2)>(in2)));
+        return array_equal(in1_bcast, in2_bcast);
+
+    } catch (const std::exception &e) {
+        return false;
+    }
 }
 
 } // namespace mdtensor

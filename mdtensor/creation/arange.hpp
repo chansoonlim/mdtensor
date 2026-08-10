@@ -9,73 +9,78 @@
 
 #pragma once
 
-#include "../core/core.hpp"
+#include "empty.hpp"
 
 namespace mdtensor {
 
-/**
- * @brief Generate a 1-D range of values with a given step (out-of-place).
- *
- * @tparam data_t (optional) Output value type. If void, deduced from inputs.
- * @tparam start_t Arithmetic type of start.
- * @tparam stop_t Arithmetic type of stop.
- * @tparam step_t (optional) Arithmetic type of step. Default is double.
- *
- * @param start Start value (inclusive).
- * @param stop Stop value (exclusive in intent; number of elements is computed
- *             from (stop - start) / step).
- * @param step Step size. Default is 1.
- *
- * @return 1-D mdarray containing the generated range.
- *
- * @note The output length is computed as ceil((stop - start) / step).
- * @note The effective step is computed in the output value type to reduce
- *       accumulation drift when `start_t`/`step_t` differ from `data_t`.
- *
- * @warning This implementation does not currently guard against invalid input
- *          such as step == 0 or mismatched sign between (stop - start) and
- *          step. Callers should ensure the range definition is valid.
- */
-template <typename data_t = void, arithmetic_c start_t, arithmetic_c stop_t,
-          arithmetic_c step_t = double>
-[[nodiscard]] inline constexpr auto arange(start_t &&start, stop_t &&stop,
-                                           step_t &&step = (step_t)1) noexcept {
-    using value_t =
-        std::conditional_t<!std::is_void_v<data_t>, data_t,
-                           core::common_data_type_t<start_t, stop_t>>;
+template <typename dtype = void, core::extents_c exts_t,
+          core::arithmetic_c start_t = int, core::arithmetic_c step_t = int,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto arange(exts_t &&exts, start_t &&start = start_t{0},
+                                    step_t &&step = step_t{1},
+                                    out_t &&out = out_t{std::nullopt}) {
+    static_assert(exts.rank() == 1, "arange only supports rank-1 extents");
 
-    const size_t num = std::ceil((stop - start) / step);
-    const value_t step_actual =
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            using value_t = core::output_value_t<dtype, start_t, step_t>;
+
+            return empty<value_t>(std::forward<decltype(exts)>(exts));
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    using value_t = typename decltype(out_md)::value_type;
+    using index_t = typename decltype(out_md)::index_type;
+
+    const value_t actual_step =
         static_cast<value_t>(start + step) - static_cast<value_t>(start);
 
-    auto out = mdarray<value_t, mdtensor::dims<1>>{mdtensor::dims<1>{num}};
+    out_md(0) = static_cast<value_t>(start);
 
-    out(0) = start;
-    for (size_t i = 1; i < num; i++) {
-        out(i) = out(i - 1) + step_actual;
+    for (index_t i = 1; i < out_md.extent(0); i++) {
+        out_md(i) = out_md(i - 1) + static_cast<value_t>(actual_step);
     }
 
-    return out;
+    return out_md;
 }
 
-/**
- * @brief Generate a 1-D range [0, stop) with step 1 (out-of-place).
- *
- * @tparam data_t (optional) Output value type. If void, deduced from input.
- * @tparam stop_t Arithmetic type of stop.
- *
- * @param stop Stop value (exclusive in intent).
- *
- * @return 1-D mdarray containing the generated range.
- *
- * @see mdtensor::arange(start, stop, step) for the general form.
- */
-template <typename data_t = void, arithmetic_c stop_t>
-[[nodiscard]] inline constexpr auto arange(stop_t &&stop) noexcept {
-    return arange<data_t>(0, std::forward<stop_t>(stop));
+template <typename dtype = void, core::arithmetic_c start_t,
+          core::arithmetic_c stop_t, core::arithmetic_c step_t = int,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto arange(start_t &&start, stop_t &&stop,
+                                    step_t &&step = step_t{1},
+                                    out_t &&out = out_t{std::nullopt}) {
+    const std::int64_t num = std::ceil((stop - start) / step);
+
+    if (num < 0) {
+        throw std::invalid_argument(
+            "calculated number of elements is negative");
+    }
+
+    return arange<dtype>(core::dims<1>{static_cast<std::size_t>(num)},
+                         std::forward<start_t>(start),
+                         std::forward<step_t>(step), std::forward<out_t>(out));
 }
 
-// TODO: Develop arange that works in compile-time contexts (e.g., constexpr
-// mdarray) and/or with static extents.
+template <typename dtype = void, core::arithmetic_c stop_t>
+[[nodiscard]] constexpr auto arange(stop_t &&stop) {
+    using start_t = typename std::remove_cvref_t<stop_t>;
+
+    return arange<dtype>(start_t{0}, std::forward<stop_t>(stop), start_t{1});
+}
+
+template <std::size_t num, typename dtype = void,
+          core::arithmetic_c start_t = int, core::arithmetic_c step_t = int,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto arange(start_t &&start = start_t{0},
+                                    step_t &&step = step_t{1},
+                                    out_t &&out = out_t{std::nullopt}) {
+    return arange<dtype>(core::extents<std::size_t, num>{},
+                         std::forward<start_t>(start),
+                         std::forward<step_t>(step), std::forward<out_t>(out));
+}
 
 } // namespace mdtensor

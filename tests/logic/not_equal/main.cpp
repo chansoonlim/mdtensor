@@ -1,39 +1,70 @@
+/**
+ * @file
+ * @brief test
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
 #include <gtest/gtest.h>
 
-#include "mdtensor/logic/array_equal.hpp"
-#include "mdtensor/logic/not_equal.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
 namespace md = mdtensor;
 
-TEST(stack, not_equal) {
-    using T = double;
+TEST(run_time, 1) {
+    using value_t = int;
+    using index_t = std::size_t;
 
-    constexpr auto a =
-        md::mdarray<T, md::extents<size_t, 2, 1, 2>>{{1, 2, 3, 4}};
-    constexpr auto b = md::mdarray<T, md::extents<size_t, 2, 1>>{{2, 3}};
-    constexpr auto c = md::not_equal(a, b);
-
-    constexpr auto c_expect =
-        md::mdarray<uint8_t, md::extents<size_t, 2, 2, 2>>{
-            {1, 0, 1, 1, 1, 1, 0, 1}};
-
-    constexpr auto is_array_equal = md::array_equal(c, c_expect);
-
-    ASSERT_TRUE(is_array_equal);
-}
-
-TEST(heap, not_equal) {
-    using T = double;
-
-    const auto a =
-        md::mdarray<T, md::dims<3>>{{1, 2, 3, 4}, md::dims<3>{2, 1, 2}};
-    const auto b = md::mdarray<T, md::dims<2>>{{2, 3}, md::dims<2>{2, 1}};
+    const auto a = md::container<value_t, md::dims<1>>{{1, 2}, md::dims<1>{2}};
+    const auto b = md::container<value_t, md::dims<1>>{{1, 3}, md::dims<1>{2}};
     const auto c = md::not_equal(a, b);
 
-    const auto c_expect = md::mdarray<uint8_t, md::dims<3>>{
-        {1, 0, 1, 1, 1, 1, 0, 1}, md::dims<3>{2, 2, 2}};
+    EXPECT_TRUE(md::array_equal(
+        c, md::container<bool, md::extents<index_t, 2>>{{false, true}}));
+}
 
-    const auto is_array_equal = md::array_equal(c, c_expect);
+TEST(run_time, 2) {
+    using value_t = int;
+    using index_t = std::size_t;
 
-    ASSERT_TRUE(is_array_equal);
+    const auto a = md::container<value_t, md::dims<1>>{{1, 2}, md::dims<1>{2}};
+    const auto b =
+        md::container<value_t, md::dims<2>>{{1, 3, 1, 4}, md::dims<2>{2, 2}};
+    const auto c = md::not_equal(a, b);
+
+    EXPECT_TRUE(
+        md::array_equal(c, md::container<bool, md::extents<index_t, 2, 2>>{
+                               {false, true, false, true}}));
+}
+
+TEST(compile_time, 1) {
+    using value_t = int;
+    using index_t = std::size_t;
+
+    constexpr auto a = md::container<value_t, md::extents<index_t, 2>>{{1, 2}};
+    constexpr auto b = md::container<value_t, md::extents<index_t, 2>>{{1, 3}};
+    constexpr auto c = md::not_equal(a, b);
+
+    static_assert(md::array_equal(
+        c, md::container<bool, md::extents<index_t, 2>>{{false, true}}));
+}
+
+TEST(compile_time, 2) {
+    using value_t = int;
+    using index_t = std::size_t;
+
+    constexpr auto a = md::container<value_t, md::extents<index_t, 2>>{{1, 2}};
+    constexpr auto b =
+        md::container<value_t, md::extents<index_t, 2, 2>>{{1, 3, 1, 4}};
+    constexpr auto c = md::not_equal(a, b);
+
+    static_assert(
+        md::array_equal(c, md::container<bool, md::extents<index_t, 2, 2>>{
+                               {false, true, false, true}}));
 }

@@ -10,36 +10,39 @@
 #pragma once
 
 #include "empty.hpp"
-#include "fill.hpp"
 
 namespace mdtensor {
+namespace ufunc {
 
-/**
- * @brief Create a new tensor filled with a scalar value (out-of-place).
- *
- * @tparam dtype Element type of the result tensor.
- * @tparam mpmode (optional) Parallel execution mode used for filling. Default
- * is MPMode::NONE.
- * @tparam exts_t (optional) Extents type. Default is extents<uint8_t>.
- *
- * @param val Fill value.
- * @param exts Output extents.
- *
- * @return Newly allocated tensor (mdarray) with extents `exts`, filled with
- * `val`.
- *
- * @note Equivalent to `out = empty<dtype>(exts); fill(out, val);`.
- *
- * @see mdtensor::empty
- * @see mdtensor::fill
- */
-template <typename dtype, MPMode mpmode = MPMode::NONE,
-          extents_c exts_t = extents<uint8_t>>
-[[nodiscard]] inline constexpr auto full(dtype &&val,
-                                         exts_t &&exts = exts_t{}) {
-    auto out = empty<dtype>(std::forward<exts_t>(exts));
-    fill<mpmode>(out, std::forward<dtype>(val));
-    return out;
+constexpr void full_ufunc(auto &&out, auto &&val) { out() = val(); }
+
+} // namespace ufunc
+
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto full(auto &&shape, auto &&val,
+                                  out_t &&out = out_t{std::nullopt}) {
+    const auto val_mds =
+        core::to_const_mdspan(std::forward<decltype(val)>(val));
+
+    using value_t = core::output_value_t<dtype, decltype(val_mds)>;
+
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return empty<value_t>(std::forward<decltype(shape)>(shape));
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
+        [](auto &&...elems) {
+            ufunc::full_ufunc(std::forward<decltype(elems)>(elems)...);
+        },
+        std::integer_sequence<bool, false, true>{}, out_md, val_mds);
+
+    return out_md;
 }
 
 } // namespace mdtensor

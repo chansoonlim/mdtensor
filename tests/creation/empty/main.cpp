@@ -1,27 +1,52 @@
+/**
+ * @file
+ * @brief test
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
 #include <gtest/gtest.h>
 
-#include "mdtensor/creation/empty.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
 namespace md = mdtensor;
 
-TEST(stack, 1) {
-    using T = double;
+TEST(run_time, 1) {
+    using value_t = double;
 
-    constexpr auto x = md::empty<T>(md::extents<size_t, 1, 2, 3>{});
+    const auto x = md::empty(md::dims<2>{2, 2});
 
-    constexpr auto is_same_extents =
-        md::core::same(x.extents(), md::extents<size_t, 1, 2, 3>{});
-
-    ASSERT_TRUE(is_same_extents);
+    static_assert(std::is_same_v<typename decltype(x)::value_type, value_t>);
 }
 
-TEST(heap, 2) {
-    using T = double;
+TEST(run_time, 2) {
+    using value_t = int;
 
-    const auto x = md::empty<T>(md::dims<3>{1, 2, 3});
+    const auto x = md::empty<value_t>(md::dims<2>{2, 2});
 
-    const auto is_same_extents =
-        md::core::same(x.extents(), md::extents<size_t, 1, 2, 3>{});
+    static_assert(std::is_same_v<typename decltype(x)::value_type, value_t>);
+}
 
-    ASSERT_TRUE(is_same_extents);
+TEST(compile_time, 1) {
+    using value_t = double;
+    using index_t = std::size_t;
+
+    constexpr auto x = md::empty(md::extents<index_t, 2, 2>{});
+
+    static_assert(std::is_same_v<typename decltype(x)::value_type, value_t>);
+}
+
+TEST(compile_time, 2) {
+    using value_t = int;
+    using index_t = std::size_t;
+
+    constexpr auto x = md::empty<value_t>(md::extents<index_t, 2, 2>{});
+
+    static_assert(std::is_same_v<typename decltype(x)::value_type, value_t>);
 }

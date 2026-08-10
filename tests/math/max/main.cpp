@@ -1,21 +1,167 @@
+/**
+ * @file
+ * @brief test
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
 #include <gtest/gtest.h>
 
-#include "mdtensor/logic/array_equal.hpp"
-#include "mdtensor/math/max.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
 namespace md = mdtensor;
 
-TEST(test, 1) {
-    using T = int;
+TEST(run_time, 1) {
+    const auto a = md::reshape(md::arange(4), md::dims<2>{2, 2});
+    const auto a_max = md::max(a);
 
-    static_assert(md::array_equal(
-        md::max(md::mdarray<T, md::extents<uint8_t, 2, 2>>{{0, 1, 2, 3}}), 3));
+    std::cout << "a_max: " << a_max << std::endl;
 
-    static_assert(md::array_equal(
-        md::max<0>(md::mdarray<T, md::extents<uint8_t, 2, 2>>{{0, 1, 2, 3}}),
-        md::mdarray<T, md::extents<uint8_t, 2>>{{2, 3}}));
-
-    static_assert(md::array_equal(
-        md::max<1>(md::mdarray<T, md::extents<uint8_t, 2, 2>>{{0, 1, 2, 3}}),
-        md::mdarray<T, md::extents<uint8_t, 2>>{{1, 3}}));
+    ASSERT_EQ(a_max, 3);
 }
+
+TEST(run_time, 2) {
+    using value_t = int;
+    using index_t = std::size_t;
+
+    const auto a = md::reshape(md::arange(4), md::dims<2>{2, 2});
+
+    const auto a_max1 = md::max<0>(a);
+    const auto a_max2 = md::max<1>(a);
+    const auto a_max3 = md::max<0>(
+        a, std::nullopt, -1,
+        md::container<bool, md::dims<1>>{{false, true}, md::dims<1>{2}});
+
+    std::cout << "a_max1: " << md::to_string(a_max1) << std::endl;
+    std::cout << "a_max2: " << md::to_string(a_max2) << std::endl;
+    std::cout << "a_max3: " << md::to_string(a_max3) << std::endl;
+
+    ASSERT_TRUE(md::array_equal(
+        a_max1, md::container<value_t, md::extents<index_t, 2>>{{2, 3}}));
+    ASSERT_TRUE(md::array_equal(
+        a_max2, md::container<value_t, md::extents<index_t, 2>>{{1, 3}}));
+    ASSERT_TRUE(md::array_equal(
+        a_max3, md::container<value_t, md::extents<index_t, 2>>{{-1, 3}}));
+}
+
+TEST(run_time, 3) {
+    using value_t = double;
+
+    auto b = md::arange<value_t>(5);
+    b(2) = std::numeric_limits<value_t>::quiet_NaN();
+
+    const auto b_max1 = md::max(b);
+    const auto b_max2 =
+        md::max(b, std::nullopt, -1, md::logical_not(md::isnan(b)));
+    const auto b_max3 = md::nanmax(b);
+
+    std::cout << "b_max1: " << md::to_string(b_max1) << std::endl;
+    std::cout << "b_max2: " << md::to_string(b_max2) << std::endl;
+    std::cout << "b_max3: " << md::to_string(b_max3) << std::endl;
+
+    ASSERT_TRUE(md::array_equal(
+        b_max1, std::numeric_limits<value_t>::quiet_NaN(), true));
+    ASSERT_EQ(b_max2, 4);
+    ASSERT_EQ(b_max3, 4);
+}
+
+TEST(run_time, 4) {
+    using value_t = int;
+    using index_t = std::size_t;
+
+    const auto a =
+        md::container<value_t, md::dims<2>>{{-50, 10}, md::dims<2>{2, 1}};
+
+    const auto a_max = md::max<-1>(a, std::nullopt, 0);
+
+    std::cout << "a_max: " << md::to_string(a_max) << std::endl;
+
+    ASSERT_TRUE(md::array_equal(
+        a_max, md::container<value_t, md::extents<index_t, 2>>{{0, 10}}));
+}
+
+TEST(run_time, 5) { ASSERT_EQ(md::max(5, std::nullopt, 6), 6); }
+
+TEST(compile_time, 1) {
+    using index_t = std::size_t;
+
+    constexpr auto a =
+        md::reshape(md::arange<4>(), md::extents<index_t, 2, 2>{});
+    constexpr auto a_max = md::max(a);
+
+    std::cout << "a_max: " << a_max << std::endl;
+
+    static_assert(a_max == 3);
+}
+
+TEST(compile_time, 2) {
+    using value_t = int;
+    using index_t = std::size_t;
+
+    constexpr auto a =
+        md::reshape(md::arange<4>(), md::extents<index_t, 2, 2>{});
+
+    constexpr auto a_max1 = md::max<0>(a);
+    constexpr auto a_max2 = md::max<1>(a);
+    constexpr auto a_max3 =
+        md::max<0>(a, std::nullopt, -1,
+                   md::container<bool, md::extents<index_t, 2>>{{false, true}});
+
+    std::cout << "a_max1: " << md::to_string(a_max1) << std::endl;
+    std::cout << "a_max2: " << md::to_string(a_max2) << std::endl;
+    std::cout << "a_max3: " << md::to_string(a_max3) << std::endl;
+
+    static_assert(md::array_equal(
+        a_max1, md::container<value_t, md::extents<index_t, 2>>{{2, 3}}));
+    static_assert(md::array_equal(
+        a_max2, md::container<value_t, md::extents<index_t, 2>>{{1, 3}}));
+    static_assert(md::array_equal(
+        a_max3, md::container<value_t, md::extents<index_t, 2>>{{-1, 3}}));
+}
+
+TEST(compile_time, 3) {
+    using value_t = double;
+
+    constexpr auto b = []() {
+        auto temp = md::arange<5, value_t>();
+        temp(2) = std::numeric_limits<value_t>::quiet_NaN();
+        return temp;
+    }();
+
+    constexpr auto b_max1 = md::max(b);
+    constexpr auto b_max2 =
+        md::max(b, std::nullopt, -1, md::logical_not(md::isnan(b)));
+    constexpr auto b_max3 = md::nanmax(b);
+
+    std::cout << "b_max1: " << md::to_string(b_max1) << std::endl;
+    std::cout << "b_max2: " << md::to_string(b_max2) << std::endl;
+    std::cout << "b_max3: " << md::to_string(b_max3) << std::endl;
+
+    static_assert(md::array_equal(
+        b_max1, std::numeric_limits<value_t>::quiet_NaN(), true));
+    static_assert(b_max2 == 4);
+    static_assert(b_max3 == 4);
+}
+
+TEST(compile_time, 4) {
+    using value_t = int;
+    using index_t = std::size_t;
+
+    constexpr auto a =
+        md::container<value_t, md::extents<index_t, 2, 1>>{{-50, 10}};
+
+    constexpr auto a_max = md::max<-1>(a, std::nullopt, 0);
+
+    std::cout << "a_max: " << md::to_string(a_max) << std::endl;
+
+    static_assert(md::array_equal(
+        a_max, md::container<value_t, md::extents<index_t, 2>>{{0, 10}}));
+}
+
+TEST(compile_time, 5) { static_assert(md::max(5, std::nullopt, 6) == 6); }

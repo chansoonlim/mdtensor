@@ -1,50 +1,150 @@
+/**
+ * @file
+ * @brief test
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
 #include <gtest/gtest.h>
 
-#include "mdtensor/linalg/matmul.hpp"
-#include "mdtensor/logic/allclose.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
 namespace md = mdtensor;
 
-TEST(stack, matmul) {
-    using T = double;
+TEST(run_time, 1) {
+    using index_t = std::size_t;
 
-    constexpr auto a = md::mdarray<T, md::extents<size_t, 2, 2>>{{1, 2, 3, 4}};
-    constexpr auto b = md::mdarray<T, md::extents<size_t, 2, 2>>{{5, 6, 7, 8}};
-    constexpr auto c = md::linalg::matmul(a, b);
+    const auto a = md::ones(md::extents<index_t, 9, 5, 7, 4>{});
+    const auto b = md::ones(md::extents<index_t, 9, 5, 4, 3>{});
 
-    constexpr auto c_expect =
-        md::mdarray<T, md::extents<size_t, 2, 2>>{{19, 22, 43, 50}};
-
-    constexpr bool allclose = md::allclose(c, c_expect);
-
-    ASSERT_TRUE(allclose);
-}
-
-TEST(heap, matmul) {
-    using T = double;
-
-    const auto a = md::mdarray<T, md::dims<2>>{{1, 2, 3, 4}, md::dims<2>{2, 2}};
-    const auto b = md::mdarray<T, md::dims<2>>{{5, 6, 7, 8}, md::dims<2>{2, 2}};
     const auto c = md::linalg::matmul(a, b);
 
-    const auto c_expect =
-        md::mdarray<T, md::dims<2>>{{19, 22, 43, 50}, md::dims<2>{2, 2}};
-
-    const bool allclose = md::allclose(c, c_expect);
-
-    ASSERT_TRUE(allclose);
+    EXPECT_TRUE(
+        md::is_same_extents(c.extents(), md::extents<index_t, 9, 5, 7, 3>{}));
 }
 
-TEST(test, mixed) {
-    using T1 = int;
-    using T2 = float;
-    using T3 = double;
+TEST(run_time, 2) {
+    using value_t = double;
+    using index_t = std::size_t;
 
     const auto a =
-        md::mdarray<T1, md::dims<2>>{{1, 2, 3, 4}, md::dims<2>{2, 2}};
+        md::container<value_t, md::extents<index_t, 2, 2>>{{1, 0, 0, 1}};
     const auto b =
-        md::mdarray<T2, md::dims<2>>{{5, 6, 7, 8}, md::dims<2>{2, 2}};
-    auto c = md::mdarray<T3, md::dims<2>>{md::dims<2>{2, 2}};
+        md::container<value_t, md::extents<index_t, 2, 2>>{{4, 1, 2, 2}};
 
-    md::linalg::matmul_to(a, b, c);
+    EXPECT_TRUE(md::allclose(
+        md::linalg::matmul(a, b),
+        md::container<value_t, md::extents<index_t, 2, 2>>{{4, 1, 2, 2}}));
+}
+
+TEST(run_time, 3) {
+    using value_t = double;
+    using index_t = std::size_t;
+
+    const auto a =
+        md::container<value_t, md::extents<index_t, 2, 2>>{{1, 0, 0, 1}};
+    const auto b = md::container<value_t, md::extents<index_t, 2>>{{1, 2}};
+
+    EXPECT_TRUE(
+        md::allclose(md::linalg::matmul(a, b),
+                     md::container<value_t, md::extents<index_t, 2>>{{1, 2}}));
+
+    EXPECT_TRUE(
+        md::allclose(md::linalg::matmul(b, a),
+                     md::container<value_t, md::extents<index_t, 2>>{{1, 2}}));
+}
+
+TEST(run_time, 4) {
+    using index_t = std::size_t;
+
+    const auto data = md::arange(2 * 2 * 4);
+    const auto a = md::reshape(data, md::extents<index_t, 2, 2, 4>{});
+    const auto b = md::reshape(data, md::extents<index_t, 2, 4, 2>{});
+    const auto c = md::linalg::matmul(a, b);
+
+    EXPECT_TRUE(
+        md::is_same_extents(c.extents(), md::extents<index_t, 2, 2, 2>{}));
+
+    EXPECT_EQ(c(0, 1, 1), 98);
+    EXPECT_EQ(md::sum(md::multiply(md::submdspan(a, 0, 1, md::full_extent),
+                                   md::submdspan(b, 0, md::full_extent, 1))),
+              98);
+}
+
+TEST(compile_time, 1) {
+    using index_t = std::size_t;
+
+    constexpr auto a = md::ones(md::extents<index_t, 9, 5, 7, 4>{});
+    constexpr auto b = md::ones(md::extents<index_t, 9, 5, 4, 3>{});
+
+    constexpr auto c = md::linalg::matmul(a, b);
+
+    static_assert(
+        md::is_same_extents(c.extents(), md::extents<index_t, 9, 5, 7, 3>{}));
+}
+
+TEST(compile_time, 2) {
+    using value_t = double;
+    using index_t = std::size_t;
+
+    constexpr auto a =
+        md::container<value_t, md::extents<index_t, 2, 2>>{{1, 0, 0, 1}};
+    constexpr auto b =
+        md::container<value_t, md::extents<index_t, 2, 2>>{{4, 1, 2, 2}};
+
+    static_assert(md::allclose(
+        md::linalg::matmul(a, b),
+        md::container<value_t, md::extents<index_t, 2, 2>>{{4, 1, 2, 2}}));
+}
+
+TEST(compile_time, 3) {
+    using value_t = double;
+    using index_t = std::size_t;
+
+    constexpr auto a =
+        md::container<value_t, md::extents<index_t, 2, 2>>{{1, 0, 0, 1}};
+    constexpr auto b = md::container<value_t, md::extents<index_t, 2>>{{1, 2}};
+
+    static_assert(
+        md::allclose(md::linalg::matmul(a, b),
+                     md::container<value_t, md::extents<index_t, 2>>{{1, 2}}));
+
+    static_assert(
+        md::allclose(md::linalg::matmul(b, a),
+                     md::container<value_t, md::extents<index_t, 2>>{{1, 2}}));
+}
+
+TEST(compile_time, 4) {
+    using index_t = std::size_t;
+
+    constexpr auto data = md::arange<2 * 2 * 4>();
+
+    static_assert([&]() {
+        const auto a = md::reshape(data, md::extents<index_t, 2, 2, 4>{});
+        const auto b = md::reshape(data, md::extents<index_t, 2, 4, 2>{});
+        const auto c = md::linalg::matmul(a, b);
+
+        if (!md::is_same_extents(c.extents(),
+                                 md::extents<index_t, 2, 2, 2>{})) {
+            return false;
+        }
+
+        if (c(0, 1, 1) != 98) {
+            return false;
+        }
+
+        if (md::sum(md::multiply(md::submdspan(a, 0, 1, md::full_extent),
+                                 md::submdspan(b, 0, md::full_extent, 1))) !=
+            98) {
+            return false;
+        }
+
+        return true;
+    }());
 }

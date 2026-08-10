@@ -10,33 +10,28 @@
 #pragma once
 
 #include "../creation/copy.hpp"
+#include "../creation/empty_like.hpp"
 #include "../creation/eye.hpp"
 #include "../math/absolute.hpp"
 
-namespace mdtensor {
-namespace linalg {
-namespace detail {
+#ifdef MDTENSOR_USE_EIGEN
+#include "../core/eigen/eigen.hpp"
+#endif
 
-template <md_c in_t, md_c out_t>
-[[nodiscard]] inline constexpr bool inv_naive(in_t &&in, out_t &&out) {
-    auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-    auto out_mds = core::to_mdspan(std::forward<out_t>(out));
+namespace mdtensor::linalg {
+namespace ufunc {
 
-    static_assert(decltype(in_mds)::rank() == 2);
-    static_assert(decltype(out_mds)::rank() == 2);
+[[nodiscard]] constexpr bool inv_native(auto &&in, auto &&out) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
 
     using index_t = typename decltype(in_mds)::index_type;
 
     const index_t n = in_mds.extent(0);
 
-    if (in_mds.extent(0) != in_mds.extent(1) ||
-        in_mds.extent(0) != out_mds.extent(0) ||
-        in_mds.extent(0) != out_mds.extent(1)) {
-        return false;
-    }
-
     auto in_copy = copy(in_mds);
-    eye_to(out_mds);
+    static_cast<void>(eye(out_mds.extents(), 0, out_mds));
 
     for (index_t i = 0; i < n; i++) {
         index_t pivot_row = i;
@@ -91,16 +86,12 @@ template <md_c in_t, md_c out_t>
     return true;
 }
 
-template <md_c in_t, md_c out_t>
-[[nodiscard]] inline constexpr bool inv_impl(in_t &&in, out_t &&out) {
-    static_assert(std::remove_cvref_t<in_t>::rank() == 2);
-    static_assert(std::remove_cvref_t<out_t>::rank() == 2);
-
+[[nodiscard]] constexpr bool inv_ufunc(auto &&in, auto &&out) {
 #ifdef MDTENSOR_USE_EIGEN
 #if __cplusplus >= 202302L // TODO: Impliement for C++20
-    if constexpr (core::eigen::eigen_mappable_mdspan_c<in_t> &&
-                  core::eigen::eigen_mappable_mdspan_c<out_t>) {
-        if (!std::is_constant_evaluated()) [[likely]] {
+    if constexpr (core::eigen::eigen_mappable_c<in_t> &&
+                  core::eigen::eigen_mappable_c<out_t>) {
+        if (!std::is_constant_evaluated()) {
             const auto ein = core::eigen::to_eigen(in);
             auto eout = core::eigen::to_eigen(out);
 
@@ -116,72 +107,35 @@ template <md_c in_t, md_c out_t>
 #endif
 #endif
 
-    return inv_naive(in, out);
+    return inv_native(in, out);
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compute matrix inverse (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input matrix (mdspan, mdarray, etc.) (... x N x N).
- * @param out Output matrix (mdspan, mdarray, etc.) (... x N x N).
- * @param valid Output mdspan, mdarray, or scalar indicating validity of the
- * inverse.
- *
- * @note The inverse is computed per-matrix when `in` is batched. The `valid`
- *       flag is produced per matrix instance.
- *
- * @see mdtensor::linalg::inv for the out-of-place version that returns the
- * result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t,
-          typename valid_t>
-inline constexpr void inv_to(in_t &&in, out_t &&out, valid_t &&valid) {
-    core::batch<mpmode>(
+template <core::Backend backend = core::Backend::AUTO>
+constexpr void inv_to(auto &&in, auto &&out, auto &&valid) {
+    core::batch_with_broadcast<backend>(
         [](auto &&in, auto &&out, auto &&valid) {
-            valid() = detail::inv_impl(std::forward<decltype(in)>(in),
+            valid() = ufunc::inv_ufunc(std::forward<decltype(in)>(in),
                                        std::forward<decltype(out)>(out));
         },
         std::index_sequence<2, 2, 0>{},
-        core::to_const_mdspan(std::forward<in_t>(in)),
-        core::to_mdspan(std::forward<out_t>(out)),
-        core::to_mdspan(std::forward<valid_t>(valid)));
+        std::integer_sequence<bool, true, false, false>{},
+        std::forward<decltype(in)>(in), std::forward<decltype(out)>(out),
+        std::forward<decltype(valid)>(valid));
 }
 
-/**
- * @brief Compute matrix inverse (out-of-place).
- *
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- * input.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input matrix (mdspan, mdarray, etc.) (... x N x N).
- *
- * @return A tuple-like output from batch_out consisting of:
- *         - inverse matrix (mdarray) (... x N x N).
- *         - validity flag (mdarray or scalar) (...), indicating if the inverse
- *        was successfully computed for each matrix instance.
- *
- * @see mdtensor::linalg::inv_to for the in-place version that writes into an
- * output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto inv(in_t &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto inv(auto &&in) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out = core::create_out<dtype>(
-        std::index_sequence<2>{}, core::slice_from_right<2>(in_mds.extents()),
-        in_mds);
-    auto valid = core::create_out<bool>(std::index_sequence<2>{},
-                                        extents<uint8_t>{}, in_mds);
+    auto out = empty_like<dtype>(in_mds);
+    auto valid = core::make_output<bool>(std::index_sequence<2>{},
+                                         core::extents<std::uint8_t>{}, in_mds);
 
-    inv_to<mpmode>(in_mds, out, valid);
+    inv_to<backend>(in_mds, out, valid);
 
     return std::pair{out, valid};
 }
 
-} // namespace linalg
-} // namespace mdtensor
+} // namespace mdtensor::linalg

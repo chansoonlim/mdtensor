@@ -9,5 +9,8 @@
 
 #pragma once
 
+#include "generator/generator.hpp"
+
 #include "rand.hpp"
+#include "randint.hpp"
 #include "uniform.hpp"

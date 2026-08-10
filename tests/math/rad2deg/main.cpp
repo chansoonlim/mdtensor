@@ -1,51 +1,39 @@
-#include <numbers>
+/**
+ * @file
+ * @brief test
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
 
 #include <gtest/gtest.h>
 
-#include "mdtensor/logic/allclose.hpp"
-#include "mdtensor/math/rad2deg.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
 namespace md = mdtensor;
 
-TEST(single, deg2rad) {
-    using T = double;
+TEST(run_time, 1) {
+    using value_t = float;
 
-    constexpr T a = std::numbers::pi_v<T> / 2.;
-    constexpr T b = md::rad2deg(a);
+    const auto x_deg = md::rad2deg(std::numbers::pi_v<value_t> / value_t{2});
 
-    constexpr T b_expect = 90;
+    std::cout << "x_deg: " << x_deg << std::endl;
 
-    constexpr bool allclose = md::allclose(b, b_expect);
-
-    ASSERT_TRUE(allclose);
+    ASSERT_TRUE(md::isclose(x_deg, value_t{90}));
 }
 
-TEST(stack, rad2deg) {
-    using T = double;
+TEST(compile_time, 1) {
+    using value_t = float;
 
-    constexpr auto a = md::mdarray<T, md::extents<size_t, 3>>{
-        {0, std::numbers::pi_v<T> / 2., std::numbers::pi_v<T>}};
-    constexpr auto b = md::rad2deg(a);
+    constexpr auto x_deg =
+        md::rad2deg(std::numbers::pi_v<value_t> / value_t{2});
 
-    constexpr auto b_expect =
-        md::mdarray<T, md::extents<size_t, 3>>{{0, 90, 180}};
+    std::cout << "x_deg: " << x_deg << std::endl;
 
-    constexpr bool allclose = md::allclose(b, b_expect);
-
-    ASSERT_TRUE(allclose);
-}
-
-TEST(heap, rad2deg) {
-    using T = double;
-
-    const auto a = md::mdarray<T, md::dims<1>>{
-        {0, std::numbers::pi_v<T> / 2., std::numbers::pi_v<T>}, md::dims<1>{3}};
-    const auto b = md::rad2deg(a);
-
-    const auto b_expect =
-        md::mdarray<T, md::dims<1>>{{0, 90, 180}, md::dims<1>{3}};
-
-    const bool allclose = md::allclose(b, b_expect);
-
-    ASSERT_TRUE(allclose);
+    static_assert(md::isclose(x_deg, value_t{90}));
 }

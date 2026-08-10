@@ -9,59 +9,50 @@
 
 #pragma once
 
-#include "../core/core.hpp"
+#include "../creation/empty_like.hpp"
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in_t, typename out_t>
-inline constexpr void sign_impl(in_t &&in, out_t &&out) {
+constexpr void sign_ufunc(auto &&in, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
     out() = (in() > 0) - (in() < 0);
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compute sign element-wise (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @see mdtensor::sign for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
-inline constexpr void sign_to(in_t &&in, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::sign_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in_t>(in)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
+template <typename dtype = std::int8_t,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto sign(auto &&in, out_t &&out = out_t{std::nullopt},
+                                  where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-/**
- * @brief Compute sign element-wise (out-of-place).
- *
- * @tparam dtype (optional) Data type of the result. Default is int8_t.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar.
- *
- * @note By default, the result type is int8_t to represent {-1, 0, 1}.
- *
- * @see mdtensor::sign_to for the in-place version that writes into an output.
- */
-template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto sign(in_t &&in) {
-    return core::batch_out<dtype, mpmode>(
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return empty_like<dtype>(in_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::sign_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::sign_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in_t>(in)));
+        std::integer_sequence<bool, true, false, true>{},
+        std::forward<decltype(in)>(in), out_md,
+        std::forward<decltype(where)>(where));
+
+    return out_md;
 }
 
 } // namespace mdtensor

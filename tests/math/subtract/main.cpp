@@ -1,86 +1,65 @@
+/**
+ * @file
+ * @brief test
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
 #include <gtest/gtest.h>
 
-#include "mdtensor/logic/allclose.hpp"
-#include "mdtensor/math/subtract.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
 namespace md = mdtensor;
 
-TEST(stack, subtract) {
-    using T = double;
+TEST(run_time, 1) {
+    const auto out = md::subtract(1.0, 4.0);
 
-    constexpr auto a =
-        md::mdarray<T, md::extents<size_t, 2, 1, 2>>{{1, 2, 3, 4}};
-    constexpr auto b = md::mdarray<T, md::extents<size_t, 2, 1>>{{5, 6}};
-    constexpr auto c = md::subtract(a, b);
+    std::cout << "out: " << out << std::endl;
 
-    constexpr auto c_expect = md::mdarray<T, md::extents<size_t, 2, 2, 2>>{
-        {-4, -3, -5, -4, -2, -1, -3, -2}};
-
-    constexpr bool is_allclose = md::allclose(c, c_expect);
-
-    ASSERT_TRUE(is_allclose);
+    ASSERT_EQ(out, -3.0);
 }
 
-TEST(stack, subtract_scalar) {
-    using T = double;
+TEST(run_time, 2) {
+    using value_t = double;
+    using index_t = std::size_t;
 
-    constexpr auto a =
-        md::mdarray<T, md::extents<size_t, 2, 1, 2>>{{1, 2, 3, 4}};
-    constexpr T b = 5;
-    constexpr auto c = md::subtract(a, b);
+    const auto x1 = md::reshape(md::arange(9.0), md::dims<2>{3, 3});
+    const auto x2 = md::arange(3.0);
+    const auto out = md::subtract(x1, x2);
 
-    constexpr auto c_expect =
-        md::mdarray<T, md::extents<size_t, 2, 1, 2>>{{-4, -3, -2, -1}};
+    std::cout << "out: " << md::to_string(out) << std::endl;
 
-    constexpr bool is_allclose = md::allclose(c, c_expect);
-
-    ASSERT_TRUE(is_allclose);
+    ASSERT_TRUE(
+        md::allclose(out, md::container<value_t, md::extents<index_t, 3, 3>>{
+                              {0, 0, 0, 3, 3, 3, 6, 6, 6}}));
 }
 
-TEST(heap, subtract) {
-    using T = double;
+TEST(compile_time, 1) {
+    constexpr auto out = md::subtract(1.0, 4.0);
 
-    const auto a =
-        md::mdarray<T, md::dims<3>>{{1, 2, 3, 4}, md::dims<3>{2, 1, 2}};
-    const auto b = md::mdarray<T, md::dims<2>>{{5, 6}, md::dims<2>{2, 1}};
-    const auto c = md::subtract(a, b);
+    std::cout << "out: " << out << std::endl;
 
-    const auto c_expect = md::mdarray<T, md::dims<3>>{
-        {-4, -3, -5, -4, -2, -1, -3, -2}, md::dims<3>{2, 2, 2}};
-
-    const bool is_allclose = md::allclose(c, c_expect);
-
-    ASSERT_TRUE(is_allclose);
+    static_assert(out == -3.0);
 }
 
-TEST(heap, subtract_scalar) {
-    using T = double;
+TEST(compile_time, 2) {
+    using value_t = double;
+    using index_t = std::size_t;
 
-    const auto a =
-        md::mdarray<T, md::dims<3>>{{1, 2, 3, 4}, md::dims<3>{2, 1, 2}};
-    const T b = 5;
-    const auto c = md::subtract(a, b);
+    constexpr auto x1 =
+        md::reshape(md::arange<9, value_t>(), md::extents<index_t, 3, 3>{});
+    constexpr auto x2 = md::arange<3, value_t>();
+    constexpr auto out = md::subtract(x1, x2);
 
-    const auto c_expect =
-        md::mdarray<T, md::dims<3>>{{-4, -3, -2, -1}, md::dims<3>{2, 1, 2}};
+    std::cout << "out: " << md::to_string(out) << std::endl;
 
-    const bool is_allclose = md::allclose(c, c_expect);
-
-    ASSERT_TRUE(is_allclose);
-}
-
-TEST(mix, subtract) {
-    using T = double;
-
-    constexpr auto a =
-        md::mdarray<T, md::extents<size_t, 2, 1, 2>>{{1, 2, 3, 4}};
-    const auto b = md::mdarray<T, md::dims<2>>{{5, 6}, md::dims<2>{2, 1}};
-    const auto c = md::subtract(a, b);
-
-    const auto c_expect = md::mdarray<T, md::dims<3>>{
-        {-4, -3, -5, -4, -2, -1, -3, -2}, md::dims<3>{2, 2, 2}};
-
-    const bool is_allclose = md::allclose(c, c_expect);
-
-    ASSERT_TRUE(is_allclose);
+    static_assert(
+        md::allclose(out, md::container<value_t, md::extents<index_t, 3, 3>>{
+                              {0, 0, 0, 3, 3, 3, 6, 6, 6}}));
 }

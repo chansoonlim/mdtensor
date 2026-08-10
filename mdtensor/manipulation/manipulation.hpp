@@ -9,9 +9,10 @@
 
 #pragma once
 
-#include "broadcast_arrays.hpp"
+#include "broadcast.hpp"
 #include "broadcast_to.hpp"
 #include "concatenate.hpp"
 #include "expand_dims.hpp"
+#include "flatten.hpp"
 #include "reshape.hpp"
 #include "transpose.hpp"

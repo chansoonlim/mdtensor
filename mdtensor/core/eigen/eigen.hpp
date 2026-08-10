@@ -9,93 +9,123 @@
 
 #pragma once
 
-#ifdef MDTENSOR_USE_EIGEN
 #include <Eigen/Dense>
-#endif
 
-#include "../convert.hpp"
+#include "../mdspan.hpp"
 #include "../type.hpp"
 
-#ifdef MDTENSOR_USE_EIGEN
-
-namespace mdtensor {
-namespace core {
-namespace eigen {
+namespace mdtensor::core::eigen {
 namespace detail {
 
-[[nodiscard]] inline constexpr int ext_to_dyn(size_t &&extent) noexcept {
-    if (extent == dyn) {
-        return Eigen::Dynamic;
+template <std::size_t Extent>
+[[nodiscard]] consteval int to_eigen_static_extent() {
+    static_assert(
+        Extent == core::dyn ||
+            Extent <= static_cast<std::size_t>(std::numeric_limits<int>::max()),
+        "Static extent value exceeds maximum int value for Eigen mapping.");
 
-    } else if (extent < std::numeric_limits<int>::max()) {
-        return static_cast<int>(extent);
+    if constexpr (Extent == core::dyn) {
+        return Eigen::Dynamic;
 
     } else {
-        assert(false);
-        return Eigen::Dynamic;
+        return static_cast<int>(Extent);
     }
 }
+
+template <core::integral_c ext_t>
+[[nodiscard]] constexpr Eigen::Index to_eigen_extent(ext_t &&ext) {
+    if constexpr (std::signed_integral<ext_t>) {
+        if (ext < 0) {
+            throw std::invalid_argument(
+                "Negative extent value is invalid for Eigen mapping.");
+        }
+    }
+
+    if (!std::in_range<Eigen::Index>(ext)) {
+        throw std::invalid_argument(
+            "Extent value exceeds maximum int value for Eigen mapping.");
+    }
+
+    return static_cast<Eigen::Index>(ext);
+}
+
+template <typename Layout, int Rows, int Cols>
+consteval int get_storage_option() {
+    if constexpr (Rows == 1 && Cols != 1) {
+        return Eigen::RowMajor;
+
+    } else if constexpr (Cols == 1 && Rows != 1) {
+        return Eigen::ColMajor;
+
+    } else if constexpr (std::same_as<Layout, core::stdex::layout_right>) {
+        return Eigen::RowMajor;
+
+    } else {
+        return Eigen::ColMajor;
+    }
+}
+
+template <typename T> consteval bool evaluate_eigen_mappable() {
+    using mds_t = core::to_mdspan_t<T>;
+
+    if constexpr (!mdspan_c<mds_t>) {
+        return false;
+
+    } else {
+        return (std::same_as<typename mds_t::layout_type,
+                             core::stdex::layout_right> ||
+                std::same_as<typename mds_t::layout_type,
+                             core::stdex::layout_left>) &&
+               mds_t::rank() == 2 && mds_t::is_always_unique() &&
+               mds_t::is_always_exhaustive() && mds_t::is_always_strided();
+    }
+}
+
+template <typename T, typename = void>
+struct is_eigen_mappable_impl : std::false_type {};
+
+template <typename T>
+struct is_eigen_mappable_impl<T, std::void_t<core::to_mdspan_t<T>>>
+    : std::bool_constant<evaluate_eigen_mappable<T>()> {};
 
 } // namespace detail
 
 template <typename T>
-concept eigen_mappable_mdspan_c =
-    (md_c<T> &&
-     (std::is_same_v<typename std::remove_cvref_t<T>::layout_type,
-                     layout_right> ||
-      std::is_same_v<typename std::remove_cvref_t<T>::layout_type,
-                     layout_left>) &&
-     std::remove_cvref_t<T>::rank() == 2 &&
-     std::remove_cvref_t<T>::is_always_unique() &&
-     std::remove_cvref_t<T>::is_always_exhaustive() &&
-     std::remove_cvref_t<T>::is_always_strided());
+struct is_eigen_mappable
+    : detail::is_eigen_mappable_impl<std::remove_cvref_t<T>> {};
 
-template <typename in_t>
-[[nodiscard]] inline constexpr auto to_eigen(in_t &&in) noexcept {
-    static_assert(eigen_mappable_mdspan_c<in_t>,
-                  "Input mdspan is not eigen mappable");
+template <typename T>
+inline constexpr bool is_eigen_mappable_v = is_eigen_mappable<T>::value;
 
+template <typename T>
+concept eigen_mappable_c = is_eigen_mappable_v<T>;
+
+template <eigen_mappable_c in_t> [[nodiscard]] auto to_eigen(in_t &&in) {
     const auto in_mds = core::to_mdspan(std::forward<in_t>(in));
-    using in_mds_t = decltype(in_mds);
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
 
-    using Scalar = typename in_mds_t::element_type;
-    using Lay = typename in_mds_t::layout_type;
+    constexpr int static_rows =
+        detail::to_eigen_static_extent<in_mds_t::static_extent(0)>();
 
-    constexpr int RowsAtCompileTime =
-        detail::ext_to_dyn(in_mds_t::static_extent(0));
+    constexpr int static_cols =
+        detail::to_eigen_static_extent<in_mds_t::static_extent(1)>();
 
-    constexpr int ColsAtCompileTime =
-        detail::ext_to_dyn(in_mds_t::static_extent(1));
+    constexpr auto option =
+        detail::get_storage_option<typename in_mds_t::layout_type, static_rows,
+                                   static_cols>();
 
-    constexpr auto Options = []() {
-        if constexpr (ColsAtCompileTime == 1 && RowsAtCompileTime != 1) {
-            return Eigen::ColMajor;
+    const Eigen::Index rows = detail::to_eigen_extent(in_mds.extent(0));
+    const Eigen::Index cols = detail::to_eigen_extent(in_mds.extent(1));
 
-        } else if constexpr (std::is_same_v<Lay, layout_right>) {
-            return Eigen::RowMajor;
+    using matrix_t = Eigen::Matrix<typename in_mds_t::value_type, static_rows,
+                                   static_cols, option>;
 
-        } else if constexpr (std::is_same_v<Lay, layout_left>) {
-            return Eigen::ColMajor;
+    using mapped_matrix_t =
+        std::conditional_t<std::is_const_v<typename in_mds_t::element_type>,
+                           const matrix_t, matrix_t>;
 
-        } else {
-            static_assert(false, "Invalid layout type for Eigen mapping");
-        }
-    }();
-
-    const int Rows = detail::ext_to_dyn(in_mds.extent(0));
-    const int Cols = detail::ext_to_dyn(in_mds.extent(1));
-
-    using eigen_t = std::conditional_t<
-        std::is_const_v<Scalar>,
-        const Eigen::Matrix<std::remove_const_t<Scalar>, RowsAtCompileTime,
-                            ColsAtCompileTime, Options>,
-        Eigen::Matrix<Scalar, RowsAtCompileTime, ColsAtCompileTime, Options>>;
-
-    return Eigen::Map<eigen_t>{in_mds.data_handle(), Rows, Cols};
+    return Eigen::Map<mapped_matrix_t, Eigen::Unaligned>{in_mds.data_handle(),
+                                                         rows, cols};
 }
 
-} // namespace eigen
-} // namespace core
-} // namespace mdtensor
-
-#endif // MDTENSOR_USE_EIGEN
+} // namespace mdtensor::core::eigen

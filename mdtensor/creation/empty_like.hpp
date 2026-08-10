@@ -13,28 +13,12 @@
 
 namespace mdtensor {
 
-/**
- * @brief Create an uninitialized tensor with the same shape as the input.
- *
- * @tparam dtype (optional) Element type of the result. If void, the value type
- *         is deduced from the input.
- *
- * @param in Input tensor-like object (mdspan, mdarray, etc.).
- *
- * @return A new tensor allocated with the same extents as `in`.
- *
- * @note This function does not initialize memory. Use `zeros_like` or
- *       `full_like` if initialization is required.
- *
- * @see mdtensor::empty for creating an uninitialized tensor from explicit
- * extents.
- */
-template <typename dtype = void, typename in_t>
-[[nodiscard]] inline constexpr auto empty_like(in_t &&in) noexcept {
-    using value_t = std::conditional_t<std::is_void_v<dtype>,
-                                       core::value_type_t<in_t>, dtype>;
+template <typename dtype = void>
+[[nodiscard]] constexpr auto empty_like(auto &&in) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+    using value_t = core::output_value_t<dtype, decltype(in_mds)>;
+
     return empty<value_t>(in_mds.extents());
 }
 

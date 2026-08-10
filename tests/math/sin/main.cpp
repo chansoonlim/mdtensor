@@ -1,47 +1,64 @@
-#include <numbers>
+/**
+ * @file
+ * @brief test
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
 
 #include <gtest/gtest.h>
 
-#include "mdtensor/logic/allclose.hpp"
-#include "mdtensor/math/sin.hpp"
+#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#include "mdtensor.hpp"
+#else
+#include "mdtensor/mdtensor.hpp"
+#endif
 
 namespace md = mdtensor;
 
+TEST(run_time, 1) {
+    using value_t = double;
+
+    ASSERT_EQ(md::sin(std::numbers::pi_v<value_t> / value_t{2}), 1);
+}
+
+TEST(run_time, 2) {
+    using value_t = double;
+    using index_t = std::size_t;
+
+    const auto x = md::deg2rad(md::container<value_t, md::dims<1>>{
+        {0, 30, 45, 60, 90}, md::dims<1>{5}});
+    const auto x_sin = md::sin(x);
+
+    std::cout << "x_sin: " << md::to_string(x_sin) << std::endl;
+
+    ASSERT_TRUE(
+        md::allclose(x_sin, md::container<value_t, md::extents<index_t, 5>>{
+                                {0, 0.5, 0.70710678, 0.8660254, 1}}));
+}
+
 #ifdef REAL_GCC
 
-TEST(stack, negative) {
-    using T = float;
+TEST(compile_time, 1) {
+    using value_t = double;
 
-    constexpr auto a = md::mdarray<T, md::extents<size_t, 4>>{
-        {0, std::numbers::pi_v<T> / 4., std::numbers::pi_v<T> / 2.,
-         std::numbers::pi_v<T>}};
-    constexpr auto b = md::sin(a);
+    static_assert(md::sin(std::numbers::pi_v<value_t> / value_t{2}) == 1);
+}
 
-    constexpr bool is_allclose =
-        md::allclose(b,
-                     md::mdarray<T, md::extents<size_t, 4>>{
-                         {0.000000, 0.707107, 1.000000, -0.000000}},
-                     0, 1e-5);
+TEST(compile_time, 2) {
+    using value_t = double;
+    using index_t = std::size_t;
 
-    ASSERT_TRUE(is_allclose);
+    constexpr auto x = md::deg2rad(
+        md::container<value_t, md::extents<index_t, 5>>{{0, 30, 45, 60, 90}});
+    constexpr auto x_sin = md::sin(x);
+
+    std::cout << "x_sin: " << md::to_string(x_sin) << std::endl;
+
+    static_assert(
+        md::allclose(x_sin, md::container<value_t, md::extents<index_t, 5>>{
+                                {0, 0.5, 0.70710678, 0.8660254, 1}}));
 }
 
 #endif
-
-TEST(heap, negative) {
-    using T = double;
-
-    const auto a = md::mdarray<T, md::dims<1>>{{0, std::numbers::pi_v<T> / 4.,
-                                                std::numbers::pi_v<T> / 2.,
-                                                std::numbers::pi_v<T>},
-                                               md::dims<1>{4}};
-    const auto b = md::sin(a);
-
-    const bool is_allclose =
-        md::allclose(b,
-                     md::mdarray<T, md::extents<size_t, 4>>{
-                         {0.000000, 0.707107, 1.000000, -0.000000}},
-                     0, 1e-5);
-
-    ASSERT_TRUE(is_allclose);
-}

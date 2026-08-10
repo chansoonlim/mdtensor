@@ -2,17 +2,20 @@
     "configurations": [
         {
             "name": "Linux",
+            "compilerPath": "/usr/bin/g++",
             "includePath": [
-                "${workspaceFolder}/**",
-                "bazel-bin/external/**",
-                "bazel-mdtensor/external/**",
+                "${workspaceFolder}",
+                "${workspaceFolder}/bazel-mdtensor/external/+_repo_rules+mdspan/include",
+                "${workspaceFolder}/bazel-mdtensor/external/eigen+",
+                "${workspaceFolder}/bazel-mdtensor/external/googletest+/googletest/include",
+                "${workspaceFolder}/bazel-mdtensor/external/google_benchmark+/include"
             ],
             "defines": [],
-            "compilerPath": "/usr/bin/gcc",
-            "cStandard": "c23",
-            "cppStandard": "gnu++23",
+            "cStandard": "c17",
+            "cppStandard": "c++20",
             "intelliSenseMode": "linux-gcc-x64"
         }
     ],
-    "version": 4
+    "version": 4,
+    "enableConfigurationSquiggles": true
 }

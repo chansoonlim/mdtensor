@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief String utilities header aggregator for mdtensor.
+ * @brief Miscellaneous utility functions for mdtensor.
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -9,4 +9,5 @@
 
 #pragma once
 
-#include "to_string.hpp"
+#include "broadcast_extents.hpp"
+#include "fill.hpp"

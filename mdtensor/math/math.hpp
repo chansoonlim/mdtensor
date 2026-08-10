@@ -21,6 +21,8 @@
 #include "min.hpp"
 #include "minimum.hpp"
 #include "multiply.hpp"
+#include "nanmax.hpp"
+#include "nanmin.hpp"
 #include "negative.hpp"
 #include "rad2deg.hpp"
 #include "sign.hpp"
