@@ -9,7 +9,7 @@
 
 #include <gtest/gtest.h>
 
-#ifdef MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_ // for single header include
+#ifdef MDTENSOR_USE_SINGLE_HEADER // for single header include
 #include "mdtensor.hpp"
 #else
 #include "mdtensor/mdtensor.hpp"
