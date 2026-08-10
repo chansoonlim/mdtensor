@@ -9,8 +9,8 @@ It is built on modern C++ standard facilities including:
 - Upcoming C++26 [std::mdarray](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1684r2.html) and [std::submdspan](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2630r4.html).
 
 Try it on Godbolt:
-  - [Matrix Addition example](https://godbolt.org/z/s6x5hc51r).
-  - [Zero-cost Abstraction test](https://godbolt.org/z/e68xzoE1Y).
+  - [Matrix Addition example](https://godbolt.org/z/cYea11TK4).
+  - [Zero-cost Abstraction test](https://godbolt.org/z/3YYa1eraz).
 
 ## Key Features
 
@@ -68,28 +68,32 @@ mdtensor is a header-only library, so you can start using it by simply including
 
   Code:
   ```cpp
+  #include <iostream>
+
   #include "mdtensor/mdtensor.hpp"
 
   namespace md = mdtensor;
 
-  constexpr auto a = md::full<int>(md::extents<std::size_t, 3, 1, 2>{}, 1);
-  constexpr auto b = md::full<int>(md::extents<std::size_t, 2, 1>{}, 2);
-  constexpr auto c = md::add(a, b);
+  int main() {
+      constexpr auto a = md::full<int>(md::extents<std::size_t, 3, 1, 2>{}, 1);
+      constexpr auto b = md::full<int>(md::extents<std::size_t, 2, 1>{}, 2);
+      constexpr auto c = md::add(a, b);
 
-  constexpr auto c_expect = md::full<int>(md::extents<std::size_t, 3, 2, 2>{}, 3);
+      constexpr auto c_expect = md::full<int>(md::extents<std::size_t, 3, 2, 2>{}, 3);
 
-  constexpr bool is_allclose = md::allclose(c, c_expect);
+      constexpr bool is_allclose = md::allclose(c, c_expect);
 
-  std::cout << "a extents: " << md::to_string(a.extents()) << std::endl;
-  std::cout << "a: " << md::to_string(a) << std::endl << std::endl;
+      std::cout << "a extents: " << md::to_string(a.extents()) << std::endl;
+      std::cout << "a: " << md::to_string(a) << std::endl << std::endl;
 
-  std::cout << "b extents: " << md::to_string(b.extents()) << std::endl;
-  std::cout << "b: " << md::to_string(b) << std::endl << std::endl;
+      std::cout << "b extents: " << md::to_string(b.extents()) << std::endl;
+      std::cout << "b: " << md::to_string(b) << std::endl << std::endl;
 
-  std::cout << "c extents: " << md::to_string(c.extents()) << std::endl;
-  std::cout << "c: " << md::to_string(c) << std::endl;
+      std::cout << "c extents: " << md::to_string(c.extents()) << std::endl;
+      std::cout << "c: " << md::to_string(c) << std::endl;
 
-  static_assert(is_allclose);
+      static_assert(is_allclose);
+  }
   ```
 
   Output:
