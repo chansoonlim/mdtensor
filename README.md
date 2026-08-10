@@ -8,10 +8,6 @@ It is built on modern C++ standard facilities including:
 - C++23 [std::mdspan](https://en.cppreference.com/w/cpp/container/mdspan).
 - Upcoming C++26 [std::mdarray](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1684r2.html) and [std::submdspan](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2630r4.html).
 
-Try it on Godbolt:
-  - [Matrix Addition example](https://godbolt.org/z/cYea11TK4).
-  - [Zero-cost Abstraction test](https://godbolt.org/z/3YYa1eraz).
-
 ## Key Features
 
 - **NumPy-like Syntax**: Familiar tensor programming model inspired by NumPy.
@@ -55,7 +51,7 @@ Try it on Godbolt:
 - **Other**: [broadcast_extents](mdtensor/util/broadcast_extents.hpp), [fill](mdtensor/util/fill.hpp).
 
 
-## Installation
+## Setup
 mdtensor is a header-only library, so you can start using it by simply including:
   ```cpp
   #include "mdtensor/mdtensor.hpp"
@@ -64,8 +60,7 @@ mdtensor is a header-only library, so you can start using it by simply including
 
 ## Examples
 
-### Matrix Addition with Broadcasting
-
+### 1. Matrix Addition with Broadcasting ([Run this code on Godbolt 😃](https://godbolt.org/z/cYea11TK4))
   Code:
   ```cpp
   #include <iostream>
@@ -118,6 +113,10 @@ Benchmarks use [GoogleBenchmark](https://github.com/google/benchmark). For examp
   ```bash
   bazel run benchmarks/add/none:ps
   ```
+
+Also supports godbolt test pages:
+  - [Matrix Addition example](https://godbolt.org/z/cYea11TK4).
+  - [Zero-cost Abstraction test](https://godbolt.org/z/3YYa1eraz).
 
 ## About
 This project includes derivative works based on:
