@@ -15,28 +15,6 @@ namespace std::experimental {
  */
 
 
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/creation/creation.hpp
-/**
- * @file
- * @brief Creation module header aggregation for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/creation/arange.hpp
-/**
- * @file
- * @brief Range generation utilities for mdtensor (arange).
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/core.hpp
 /**
  * @file
@@ -48,12 +26,21 @@ namespace std::experimental {
  */
 
 
-#include <cmath>
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/batch.hpp
+/**
+ * @file
+ * @brief Batch utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
 
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/broadcast.hpp
 /**
  * @file
- * @brief Broadcasting utilities for mdtensor.
+ * @brief Broadcast utilities for mdtensor.
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -61,14 +48,10 @@ namespace std::experimental {
  */
 
 
-#include <algorithm>
-#include <optional>
-#include <tuple>
-
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/submdspan.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/extents.hpp
 /**
  * @file
- * @brief Submdspan utilities for mdtensor.
+ * @brief Extents utilities for mdtensor.
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -76,10 +59,21 @@ namespace std::experimental {
  */
 
 
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/convert.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/util.hpp
 /**
  * @file
- * @brief Conversion utilities for mdtensor.
+ * @brief Other utility functions for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/mdspan.hpp
+/**
+ * @file
+ * @brief Mdspan utilities for mdtensor.
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -98,74 +92,106 @@ namespace std::experimental {
  */
 
 
+#include <algorithm>
+#include <array>
+#include <charconv>
+#include <cmath>
 #include <concepts>
+#include <cstddef>
+#include <cstdint>
+#include <iomanip>
+#include <limits>
+#include <numbers>
+#include <optional>
+#include <sstream>
+#include <stdexcept>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
-#ifndef MDSPAN_SINGLE_HEADER_INCLUDE_GUARD_ // NOTE: for godbolt test
+// TODO: Remove when C++23 std::mdspan supports
+#ifndef MDSPAN_SINGLE_HEADER_INCLUDE_GUARD_ // for godbolt test
 #include <experimental/mdarray>
-#include <experimental/mdspan> // TODO: Remove when C++23 std::mdspan supports
+#include <experimental/mdspan>
 #endif
 
-namespace std::experimental {
-
-// dims: will be included in C++23
-// (https://en.cppreference.com/w/cpp/container/mdspan/extents)
-template <size_t Rank, class IndexType = size_t>
-using dims = dextents<IndexType, Rank>;
-
-static_assert(dynamic_extent == std::dynamic_extent);
-
-constexpr auto dyn = dynamic_extent;
-
-} // namespace std::experimental
-
 namespace mdtensor {
-
-using namespace std::experimental;
 
 #if defined(__GNUC__) && !defined(__llvm__) && !defined(__INTEL_COMPILER)
 #define REAL_GCC __GNUC__ // probably
 #endif
 
-// ----------------------------------------------------------------------
+// TODO: modify under define
+#if defined(_OPENMP) && defined(REAL_GCC)
+#define MDTENSOR_USE_OPENMP
+#endif
+
+namespace core {
+
+namespace stdex = std::experimental;
+
+// ------------------------------------------------------------------
+// - general type aliases -------------------------------------------
+// ------------------------------------------------------------------
 
 template <typename T>
-concept arithmetic_c = std::is_arithmetic_v<std::remove_cvref_t<T>>;
-
-// ----------------------------------------------------------------------
-
-namespace detail {
-
-template <typename T> struct is_extents_impl : std::false_type {};
-
-template <typename IndexType, size_t... Extents>
-struct is_extents_impl<std::experimental::extents<IndexType, Extents...>>
-    : std::true_type {};
-
-} // namespace detail
+concept integral_c = std::integral<std::remove_cvref_t<T>>;
 
 template <typename T>
-struct is_extents : detail::is_extents_impl<std::remove_cvref_t<T>> {};
+concept unsigned_integral_c = std::unsigned_integral<std::remove_cvref_t<T>>;
+
+template <typename T>
+concept floating_point_c = std::floating_point<std::remove_cvref_t<T>>;
+
+template <typename T>
+concept arithmetic = std::integral<std::remove_cvref_t<T>> ||
+                     std::floating_point<std::remove_cvref_t<T>>;
+
+template <typename T>
+concept arithmetic_c = arithmetic<std::remove_cvref_t<T>>;
+
+// ------------------------------------------------------------------
+// - extents type aliases -------------------------------------------
+// ------------------------------------------------------------------
+
+template <typename IndexType, std::size_t... Extents>
+using extents = stdex::extents<IndexType, Extents...>;
+
+template <typename IndexType, std::size_t Rank>
+using dextents = stdex::dextents<IndexType, Rank>;
+
+#if false
+// dims: will be included in C++23
+// (https://en.cppreference.com/w/cpp/container/mdspan/extents)
+template <std::size_t Rank, class IndexType = std::size_t>
+using dims = stdex::dims<IndexType, Rank>;
+
+#else
+template <std::size_t Rank, class IndexType = std::size_t>
+using dims = stdex::dextents<IndexType, Rank>;
+
+#endif
+
+template <typename T> struct is_extents : stdex::detail::__is_extents<T> {};
 
 template <typename T> constexpr bool is_extents_v = is_extents<T>::value;
 
 template <typename T>
-concept extents_c = is_extents_v<T>;
-
-// ----------------------------------------------------------------------
+concept extents_c = is_extents_v<std::remove_cvref_t<T>>;
 
 namespace detail {
 
 template <typename T> struct is_extents_tuple_impl : std::false_type {};
 
-template <typename... ExtentsTypes>
-struct is_extents_tuple_impl<std::tuple<ExtentsTypes...>>
-    : std::conjunction<is_extents<ExtentsTypes>...> {};
+template <typename... Ts>
+struct is_extents_tuple_impl<std::tuple<Ts...>>
+    : std::conjunction<is_extents<std::remove_cvref_t<Ts>>...> {};
 
 } // namespace detail
 
 template <typename T>
-struct is_extents_tuple
-    : detail::is_extents_tuple_impl<std::remove_cvref_t<T>> {};
+struct is_extents_tuple : detail::is_extents_tuple_impl<T> {};
 
 template <typename T>
 constexpr bool is_extents_tuple_v = is_extents_tuple<T>::value;
@@ -173,12 +199,18 @@ constexpr bool is_extents_tuple_v = is_extents_tuple<T>::value;
 template <typename T>
 concept extents_tuple_c = is_extents_tuple_v<T>;
 
-// ----------------------------------------------------------------------
+constexpr auto dynamic_extent = stdex::dynamic_extent;
+constexpr auto dyn = dynamic_extent;
 
-template <typename T>
-concept extents_info_c = extents_c<T> || extents_tuple_c<T>;
+// ------------------------------------------------------------------
+// - mdspan type aliases --------------------------------------------
+// ------------------------------------------------------------------
 
-// ----------------------------------------------------------------------
+template <typename ElementType, typename Extents,
+          typename LayoutPolicy = stdex::layout_right,
+          typename AccessorPolicy = stdex::default_accessor<ElementType>>
+using mdspan =
+    stdex::mdspan<ElementType, Extents, LayoutPolicy, AccessorPolicy>;
 
 namespace detail {
 
@@ -186,27 +218,29 @@ template <typename T> struct is_mdspan_impl : std::false_type {};
 
 template <typename ElementType, typename ExtentsType, typename LayoutType,
           typename AccessorType>
-struct is_mdspan_impl<std::experimental::mdspan<ElementType, ExtentsType,
-                                                LayoutType, AccessorType>>
+struct is_mdspan_impl<
+    mdspan<ElementType, ExtentsType, LayoutType, AccessorType>>
     : std::true_type {};
 
 } // namespace detail
 
-template <typename T>
-struct is_mdspan : detail::is_mdspan_impl<std::remove_cvref_t<T>> {};
+template <typename T> struct is_mdspan : detail::is_mdspan_impl<T> {};
 
 template <typename T> constexpr bool is_mdspan_v = is_mdspan<T>::value;
 
 template <typename T>
-concept mdspan_c = requires {
-    typename std::remove_cvref_t<T>::value_type;
-    typename std::remove_cvref_t<T>::element_type;
-    typename std::remove_cvref_t<T>::extents_type;
-    typename std::remove_cvref_t<T>::layout_type;
-    typename std::remove_cvref_t<T>::accessor_type;
-} && is_mdspan_v<T>;
+concept mdspan_c = is_mdspan_v<std::remove_cvref_t<T>>;
 
-// ----------------------------------------------------------------------
+constexpr auto full_extent = stdex::full_extent;
+
+// ------------------------------------------------------------------
+// - mdarray type aliases ------------------------------------------
+// ------------------------------------------------------------------
+
+template <typename ElementType, typename Extents,
+          typename LayoutPolicy = stdex::layout_right,
+          typename Container = std::vector<ElementType>>
+using mdarray = stdex::mdarray<ElementType, Extents, LayoutPolicy, Container>;
 
 namespace detail {
 
@@ -214,155 +248,121 @@ template <typename T> struct is_mdarray_impl : std::false_type {};
 
 template <typename ElementType, typename ExtentsType, typename LayoutType,
           typename ContainerType>
-struct is_mdarray_impl<std::experimental::mdarray<ElementType, ExtentsType,
-                                                  LayoutType, ContainerType>>
+struct is_mdarray_impl<
+    mdarray<ElementType, ExtentsType, LayoutType, ContainerType>>
     : std::true_type {};
 
 } // namespace detail
 
-template <typename T>
-struct is_mdarray : detail::is_mdarray_impl<std::remove_cvref_t<T>> {};
+template <typename T> struct is_mdarray : detail::is_mdarray_impl<T> {};
 
 template <typename T> constexpr bool is_mdarray_v = is_mdarray<T>::value;
 
 template <typename T>
-concept mdarray_c = is_mdarray_v<T>;
+concept mdarray_c = is_mdarray_v<std::remove_cvref_t<T>>;
 
-// ----------------------------------------------------------------------
+// ------------------------------------------------------------------
+// - backend type aliases ---------------------------------------------
+// ------------------------------------------------------------------
 
-template <typename T> constexpr bool is_md_v = mdspan_c<T> || mdarray_c<T>;
+enum class Backend {
+    AUTO,   // Automatically select backend based on input types and sizes
+    NATIVE, // Native mdtensor implementation
+    SIMD,   // SIMD parallelization
 
-template <typename T>
-concept md_c = is_md_v<T>;
+#ifdef MDTENSOR_USE_EIGEN
+    EIGEN, // Eigen backend
+#endif
 
-// ----------------------------------------------------------------------
-
-namespace core {
-
-template <extents_c exts_t>
-[[nodiscard]] inline constexpr size_t
-static_size(const exts_t &exts = exts_t{}) noexcept {
-    if constexpr (exts_t::rank() == 0) {
-        return 0;
-
-    } else if constexpr (exts_t::rank_dynamic() == 0) {
-        return []<size_t... Is>(std::index_sequence<Is...>) {
-            return (exts_t::static_extent(Is) * ...);
-        }(std::make_index_sequence<exts_t::rank()>{});
-
-    } else {
-        return dyn;
-    }
-}
-
-template <extents_c exts_t>
-[[nodiscard]] inline constexpr size_t
-size(const exts_t &exts = exts_t{}) noexcept {
-    if constexpr (exts_t::rank() == 0) {
-        return 0;
-
-    } else if constexpr (exts_t::rank_dynamic() == 0) {
-        return []<size_t... Is>(std::index_sequence<Is...>) {
-            return (exts_t::static_extent(Is) * ...);
-        }(std::make_index_sequence<exts_t::rank()>{});
-
-    } else {
-        return [&exts]<size_t... Is>(std::index_sequence<Is...>) {
-            return (exts.extent(Is) * ...);
-        }(std::make_index_sequence<exts_t::rank()>{});
-    }
-}
-
-template <extents_c in_t>
-[[nodiscard]] inline constexpr bool same(const in_t &in = in_t{}) noexcept {
-    return true;
-}
-
-template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
-[[nodiscard]] inline constexpr bool same(const in1_t &in1 = in1_t{},
-                                         const in2_t &in2 = in2_t{},
-                                         const ins_t &...ins) noexcept {
-    if constexpr (in1_t::rank() != in2_t::rank()) {
-        return false;
-
-    } else if constexpr (in1_t::rank_dynamic() == 0 &&
-                         in2_t::rank_dynamic() == 0 &&
-                         []<size_t... Is>(std::index_sequence<Is...>) {
-                             return ((in1_t::static_extent(Is) !=
-                                      in2_t::static_extent(Is)) ||
-                                     ...);
-                         }(std::make_index_sequence<in1_t::rank()>{})) {
-        return false;
-
-    } else {
-        for (size_t i = 0; i < in1_t::rank(); i++) {
-            if (static_cast<size_t>(in1.extent(i)) !=
-                static_cast<size_t>(in2.extent(i))) {
-                return false;
-            }
-        }
-    }
-
-    if constexpr (sizeof...(ins_t) != 0) {
-        return same(in2, ins...);
-
-    } else {
-        return true;
-    }
-}
-
-// ----------------------------------------------------------------------
+#ifdef MDTENSOR_USE_OPENMP
+    OPENMP, // CPU multi-processing with OpenMP
+#endif
+};
 
 namespace detail {
 
-template <typename T, typename = void> struct value_type_t_impl {
-    using type = std::remove_cvref_t<T>;
-};
+template <typename T> struct is_backend_impl : std::false_type {};
 
-template <typename T>
-struct value_type_t_impl<
-    T, std::void_t<typename std::remove_cvref_t<T>::value_type>> {
-    using type = typename std::remove_cvref_t<T>::value_type;
-};
+template <> struct is_backend_impl<Backend> : std::true_type {};
 
 } // namespace detail
 
-template <typename T>
-using value_type_t = typename detail::value_type_t_impl<T>::type;
+template <typename T> struct is_backend : detail::is_backend_impl<T> {};
 
-// ----------------------------------------------------------------------
+template <typename T> constexpr bool is_backend_v = is_backend<T>::value;
+
+template <typename T>
+concept backend_c = is_backend_v<std::remove_cvref_t<T>>;
+
+// ------------------------------------------------------------------
+// - copy type aliases ----------------------------------------------
+// ------------------------------------------------------------------
+
+enum class Copy : std::uint8_t {
+    TRUE,  // Copy the input tensor to a new tensor
+    FALSE, // Do not copy the input tensor; return a view of the input tensor
+    AUTO,  // Automatically determine whether to copy or not based on input
+};
+
+// ------------------------------------------------------------------
+// - strided_slice type aliases -------------------------------------
+// ------------------------------------------------------------------
+
+template <std::size_t start, std::size_t end>
+using slice =
+    stdex::strided_slice<std::integral_constant<std::size_t, start>,
+                         std::integral_constant<std::size_t, end - start>,
+                         std::integral_constant<std::size_t, 1>>;
+
+// ------------------------------------------------------------------
+// - is_nullopt_t type aliases --------------------------------------
+// ------------------------------------------------------------------
+
+namespace detail {
+
+template <typename T> struct is_nullopt_impl : std::false_type {};
+
+template <> struct is_nullopt_impl<std::nullopt_t> : std::true_type {};
+
+} // namespace detail
+
+template <typename T> struct is_nullopt_t : detail::is_nullopt_impl<T> {};
+
+template <typename T> constexpr bool is_nullopt_t_v = is_nullopt_t<T>::value;
+
+template <typename T>
+concept is_nullopt_t_c = is_nullopt_t_v<std::remove_cvref_t<T>>;
+
+// ------------------------------------------------------------------
+// - common_index_type_t helpers ------------------------------------
+// ------------------------------------------------------------------
 
 namespace detail {
 
 template <std::size_t Size> struct signed_by_size;
 
 template <> struct signed_by_size<1> {
-    using type = int8_t;
+    using type = std::int8_t;
 };
 
 template <> struct signed_by_size<2> {
-    using type = int16_t;
+    using type = std::int16_t;
 };
 
 template <> struct signed_by_size<4> {
-    using type = int32_t;
+    using type = std::int32_t;
 };
 
 template <> struct signed_by_size<8> {
-    using type = int64_t;
+    using type = std::int64_t;
 };
 
 template <std::size_t Size>
 using signed_by_size_t = typename signed_by_size<Size>::type;
 
 template <typename T>
-inline constexpr bool valid_extent_index_v =
-    std::integral<std::remove_cvref_t<T>> &&
-    !std::same_as<std::remove_cvref_t<T>, bool> &&
-    (sizeof(std::remove_cvref_t<T>) == 1 ||
-     sizeof(std::remove_cvref_t<T>) == 2 ||
-     sizeof(std::remove_cvref_t<T>) == 4 ||
-     sizeof(std::remove_cvref_t<T>) == 8);
+constexpr bool valid_extent_index_v =
+    integral_c<T> && !std::same_as<std::remove_cvref_t<T>, bool>;
 
 template <typename... Ts> struct common_index_type_impl {
     // no type
@@ -424,52 +424,23 @@ template <typename... Ts>
 using common_index_type_t =
     typename detail::common_index_type_impl<Ts...>::type;
 
-// ----------------------------------------------------------------------
+// ------------------------------------------------------------------
+// - common_data_type_t helpers -------------------------------------
+// ------------------------------------------------------------------
 
 namespace detail {
 
-template <typename T> struct unwrap_optional {
-    using type = std::remove_cvref_t<T>;
-};
+template <typename T>
+constexpr bool data_bool_v = std::same_as<std::remove_cvref_t<T>, bool>;
 
-template <typename T> struct unwrap_optional<std::optional<T>> {
-    using type = std::remove_cvref_t<T>;
-};
+template <typename T> constexpr bool data_fpoint_v = floating_point_c<T>;
 
 template <typename T>
-using data_arg_t = typename unwrap_optional<std::remove_cvref_t<T>>::type;
-
-template <typename... Ts> struct filter_nullopt;
-
-template <> struct filter_nullopt<> {
-    using type = std::tuple<>;
-};
-
-template <typename T, typename... Ts> struct filter_nullopt<T, Ts...> {
-  private:
-    using arg_t = data_arg_t<T>;
-    using tail_t = typename filter_nullopt<Ts...>::type;
-
-  public:
-    using type = std::conditional_t<
-        std::same_as<std::remove_cvref_t<T>, std::nullopt_t>, tail_t,
-        decltype(std::tuple_cat(std::declval<std::tuple<arg_t>>(),
-                                std::declval<tail_t>()))>;
-};
-
-template <typename T>
-inline constexpr bool data_bool_v = std::same_as<std::remove_cvref_t<T>, bool>;
-
-template <typename T>
-inline constexpr bool data_fpoint_v =
-    std::floating_point<std::remove_cvref_t<T>>;
-
-template <typename T>
-inline constexpr bool data_integer_v =
+constexpr bool data_integer_v =
     std::integral<std::remove_cvref_t<T>> && !data_bool_v<T>;
 
 template <typename T>
-inline constexpr bool data_scalar_v =
+constexpr bool data_scalar_v =
     data_bool_v<T> || data_integer_v<T> || data_fpoint_v<T>;
 
 template <typename T1, typename T2> struct common_data_pair_impl {
@@ -497,7 +468,7 @@ struct common_data_pair_impl<T, B> {
     using type = std::remove_cvref_t<T>;
 };
 
-// floating + something -> floating
+// floating + scalar -> floating
 template <typename T1, typename T2>
     requires(!data_bool_v<T1> && !data_bool_v<T2> && data_scalar_v<T1> &&
              data_scalar_v<T2> && (data_fpoint_v<T1> || data_fpoint_v<T2>))
@@ -546,902 +517,992 @@ template <typename T1, typename T2, typename... Ts>
                                        std::remove_cvref_t<T2>>::type;
     }
 struct data_promote_impl<T1, T2, Ts...> {
-  public:
-    using type = typename data_promote_impl<
+  private:
+    using pair_t =
         typename common_data_pair_impl<std::remove_cvref_t<T1>,
-                                       std::remove_cvref_t<T2>>::type,
-        Ts...>::type;
-};
+                                       std::remove_cvref_t<T2>>::type;
 
-template <typename Tuple> struct common_data_type_impl {
-    // no type
+  public:
+    using type = typename data_promote_impl<pair_t, Ts...>::type;
 };
-
-template <typename... Ts>
-struct common_data_type_impl<std::tuple<Ts...>> : data_promote_impl<Ts...> {};
 
 } // namespace detail
 
 template <typename... Ts>
-using common_data_type_t = typename detail::common_data_type_impl<
-    typename detail::filter_nullopt<Ts...>::type>::type;
-
-// ----------------------------------------------------------------------
+    requires(sizeof...(Ts) > 0 && (detail::data_scalar_v<Ts> && ...))
+using common_data_type_t = typename detail::data_promote_impl<Ts...>::type;
 
 } // namespace core
-
-template <typename T, extents_c extent_t>
-using mdarray = std::conditional_t<
-    extent_t::rank_dynamic() == 0,
-    std::experimental::mdarray<T, extent_t, layout_right,
-                               std::array<T, core::static_size<extent_t>()>>,
-    std::experimental::mdarray<T, extent_t, layout_right, std::vector<T>>>;
-
-template <size_t start, size_t end>
-using slice = std::experimental::strided_slice<
-    std::integral_constant<size_t, start>,
-    std::integral_constant<size_t, end - start>,
-    std::integral_constant<size_t, 1>>;
-
-enum class MPMode : uint8_t {
-    NONE,  // No parallelization
-    SIMD,  // SIMD parallelization
-    CPUMP, // CPU multi-processing with OpenMP
-};
-
 } // namespace mdtensor
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/type.hpp
 
-namespace mdtensor {
-namespace core {
+namespace mdtensor::core {
 
-template <typename in_t>
-[[nodiscard]] inline constexpr auto to_mdspan(in_t &&in) noexcept {
-    using in_base_t = std::remove_reference_t<in_t>;
+[[nodiscard]] constexpr auto to_mdspan(auto &&io) {
+    if constexpr (mdspan_c<decltype(io)>) {
+        // If the input is already an mdspan, just return it as-is
+        return std::forward<decltype(io)>(io);
 
-    if constexpr (mdspan_c<in_base_t>) {
-        return std::forward<in_t>(in);
-
-    } else if constexpr (mdarray_c<in_base_t>) {
-        return in.to_mdspan();
-
-    } else if constexpr (requires { in.to_mdspan(); }) {
-        return in.to_mdspan();
+    } else if constexpr (requires { io.to_mdspan(); }) {
+        // If the input has a to_mdspan() member function, call it
+        return io.to_mdspan();
 
     } else {
-        auto exts = extents<size_t>{};
-        return mdspan<in_base_t, decltype(exts)>{&in, exts};
+        // If the input is not an mdspan,
+        // create a new mdspan that points to the input data
+        using element_t = std::remove_reference_t<decltype(io)>;
+        using extents_t = core::extents<std::uint8_t>;
+
+        return core::mdspan<element_t, extents_t>{std::addressof(io),
+                                                  extents_t{}};
     }
 }
 
-template <md_c in_t>
-[[nodiscard]] inline constexpr auto to_const(in_t &&in) noexcept {
-    using in_base_t = std::remove_reference_t<in_t>;
+[[nodiscard]] constexpr auto to_const_mdspan(auto &&in) {
+    if constexpr (mdspan_c<decltype(in)>) {
+        if constexpr (std::is_const_v<typename std::remove_reference_t<
+                          decltype(in)>::element_type>) {
+            // If the input is already a const mdspan, just return it as-is
+            return std::forward<decltype(in)>(in);
 
-    if constexpr (std::is_const_v<typename in_base_t::element_type>) {
-        return std::forward<in_t>(in);
+        } else {
+            // If the input is a non-const mdspan,
+            // create a new const mdspan with the same data handle and mapping
+            using in_t = std::remove_cvref_t<decltype(in)>;
+
+            return core::mdspan<
+                const typename in_t::value_type, typename in_t::extents_type,
+                typename in_t::layout_type,
+                stdex::default_accessor<const typename in_t::value_type>>(
+                in.data_handle(), in.mapping(), {});
+        }
 
     } else {
-        using element_t = const typename in_base_t::value_type;
+        // If the input is not an mdspan,
+        // create a new const mdspan with the same data handle and mapping
+        auto mds = to_mdspan(std::forward<decltype(in)>(in));
 
-        return mdspan<element_t, typename in_base_t::extents_type,
-                      typename in_base_t::layout_type,
-                      default_accessor<element_t>>(in.data_handle(),
-                                                   in.mapping(), {});
+        using mds_t = std::remove_cvref_t<decltype(mds)>;
+
+        return core::mdspan<
+            const typename mds_t::value_type, typename mds_t::extents_type,
+            typename mds_t::layout_type,
+            stdex::default_accessor<const typename mds_t::value_type>>(
+            mds.data_handle(), mds.mapping(), {});
     }
 }
 
-template <typename in_t>
-[[nodiscard]] inline constexpr auto to_const_mdspan(in_t &&in) noexcept {
-    return to_const(to_mdspan(std::forward<in_t>(in)));
-}
+[[nodiscard]] constexpr auto to_output_mdspan(auto &&out) {
+    if constexpr (mdspan_c<decltype(out)>) {
+        static_assert(
+            !std::is_const_v<
+                typename std::remove_reference_t<decltype(out)>::element_type>,
+            "Output mdspan must not be const");
 
-template <md_c in_t>
-[[nodiscard]] inline constexpr bool is_always_reshapable() noexcept {
-    return in_t::is_always_unique() && in_t::is_always_exhaustive() &&
-           in_t::is_always_strided();
-}
+        // If the output is already an mdspan, just return it as-is
+        return std::forward<decltype(out)>(out);
 
-template <md_c in_t>
-[[nodiscard]] inline constexpr bool is_reshapable(in_t &&in) noexcept {
-    return in.is_unique() && in.is_exhaustive() && in.is_strided();
-}
+    } else {
+        static_assert(std::is_lvalue_reference_v<decltype(out)>,
+                      "Output owners and scalars must be passed as lvalues.");
 
-template <extents_c exts_t, typename in_t>
-[[nodiscard]] inline constexpr auto
-static_reshape(in_t &&in, exts_t &&new_exts = exts_t{}) noexcept {
-    const auto in_mds = to_mdspan(std::forward<in_t>(in));
-    using in_mds_t = decltype(in_mds);
-
-    static_assert(exts_t::rank_dynamic() == 0,
-                  "static_reshape requires static extents.");
-
-    static_assert(in_mds_t::rank_dynamic() == 0,
-                  "static_reshape requires static mdspan.");
-
-    static_assert(is_always_reshapable<in_mds_t>(),
-                  "static_reshape requires always reshapable mdspan.");
-
-    static_assert(core::static_size<typename in_mds_t::extents_type>() ==
-                      core::static_size<exts_t>(),
-                  "static_reshape requires same number of elements.");
-
-    return mdspan<typename in_mds_t::element_type, exts_t>{
-        in_mds.data_handle()};
-}
-
-template <extents_c exts_t, typename in_t>
-[[nodiscard]] inline constexpr auto
-reshape(in_t &&in, exts_t &&new_exts = exts_t{}) noexcept {
-    const auto in_mds = to_mdspan(std::forward<in_t>(in));
-    using in_mds_t = decltype(in_mds);
-
-    assert(is_reshapable(in_mds));
-    assert(core::size(in_mds.extents()) ==
-           core::size(std::forward<exts_t>(new_exts)));
-
-    return mdspan<typename in_mds_t::element_type, std::remove_cvref_t<exts_t>>{
-        in_mds.data_handle(), std::forward<exts_t>(new_exts)};
+        return to_mdspan(std::forward<decltype(out)>(out));
+    }
 }
 
 template <typename T>
 using to_mdspan_t = decltype(to_mdspan(std::declval<T>()));
 
-template <typename T>
-using to_mdcontainer_t =
-    std::conditional_t<to_mdspan_t<T>::rank() == 0,
-                       typename to_mdspan_t<T>::value_type,
-                       mdarray<typename to_mdspan_t<T>::value_type,
-                               typename to_mdspan_t<T>::extents_type>>;
-
-} // namespace core
-} // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/convert.hpp
-
-namespace mdtensor {
-
-template <typename in_t, typename... slices_t>
-[[nodiscard]] inline constexpr auto submdspan(in_t &&in,
-                                              slices_t &&...slices) noexcept {
-    return std::experimental::submdspan(core::to_mdspan(std::forward<in_t>(in)),
-                                        std::forward<slices_t>(slices)...);
+[[nodiscard]] constexpr auto submdspan(auto &&io, auto &&...slices) {
+    return stdex::submdspan(to_mdspan(std::forward<decltype(io)>(io)),
+                            std::forward<decltype(slices)>(slices)...);
 }
 
-namespace core {
-
-template <size_t lspace, size_t rspace, typename in_t, typename... slices_t>
-[[nodiscard]] inline constexpr auto
-submdspan_with_space(in_t &&in, slices_t &&...slices) noexcept {
-    return [&]<size_t... Is, size_t... Js>(std::index_sequence<Is...>,
-                                           std::index_sequence<Js...>) {
-        return submdspan(std::forward<in_t>(in), ((void)Is, full_extent)...,
-                         std::forward<slices_t>(slices)...,
-                         ((void)Js, full_extent)...);
+template <std::size_t lspace = 0, std::size_t rspace = 0>
+[[nodiscard]] constexpr auto submdspan_with_space(auto &&io, auto &&...slices) {
+    return [&]<std::size_t... Is, std::size_t... Js>(
+               std::index_sequence<Is...>, std::index_sequence<Js...>) {
+        return submdspan(to_mdspan(std::forward<decltype(io)>(io)),
+                         ((void)Is, core::full_extent)...,
+                         std::forward<decltype(slices)>(slices)...,
+                         ((void)Js, core::full_extent)...);
     }(std::make_index_sequence<lspace>{}, std::make_index_sequence<rspace>{});
 }
 
-template <size_t lspace = 0, typename in_t, typename... slices_t>
-[[nodiscard]] inline constexpr auto
-submdspan_from_left(in_t &&in, slices_t &&...slices) noexcept {
-    using in_base_t = std::remove_reference_t<in_t>;
+template <std::size_t lspace = 0>
+[[nodiscard]] constexpr auto submdspan_from_left(auto &&io, auto &&...slices) {
+    using base_t = std::remove_reference_t<decltype(io)>;
 
-    constexpr size_t rspace =
-        to_mdspan_t<in_base_t>::rank() - (lspace + sizeof...(slices_t));
-
-    return submdspan_with_space<lspace, rspace>(
-        std::forward<in_t>(in), std::forward<slices_t>(slices)...);
-}
-
-template <size_t rspace = 0, typename in_t, typename... slices_t>
-[[nodiscard]] inline constexpr auto
-submdspan_from_right(in_t &&in, slices_t &&...slices) noexcept {
-    using in_base_t = std::remove_reference_t<in_t>;
-
-    constexpr size_t lspace =
-        to_mdspan_t<in_base_t>::rank() - (rspace + sizeof...(slices_t));
+    constexpr std::size_t rspace =
+        to_mdspan_t<base_t>::rank() - (lspace + sizeof...(slices));
 
     return submdspan_with_space<lspace, rspace>(
-        std::forward<in_t>(in), std::forward<slices_t>(slices)...);
+        std::forward<decltype(io)>(io),
+        std::forward<decltype(slices)>(slices)...);
 }
 
-} // namespace core
-} // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/submdspan.hpp
+template <std::size_t rspace = 0>
+[[nodiscard]] constexpr auto submdspan_from_right(auto &&io, auto &&...slices) {
+    using base_t = std::remove_reference_t<decltype(io)>;
 
-namespace mdtensor {
-namespace core {
+    constexpr std::size_t lspace =
+        to_mdspan_t<base_t>::rank() - (rspace + sizeof...(slices));
 
-template <size_t offset, size_t rank, extents_c in_t>
-[[nodiscard]] inline constexpr auto
-slice_with_offset(in_t &&in = in_t{}) noexcept {
-    using in_base_t = std::remove_cvref_t<in_t>;
+    return submdspan_with_space<lspace, rspace>(
+        std::forward<decltype(io)>(io),
+        std::forward<decltype(slices)>(slices)...);
+}
 
-    static_assert(in_base_t::rank() >= offset + rank,
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/mdspan.hpp
+
+namespace mdtensor::core {
+
+template <std::integral index_t>
+[[nodiscard]] constexpr index_t bounding_index(index_t index,
+                                               const std::size_t &bound) {
+    if constexpr (std::is_signed_v<index_t>) {
+        if (index < index_t{0}) {
+            index = static_cast<index_t>(bound + 1 -
+                                         static_cast<std::size_t>(-index));
+        }
+    }
+
+    if (index < index_t{0} || bound < static_cast<std::size_t>(index)) {
+        throw std::out_of_range(
+            "Index is out of bounds: " + std::to_string(index) +
+            " is not in [0, " + std::to_string(bound) + ").");
+    }
+
+    return index;
+}
+
+template <std::integral in_t, in_t... ins, typename compare_t>
+[[nodiscard]] consteval auto
+get_sorted_array(std::integer_sequence<in_t, ins...>,
+                 compare_t compare) noexcept {
+    auto arr = std::array{ins...};
+    std::sort(arr.begin(), arr.end(), compare);
+    return arr;
+}
+
+template <std::size_t rank, std::integral axes_t, axes_t... axes,
+          typename compare_t>
+[[nodiscard]] consteval auto
+get_sorted_axes(std::integer_sequence<axes_t, axes...>,
+                compare_t compare) noexcept {
+    constexpr auto arr =
+        get_sorted_array(std::index_sequence<static_cast<std::size_t>(
+                             bounding_index<axes_t>(axes, rank - 1))...>{},
+                         compare);
+
+    if constexpr (1 < arr.size()) {
+        static_assert(
+            [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                return ((arr[Is] != arr[Is + 1]) && ...);
+            }(std::make_index_sequence<arr.size() - 1>{}),
+            "Duplicate axes are not allowed.");
+    }
+
+    return arr;
+}
+
+template <typename value_t, std::size_t size>
+[[nodiscard]] constexpr bool contains(const std::array<value_t, size> &array,
+                                      const value_t &value) noexcept {
+    for (const auto element : array) {
+        if (element == value) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+template <extents_c exts_t>
+[[nodiscard]] inline std::string to_string(exts_t &&exts) {
+    using base_t = std::remove_cvref_t<exts_t>;
+
+    std::string str = "(";
+
+    for (std::size_t i = 0; i < base_t::rank(); i++) {
+        if (i != 0) {
+            str += ", ";
+        }
+
+        str += std::to_string(exts.extent(i));
+    }
+
+    if constexpr (base_t::rank() == 1) {
+        str += ",";
+    }
+
+    return str + ")";
+}
+
+namespace detail {
+
+inline constexpr int numpy_default_precision = 8;
+
+template <std::floating_point value_t>
+[[nodiscard]] inline std::string floating_value_to_string(const value_t value) {
+    if constexpr (requires {
+                      { std::isnan(value) } -> std::convertible_to<bool>;
+                  }) {
+        if (std::isnan(value)) {
+            return "nan";
+        }
+    }
+
+    if constexpr (requires {
+                      { std::isinf(value) } -> std::convertible_to<bool>;
+                  }) {
+        if (std::isinf(value)) {
+            return std::signbit(value) ? "-inf" : "inf";
+        }
+    }
+
+    const value_t magnitude = std::abs(value);
+
+    /*
+     * NumPy-like scalar approximation:
+     *
+     * - fixed-point:      1e-4 <= |x| < 1e8, including zero
+     * - scientific:       0 < |x| < 1e-4 or |x| >= 1e8
+     *
+     * NumPy's exact choice is array-wide, so mixed arrays may use
+     * scientific notation even when an individual value would not.
+     */
+    const bool use_scientific =
+        magnitude != value_t{0} &&
+        (magnitude < value_t{1e-4} || magnitude >= value_t{1e8});
+
+    const std::chars_format format = use_scientific
+                                         ? std::chars_format::scientific
+                                         : std::chars_format::fixed;
+
+    std::array<char, 128> buffer{};
+
+    // First obtain the shortest round-trippable representation.
+    auto [ptr, ec] = std::to_chars(buffer.data(), buffer.data() + buffer.size(),
+                                   value, format);
+
+    if (ec != std::errc{}) {
+        throw std::runtime_error(
+            "Failed to convert floating-point value to string.");
+    }
+
+    std::string text(buffer.data(), ptr);
+
+    const auto fractional_digits = [](const std::string &str) -> std::size_t {
+        const std::size_t exponent_pos = str.find_first_of("eE");
+
+        const std::size_t mantissa_end =
+            exponent_pos == std::string::npos ? str.size() : exponent_pos;
+
+        const std::size_t decimal_pos = str.find('.');
+
+        if (decimal_pos == std::string::npos || decimal_pos >= mantissa_end) {
+            return 0;
+        }
+
+        return mantissa_end - decimal_pos - 1;
+    };
+
+    // NumPy default: at most 8 fractional digits.
+    if (fractional_digits(text) >
+        static_cast<std::size_t>(numpy_default_precision)) {
+        auto [rounded_ptr, rounded_ec] =
+            std::to_chars(buffer.data(), buffer.data() + buffer.size(), value,
+                          format, numpy_default_precision);
+
+        if (rounded_ec != std::errc{}) {
+            throw std::runtime_error(
+                "Failed to convert floating-point value to string.");
+        }
+
+        text.assign(buffer.data(), rounded_ptr);
+    }
+
+    // Remove unnecessary trailing zeros, but preserve the decimal point.
+    const std::size_t exponent_pos = text.find_first_of("eE");
+
+    const std::size_t mantissa_end =
+        exponent_pos == std::string::npos ? text.size() : exponent_pos;
+
+    const std::size_t decimal_pos = text.find('.');
+
+    if (decimal_pos == std::string::npos || decimal_pos >= mantissa_end) {
+        // "21"     -> "21."
+        // "1e+08"  -> "1.e+08"
+        text.insert(mantissa_end, 1, '.');
+
+    } else {
+        std::size_t trim_end = mantissa_end;
+
+        while (trim_end > decimal_pos + 1 && text[trim_end - 1] == '0') {
+            --trim_end;
+        }
+
+        // Decimal point itself is intentionally retained.
+        text.erase(trim_end, mantissa_end - trim_end);
+    }
+
+    return text;
+}
+
+template <arithmetic_c value_t>
+[[nodiscard]] inline std::string value_to_string(const value_t &value) {
+    using base_t = std::remove_cvref_t<value_t>;
+
+    if constexpr (std::same_as<base_t, bool>) {
+        return value ? "true" : "false";
+
+    } else if constexpr (std::is_integral_v<base_t>) {
+        if constexpr (std::is_signed_v<base_t>) {
+            return std::to_string(static_cast<long long>(value));
+
+        } else {
+            return std::to_string(static_cast<unsigned long long>(value));
+        }
+
+    } else if constexpr (std::is_floating_point_v<base_t>) {
+        return floating_value_to_string(value);
+    }
+}
+
+template <typename value_t>
+[[nodiscard]] inline std::string
+value_to_string(const std::optional<value_t> &value) {
+    if (!value.has_value()) {
+        return "nullopt";
+    }
+
+    return value_to_string(*value);
+}
+
+} // namespace detail
+
+template <typename in_t>
+    requires(!extents_c<in_t>)
+[[nodiscard]] inline std::string to_string(in_t &&in) {
+    const auto in_mds = to_const_mdspan(std::forward<in_t>(in));
+
+    std::string str = "[";
+
+    if constexpr (in_mds.rank() == 0) {
+        if constexpr (requires { detail::value_to_string(in_mds()); }) {
+            return detail::value_to_string(in_mds());
+
+        } else {
+            return "NOT_STRING_CONVERTIBLE";
+        }
+
+    } else {
+        using index_t = typename decltype(in_mds)::index_type;
+
+        for (index_t i = 0; i < in_mds.extent(0); i++) {
+            if (i != 0) {
+                str += ", ";
+            }
+
+            str += to_string(submdspan_from_left(in_mds, i));
+        }
+    }
+
+    return str + "]";
+}
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/util.hpp
+
+namespace mdtensor::core {
+
+template <extents_c in_t>
+[[nodiscard]] constexpr std::size_t extents_size(in_t &&in) noexcept {
+    if constexpr (in.rank() == 0) {
+        // NOTE: mdspan with rank 0 can capture a single element.
+        return 1;
+
+    } else if constexpr (in.rank_dynamic() == 0) {
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            return (in.static_extent(Is) * ...);
+        }(std::make_index_sequence<in.rank()>{});
+
+    } else {
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            return (static_cast<std::size_t>(in.extent(Is)) * ...);
+        }(std::make_index_sequence<in.rank()>{});
+    }
+}
+
+template <extents_c in_t>
+[[nodiscard]] consteval bool is_always_same_extents() noexcept {
+    return true;
+}
+
+template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
+[[nodiscard]] consteval bool is_always_same_extents() noexcept {
+    using base1_t = std::remove_cvref_t<in1_t>;
+    using base2_t = std::remove_cvref_t<in2_t>;
+
+    if constexpr (base1_t::rank() != base2_t::rank()) {
+        return false;
+
+    } else if constexpr (base1_t::rank_dynamic() != 0 ||
+                         base2_t::rank_dynamic() != 0) {
+        return false;
+
+    } else if constexpr ([&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                             return ((base1_t::static_extent(Is) !=
+                                      base2_t::static_extent(Is)) ||
+                                     ...);
+                         }(std::make_index_sequence<base1_t::rank()>{})) {
+        return false;
+    }
+
+    if constexpr (sizeof...(ins_t) != 0) {
+        return is_always_same_extents<in2_t, ins_t...>();
+
+    } else {
+        return true;
+    }
+}
+
+template <extents_c in_t>
+[[nodiscard]] constexpr bool is_same_extents(in_t &&in) noexcept {
+    return true;
+}
+
+template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
+[[nodiscard]] constexpr bool is_same_extents(in1_t &&in1, in2_t &&in2,
+                                             ins_t &&...ins) noexcept {
+    using base1_t = std::remove_cvref_t<in1_t>;
+    using base2_t = std::remove_cvref_t<in2_t>;
+
+    if constexpr (base1_t::rank() != base2_t::rank()) {
+        return false;
+    }
+
+    using index_t = common_index_type_t<typename base1_t::index_type,
+                                        typename base2_t::index_type>;
+
+    for (std::size_t i = 0; i < base1_t::rank(); i++) {
+        if (static_cast<index_t>(in1.extent(i)) !=
+            static_cast<index_t>(in2.extent(i))) {
+            return false;
+        }
+    }
+
+    if constexpr (sizeof...(ins_t) != 0) {
+        return is_same_extents(in2, ins...);
+
+    } else {
+        return true;
+    }
+}
+
+template <std::size_t offset, std::size_t rank, extents_c in_t>
+[[nodiscard]] constexpr auto slice_extents(in_t &&in) noexcept {
+    using index_t = typename std::remove_cvref_t<in_t>::index_type;
+
+    static_assert(in.rank() >= offset + rank,
                   "Incompatible offset and rank for slicing.");
 
-    return [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return extents<typename in_base_t::index_type,
-                       in_base_t::static_extent(offset + Is)...>{
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return extents<index_t, in.static_extent(offset + Is)...>{
             in.extent(offset + Is)...};
     }(std::make_index_sequence<rank>{});
 }
 
-template <size_t rank, extents_c in_t>
-[[nodiscard]] inline constexpr auto
-slice_from_left(in_t &&in = in_t{}) noexcept {
-    return slice_with_offset<0, rank>(std::forward<in_t>(in));
+template <std::size_t rank, extents_c in_t>
+[[nodiscard]] constexpr auto slice_extents_from_left(in_t &&in) noexcept {
+    return slice_extents<0, rank>(std::forward<in_t>(in));
 }
 
-template <size_t rank, extents_c in_t>
-[[nodiscard]] inline constexpr auto
-slice_from_right(in_t &&in = in_t{}) noexcept {
-    using in_base_t = std::remove_cvref_t<in_t>;
-
-    return slice_with_offset<in_base_t::rank() - rank, rank>(
+template <std::size_t rank, extents_c in_t>
+[[nodiscard]] constexpr auto slice_extents_from_right(in_t &&in) noexcept {
+    return slice_extents<std::remove_cvref_t<in_t>::rank() - rank, rank>(
         std::forward<in_t>(in));
 }
 
+[[nodiscard]] constexpr auto to_extents(auto &&shape) {
+    using base_t = std::remove_cvref_t<decltype(shape)>;
+
+    if constexpr (core::extents_c<base_t>) {
+        return std::forward<decltype(shape)>(shape);
+
+    } else if constexpr (integral_c<base_t>) {
+        if (shape < base_t{0}) {
+            throw std::invalid_argument("shape must be non-negative");
+        }
+
+        using index_t = std::make_unsigned_t<base_t>;
+
+        return core::dextents<index_t, 1>{static_cast<index_t>(shape)};
+    }
+}
+
 template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
-[[nodiscard]] inline constexpr auto
-concatenate_extents(in1_t &&in1 = in1_t{}, in2_t &&in2 = in2_t{},
-                    ins_t &&...ins) noexcept {
-    using in1_base_t = std::remove_cvref_t<in1_t>;
-    using in2_base_t = std::remove_cvref_t<in2_t>;
-    using index_t = common_index_type_t<typename in1_base_t::index_type,
-                                        typename in2_base_t::index_type>;
+[[nodiscard]] constexpr auto compose_extents(in1_t &&in1, in2_t &&in2,
+                                             ins_t &&...ins) noexcept {
+    using base1_t = std::remove_cvref_t<in1_t>;
+    using base2_t = std::remove_cvref_t<in2_t>;
+    using index_t = common_index_type_t<typename base1_t::index_type,
+                                        typename base2_t::index_type>;
 
     const auto cexts =
-        [&]<size_t... Is, size_t... Js>(std::index_sequence<Is...>,
-                                        std::index_sequence<Js...>) {
-            return extents<index_t, in1_base_t::static_extent(Is)...,
-                           in2_base_t::static_extent(Js)...>{
+        [&]<std::size_t... Is, std::size_t... Js>(std::index_sequence<Is...>,
+                                                  std::index_sequence<Js...>) {
+            return extents<index_t, base1_t::static_extent(Is)...,
+                           base2_t::static_extent(Js)...>{
                 static_cast<index_t>(in1.extent(Is))...,
                 static_cast<index_t>(in2.extent(Js))...};
-        }(std::make_index_sequence<in1_base_t::rank()>{},
-          std::make_index_sequence<in2_base_t::rank()>{});
+        }(std::make_index_sequence<base1_t::rank()>{},
+          std::make_index_sequence<base2_t::rank()>{});
 
     if constexpr (sizeof...(ins_t) == 0) {
         return cexts;
 
     } else {
-        return concatenate_extents(cexts, std::forward<ins_t>(ins)...);
+        return compose_extents(cexts, std::forward<ins_t>(ins)...);
     }
 }
 
+namespace {
+
+template <extents_c in_t>
+[[nodiscard]] constexpr auto expand_extents_dims_impl_(in_t &&in,
+                                                       std::index_sequence<>) {
+    return std::forward<in_t>(in);
+}
+
+template <extents_c in_t, std::size_t axis, std::size_t... axes>
+[[nodiscard]] constexpr auto
+expand_extents_dims_impl_(in_t &&in, std::index_sequence<axis, axes...>) {
+    // NOTE: this function requires ordered axes and does not check duplicates.
+
+    using base_t = std::remove_cvref_t<in_t>;
+
+    return expand_extents_dims_impl_(
+        compose_extents(slice_extents_from_left<axis>(std::forward<in_t>(in)),
+                        extents<uint8_t, 1>{},
+                        slice_extents_from_right<base_t::rank() - axis>(
+                            std::forward<in_t>(in))),
+        std::index_sequence<axes...>{});
+}
+
+} // namespace
+
+template <extents_c in_t, std::integral axes_t, axes_t... axes>
+[[nodiscard]] constexpr auto
+expand_extents_dims(in_t &&in, std::integer_sequence<axes_t, axes...>) {
+    constexpr auto axes_sorted = get_sorted_axes<in.rank() + sizeof...(axes)>(
+        std::integer_sequence<axes_t, axes...>{}, std::less<std::size_t>{});
+
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return expand_extents_dims_impl_(
+            std::forward<in_t>(in), std::index_sequence<axes_sorted[Is]...>{});
+    }(std::make_index_sequence<axes_sorted.size()>{});
+}
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/extents.hpp
+
+namespace mdtensor::core {
 namespace detail {
 
-template <size_t I, size_t brank, extents_c in_t>
-[[nodiscard]] inline constexpr size_t aligned_static_extent() noexcept {
-    using in_base_t = std::remove_cvref_t<in_t>;
+template <std::size_t I, std::size_t brank, extents_c in_t>
+[[nodiscard]] consteval std::size_t aligned_static_extent() noexcept {
+    using base_t = std::remove_cvref_t<in_t>;
 
-    constexpr size_t rank = in_base_t::rank();
+    constexpr std::size_t rank = base_t::rank();
+
+    static_assert(I < brank, "Index I must be less than broadcast rank brank.");
+    static_assert(rank <= brank,
+                  "Input rank must be less than or equal to broadcast rank.");
 
     if constexpr (I < brank - rank) {
         return 1;
 
     } else {
-        return in_base_t::static_extent(I - (brank - rank));
+        return base_t::static_extent(I - (brank - rank));
     }
 }
 
-template <size_t... Exts>
-[[nodiscard]] inline constexpr size_t broadcast_static_extent() noexcept {
+template <std::size_t... Extents>
+[[nodiscard]] consteval std::size_t broadcast_static_extent() noexcept {
+    static_assert(sizeof...(Extents) > 0,
+                  "At least one extent must be provided for broadcasting.");
 
-    static_assert(
-        [&] {
-            constexpr auto exts = std::array{Exts...};
+    if constexpr (((Extents == 1 || Extents == core::dyn) && ...)) {
+        // return dyn if any extent is dyn, else return 1
+        return std::max({Extents...});
 
-            for (size_t i = 0; i < sizeof...(Exts); i++) {
-                for (size_t j = i + 1; j < sizeof...(Exts); j++) {
-                    const size_t ei = exts[i];
-                    const size_t ej = exts[j];
+    } else {
+        // select the extent that is not 1 or dyn
+        constexpr std::size_t bext = std::max(
+            {((Extents != 1 && Extents != core::dyn) ? Extents : 0)...});
 
-                    if (ei != ej && ei != 1 && ei != dyn && ej != 1 &&
-                        ej != dyn) {
-                        return false;
-                    }
-                }
-            }
-            return true;
-        }(),
-        "Incompatible static extents for broadcasting.");
+        static_assert(
+            ((Extents == bext || Extents == 1 || Extents == core::dyn) && ...),
+            "Incompatible static extents for broadcasting.");
 
-    return std::max({Exts...});
+        return bext;
+    }
 }
 
-template <size_t I, size_t brank, extents_c in_t>
-[[nodiscard]] inline constexpr auto aligned_extent(in_t &&in) noexcept {
-    using in_base_t = std::remove_cvref_t<in_t>;
+template <std::size_t I, std::size_t brank, extents_c in_t>
+[[nodiscard]] constexpr auto aligned_extent(in_t &&in) noexcept {
+    using index_t = typename std::remove_cvref_t<in_t>::index_type;
 
-    constexpr size_t rank = in_base_t::rank();
+    constexpr std::size_t rank = in.rank();
+
+    static_assert(I < brank, "Index I must be less than broadcast rank brank.");
+    static_assert(rank <= brank,
+                  "Input rank must be less than or equal to broadcast rank.");
 
     if constexpr (I < brank - rank) {
-        return typename in_base_t::index_type{1};
+        return index_t{1};
 
     } else {
         return in.extent(I - (brank - rank));
     }
 }
 
-template <typename index_t, typename... exts_t>
-[[nodiscard]] inline constexpr index_t
-broadcast_extent(exts_t... exts) noexcept {
-    assert([&] {
-        for (size_t i = 0; i < sizeof...(exts); i++) {
-            for (size_t j = i + 1; j < sizeof...(exts); j++) {
-                const index_t ei = std::get<i>(std::forward_as_tuple(exts...));
-                const index_t ej = std::get<j>(std::forward_as_tuple(exts...));
+template <typename index_t, std::convertible_to<index_t>... exts_t>
+[[nodiscard]] constexpr index_t broadcast_extent(exts_t &&...exts) {
+    static_assert(sizeof...(exts) > 0,
+                  "At least one extent must be provided for broadcasting.");
 
-                if (ei != ej && ei != 1 && ej != 1) {
-                    return false;
-                }
-            }
+    index_t bext = 1;
+
+    for (const index_t &ext : {static_cast<index_t>(exts)...}) {
+        if (ext == 1) {
+            continue;
+
+        } else if (bext == 1) {
+            bext = ext;
+
+        } else if (ext != bext) {
+            throw std::invalid_argument(
+                "Incompatible extents for broadcasting.");
         }
-        return true;
-    }());
+    }
 
-    return std::max({static_cast<index_t>(exts)...});
+    return bext;
 }
 
 } // namespace detail
 
 template <extents_c... ins_t>
-[[nodiscard]] inline constexpr auto broadcast_extents(ins_t &&...ins) noexcept {
+[[nodiscard]] constexpr auto broadcast_extents(ins_t &&...ins) {
+    static_assert(sizeof...(ins) > 0,
+                  "At least one extents must be provided for broadcasting.");
+
     using index_t =
         common_index_type_t<typename std::remove_cvref_t<ins_t>::index_type...>;
 
-    constexpr size_t brank = std::max({std::remove_cvref_t<ins_t>::rank()...});
+    constexpr std::size_t brank = std::max({ins.rank()...});
 
     if constexpr (brank == 0) {
-        return extents<index_t>{};
+        return core::extents<index_t>{};
 
     } else {
-        return [&]<size_t... Is>(std::index_sequence<Is...>) {
-            const auto static_extent_at = [&]<size_t I>() {
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            const auto static_extent_at = [&]<std::size_t I>() {
                 return detail::broadcast_static_extent<
                     detail::aligned_static_extent<I, brank, ins_t>()...>();
             };
 
-            const auto extent_at = [&]<size_t I>() {
+            const auto extent_at = [&]<std::size_t I>() {
                 return detail::broadcast_extent<index_t>(
                     detail::aligned_extent<I, brank>(
                         std::forward<ins_t>(ins))...);
             };
 
-            return extents<index_t,
-                           static_extent_at.template operator()<Is>()...> {
+            return core::extents<
+                index_t, static_extent_at.template operator()<Is>()...> {
                 extent_at.template operator()<Is>()...
             };
         }(std::make_index_sequence<brank>{});
     }
 }
 
-template <size_t offset, size_t brank, mdspan_c in_t, extents_c new_bexts_t>
-[[nodiscard]] inline constexpr auto
-broadcast_axes_to(in_t &&in = in_t{},
-                  new_bexts_t &&new_bexts = new_bexts_t{}) noexcept {
-    using in_base_t = std::remove_cvref_t<in_t>;
-    using new_bexts_base_t = std::remove_cvref_t<new_bexts_t>;
+[[nodiscard]] constexpr auto broadcast_to(auto &&in, auto &&shape) {
+    const auto in_mds = to_const_mdspan(std::forward<decltype(in)>(in));
+    const auto exts = core::to_extents(std::forward<decltype(shape)>(shape));
 
-    constexpr size_t urank = in_base_t::rank() - brank;
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
+    using exts_t = std::remove_cvref_t<decltype(exts)>;
 
-    static_assert(in_base_t::rank() >= offset + brank,
-                  "Incompatible offset and brank for broadcasting.");
-    static_assert(new_bexts_base_t::rank() >= brank,
-                  "Incompatible brank for broadcasting.");
+    constexpr std::size_t org_rank = in_mds_t::rank();
+    constexpr std::size_t new_rank = exts_t::rank();
 
-    if constexpr (brank == new_bexts_base_t::rank() &&
-                  []<size_t... Is>(std::index_sequence<Is...>) {
-                      return ((in_base_t::static_extent(offset + Is) != dyn &&
-                               in_base_t::static_extent(offset + Is) ==
-                                   new_bexts_base_t::static_extent(Is)) &&
-                              ...);
-                  }(std::make_index_sequence<brank>{})) {
-        return std::forward<in_t>(in);
+    static_assert(org_rank <= new_rank, "Incompatible ranks for broadcasting.");
 
-    } else if constexpr (in_base_t::rank() == 0) {
-        using index_type = typename new_bexts_base_t::index_type;
+    if constexpr (is_always_same_extents<typename in_mds_t::extents_type,
+                                         exts_t>()) {
+        return in_mds; // change to const mdspan
 
-        auto new_strides = std::array<index_type, new_bexts_base_t::rank()>{};
+    } else if constexpr (org_rank == 0) {
+        using index_t = typename exts_t::index_type;
 
-        for (size_t i = 0; i < new_bexts_base_t::rank(); i++) {
+        auto new_strides = std::array<index_t, new_rank>{};
+
+        for (std::size_t i = 0; i < new_rank; i++) {
             new_strides[i] = 0;
         }
 
-        return mdspan<typename in_base_t::element_type, new_bexts_base_t,
-                      layout_stride, typename in_base_t::accessor_type>{
-            in.data_handle(),
-            layout_stride::mapping{std::forward<new_bexts_t>(new_bexts),
-                                   new_strides}};
+        return core::mdspan<typename in_mds_t::element_type, exts_t,
+                            stdex::layout_stride,
+                            typename in_mds_t::accessor_type>{
+            in_mds.data_handle(),
+            stdex::layout_stride::mapping{exts, new_strides}};
 
     } else {
-        using index_type =
-            common_index_type_t<typename in_base_t::index_type,
-                                typename new_bexts_base_t::index_type>;
+        using index_t = typename exts_t::index_type;
+        using cindex_t =
+            common_index_type_t<typename in_mds_t::index_type, index_t>;
 
-        auto new_strides =
-            std::array<index_type, urank + new_bexts_base_t::rank()>{};
+        // ni = new_rank - org_rank + oi
+        const auto get_ni = [](std::size_t i) {
+            return new_rank - org_rank + i;
+        };
 
-        for (size_t i = 0; i < new_strides.size(); i++) {
-            if (i < offset) {
-                new_strides[i] = static_cast<index_type>(in.stride(i));
+        // assertion
+        static_assert(
+            [&] {
+                for (std::size_t i = 0; i < org_rank; i++) {
+                    const auto src = in_mds_t::static_extent(i);
+                    const auto dst = exts_t::static_extent(get_ni(i));
 
-            } else if (i < offset + new_bexts_base_t::rank() - brank) {
-                new_strides[i] = 0;
+                    if (src != core::dyn && //
+                        dst != core::dyn && //
+                        src != dst &&       //
+                        src != 1) {
+                        return false;
+                    }
+                }
+                return true;
+            }(),
+            "Incompatible extents for broadcasting.");
 
-            } else if (i < offset + new_bexts_base_t::rank()) {
-                const size_t j = i + brank - new_bexts_base_t::rank();
+        for (std::size_t i = 0; i < org_rank; i++) {
+            if (static_cast<cindex_t>(in_mds.extent(i)) !=
+                    static_cast<cindex_t>(exts.extent(get_ni(i))) &&
+                static_cast<cindex_t>(in_mds.extent(i)) != cindex_t{1}) {
+                throw std::invalid_argument(
+                    "Incompatible extents for broadcasting.");
+            }
+        }
 
-                if (static_cast<size_t>(in.extent(j)) ==
-                    static_cast<size_t>(new_bexts.extent(i - offset))) {
-                    new_strides[i] = static_cast<index_type>(in.stride(j));
+        // calculation
+        auto new_strides = std::array<index_t, new_rank>{};
 
-                } else if (in.extent(j) == 1) {
-                    new_strides[i] = 0;
+        for (std::size_t i = 0; i < new_rank - org_rank; i++) {
+            new_strides[i] = 0;
+        }
+
+        for (std::size_t i = 0; i < org_rank; i++) {
+            if (static_cast<cindex_t>(in_mds.extent(i)) ==
+                static_cast<cindex_t>(exts.extent(get_ni(i)))) {
+                new_strides[get_ni(i)] = static_cast<index_t>(in_mds.stride(i));
+
+            } else {
+                new_strides[get_ni(i)] = 0;
+            }
+        }
+
+        return core::mdspan<typename in_mds_t::element_type, exts_t,
+                            stdex::layout_stride,
+                            typename in_mds_t::accessor_type>{
+            in_mds.data_handle(),
+            stdex::layout_stride::mapping{exts, new_strides}};
+    }
+}
+
+namespace detail {
+
+template <std::size_t... uranks, core::mdspan_c... ios_t>
+[[nodiscard]] constexpr auto
+get_broadcast_extents(std::index_sequence<uranks...>, ios_t &&...ios) {
+    static_assert(sizeof...(uranks) == sizeof...(ios_t),
+                  "Number of uranks must match number of inputs.");
+    static_assert(((ios.rank() >= uranks) && ...),
+                  "Input rank must be greater than or equal to urank.");
+
+    return broadcast_extents(
+        slice_extents_from_left<ios.rank() - uranks>(ios.extents())...);
+}
+
+} // namespace detail
+
+template <std::size_t... uranks, bool... bcast>
+[[nodiscard]] constexpr auto broadcast(std::index_sequence<uranks...>,
+                                       std::integer_sequence<bool, bcast...>,
+                                       auto &&...ios) {
+    static_assert(sizeof...(uranks) == sizeof...(ios));
+    static_assert(sizeof...(bcast) == sizeof...(ios));
+
+    // calculate mdspans for inputs and outputs
+    const auto ios_mds =
+        std::make_tuple(to_mdspan(std::forward<decltype(ios)>(ios))...);
+
+    // calculate broadcasted extents
+    constexpr auto ur = std::array{uranks...};
+
+    const auto bexts = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return detail::get_broadcast_extents(std::index_sequence<ur[Is]...>{},
+                                             std::get<Is>(ios_mds)...);
+    }(std::make_index_sequence<sizeof...(ios)>{});
+
+    // calculate broadcasted mdspans
+    constexpr auto bc = std::array{bcast...};
+
+    return std::make_tuple(
+        [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            const auto get_broadcasted = [&]<std::size_t I>() {
+                if constexpr (!bc[I]) {
+                    // change to mdspan without broadcasting
+                    return std::get<I>(ios_mds);
+
+                } else if constexpr (bexts.rank() == 0) {
+                    // change to const mdspan without broadcasting
+                    return core::to_const_mdspan(std::get<I>(ios_mds));
 
                 } else {
-                    assert(false);
+                    // broadcast to const mdspan
+                    return broadcast_to(
+                        std::get<I>(ios_mds),
+                        compose_extents(bexts,
+                                        slice_extents_from_right<ur[I]>(
+                                            std::get<I>(ios_mds).extents())));
                 }
+            };
 
-            } else {
-                new_strides[i] = static_cast<index_type>(
-                    in.stride(i + brank - new_bexts_base_t::rank()));
-            }
-        }
-
-        const auto new_extents = [&]() {
-            if constexpr (offset == 0) {
-                return concatenate_extents(
-                    std::forward<new_bexts_t>(new_bexts),
-                    slice_from_right<urank>(in.extents()));
-
-            } else {
-                return concatenate_extents(
-                    slice_from_left<offset>(in.extents()),
-                    std::forward<new_bexts_t>(new_bexts),
-                    slice_from_right<urank - offset>(in.extents()));
-            }
-        }();
-
-        return mdspan<typename in_base_t::element_type,
-                      std::remove_cvref_t<decltype(new_extents)>, layout_stride,
-                      typename in_base_t::accessor_type>{
-            in.data_handle(), layout_stride::mapping{new_extents, new_strides}};
-    }
+            return std::make_tuple(
+                get_broadcasted.template operator()<Is>()...);
+        }(std::make_index_sequence<sizeof...(ios)>{}),
+        bexts);
 }
 
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/broadcast.hpp
+
+namespace mdtensor::core {
 namespace detail {
 
-template <size_t brank, typename func_t, size_t offset, size_t... offsets,
-          mdspan_c in_t, mdspan_c... ins_t>
-inline constexpr void batch_impl_none(func_t &&func,
-                                      std::index_sequence<offset, offsets...>,
-                                      in_t &&in, ins_t &&...ins) {
-    static_assert(sizeof...(offsets) == sizeof...(ins),
-                  "Number of offsets must match number of inputs.");
-
-    using index_t = typename std::remove_cvref_t<in_t>::index_type;
-
+template <std::size_t brank, mdspan_c io_t, mdspan_c... ios_t>
+constexpr void batch_impl_native(auto &&func, io_t &&io, ios_t &&...ios) {
     if constexpr (brank == 0) {
-        std::forward<func_t>(func)(in, ins...);
+        func(std::forward<io_t>(io), std::forward<ios_t>(ios)...);
 
     } else {
-        for (index_t i = 0; i < in.extent(offset); i++) {
-            batch_impl_none<brank - 1>(
-                std::forward<func_t>(func),
-                std::index_sequence<offset, offsets...>{},
-                submdspan_from_left<offset>(in, i),
-                submdspan_from_left<offsets>(ins, i)...);
+        using index_t = typename std::remove_cvref_t<io_t>::index_type;
+
+        for (index_t i = 0; i < io.extent(0); i++) {
+            batch_impl_native<brank - 1>(
+                std::forward<decltype(func)>(func),
+                submdspan_from_left(std::forward<io_t>(io), i),
+                submdspan_from_left(std::forward<ios_t>(ios), i)...);
         }
     }
 }
 
-#if defined(_OPENMP) && defined(REAL_GCC)
+#ifdef MDTENSOR_USE_OPENMP
 
-template <size_t brank, typename func_t, size_t offset, size_t... offsets,
-          mdspan_c in_t, mdspan_c... ins_t>
-inline void batch_impl_cpump(func_t &&func,
-                             std::index_sequence<offset, offsets...>, in_t &&in,
-                             ins_t &&...ins) {
-    static_assert(sizeof...(offsets) == sizeof...(ins),
-                  "Number of offsets must match number of inputs.");
-
-    using index_t = typename std::remove_cvref_t<in_t>::index_type;
-
+template <std::size_t brank, mdspan_c io_t, mdspan_c... ios_t>
+void batch_impl_openmp(auto &&func, io_t &&io, ios_t &&...ios) {
     if constexpr (brank == 0) {
-        std::forward<func_t>(func)(in, ins...);
+        func(std::forward<io_t>(io), std::forward<ios_t>(ios)...);
 
     } else {
+        // Parallelize only the outermost batch axis.
+        using index_t = typename std::remove_cvref_t<io_t>::index_type;
+
 #pragma omp parallel for
-        for (index_t i = 0; i < in.extent(offset); i++) {
-            batch_impl_none<brank - 1>(
-                std::forward<func_t>(func),
-                std::index_sequence<offset, offsets...>{},
-                submdspan_from_left<offset>(in, i),
-                submdspan_from_left<offsets>(ins, i)...);
+        for (index_t i = 0; i < io.extent(0); i++) {
+            batch_impl_native<brank - 1>(
+                std::forward<decltype(func)>(func),
+                submdspan_from_left(std::forward<io_t>(io), i),
+                submdspan_from_left(std::forward<ios_t>(ios), i)...);
         }
     }
 }
 
 #endif
-
-template <MPMode mpmode, size_t brank, typename func_t, size_t... offsets,
-          mdspan_c... ins_t>
-inline constexpr void batch_impl(func_t &&func, std::index_sequence<offsets...>,
-                                 ins_t &&...ins) {
-    if constexpr (mpmode == MPMode::CPUMP) {
-        batch_impl_cpump<brank>(std::forward<func_t>(func),
-                                std::index_sequence<offsets...>{}, ins...);
-
-    } else {
-        batch_impl_none<brank>(std::forward<func_t>(func),
-                               std::index_sequence<offsets...>{}, ins...);
-    }
-}
 
 } // namespace detail
 
-template <typename dtype, extents_c exts_t>
-[[nodiscard]] inline constexpr auto create_data(exts_t &&exts) noexcept {
-    using exts_base_t = std::remove_cvref_t<exts_t>;
-
-    if constexpr (exts_base_t::rank() == 0) {
-        return dtype{};
-
-    } else if constexpr (exts_base_t::rank_dynamic() != 0 &&
-                         std::is_same_v<dtype, bool>) {
-        // NOTE: This is a workaround for the fact that std::vector<bool> is a
-        //       specialization that does not behave like a normal container.
-        return mdarray<int8_t, exts_base_t>{std::forward<exts_t>(exts)};
-
-    } else {
-        return mdarray<dtype, exts_base_t>{std::forward<exts_t>(exts)};
-    }
-}
-
-template <typename dtype = void, size_t... offsets, size_t... uranks,
-          extents_c uout_exts_t, mdspan_c... ins_t>
-[[nodiscard]] inline constexpr auto
-create_out(std::index_sequence<offsets...>, std::index_sequence<uranks...>,
-           uout_exts_t &&uout_exts, ins_t &&...ins) noexcept {
-    static_assert(sizeof...(offsets) == sizeof...(ins_t) + 1,
-                  "Number of offsets must be number of inputs + 1.");
-    static_assert(sizeof...(uranks) == sizeof...(ins_t),
-                  "Number of uranks must match number of inputs.");
-
-    using value_t =
-        std::conditional_t<std::is_void_v<dtype>,
-                           common_data_type_t<value_type_t<ins_t>...>, dtype>;
-
-    constexpr auto ofst = std::array{offsets...};
-    constexpr auto ur = std::array{uranks...};
-    constexpr auto br = [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return std::array{
-            (std::tuple_element_t<
-                 Is, std::tuple<std::remove_cvref_t<ins_t>...>>::rank() -
-             ur[Is])...};
-    }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-    auto ins_tuple = std::forward_as_tuple(ins...);
-
-    const auto bexts = [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return broadcast_extents(slice_with_offset<ofst[Is], br[Is]>(
-            std::get<Is>(ins_tuple).extents())...);
-    }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-    constexpr size_t uout_offset = ofst[sizeof...(ins_t)];
-
-    return create_data<value_t>(concatenate_extents(
-        slice_from_left<uout_offset>(uout_exts), bexts,
-        slice_from_right<std::remove_cvref_t<uout_exts_t>::rank() -
-                         uout_offset>(uout_exts)));
-}
-
-template <typename dtype = void, size_t... uranks, extents_c uout_exts_t,
-          mdspan_c... ins_t>
-[[nodiscard]] inline constexpr auto create_out(std::index_sequence<uranks...>,
-                                               uout_exts_t &&uout_exts,
-                                               ins_t &&...ins) noexcept {
-    return [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return create_out<dtype>(std::index_sequence<((void)Is, 0)...>{},
-                                 std::index_sequence<uranks...>{},
-                                 std::forward<uout_exts_t>(uout_exts),
-                                 std::forward<ins_t>(ins)...);
-    }(std::make_index_sequence<sizeof...(ins_t) + 1>{});
-}
-
-template <typename dtype = void, extents_c uout_exts_t, mdspan_c... ins_t>
-[[nodiscard]] inline constexpr auto create_out(uout_exts_t &&uout_exts,
-                                               ins_t &&...ins) noexcept {
-    return [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return create_out<dtype>(std::index_sequence<((void)Is, 0)...>{},
-                                 std::forward<uout_exts_t>(uout_exts),
-                                 std::forward<ins_t>(ins)...);
-    }(std::make_index_sequence<sizeof...(ins_t)>{});
-}
-
-template <typename dtype = void, size_t... offsets, size_t... uranks,
-          extents_tuple_c uout_exts_tuple_t, mdspan_c... ins_t>
-[[nodiscard]] inline constexpr auto
-create_outs(std::index_sequence<offsets...>, std::index_sequence<uranks...>,
-            uout_exts_tuple_t &&uout_exts_tuple, ins_t &&...ins) noexcept {
-    constexpr size_t outs_num =
-        std::tuple_size_v<std::remove_cvref_t<uout_exts_tuple_t>>;
-
-    static_assert(
-        sizeof...(offsets) == sizeof...(ins_t) + outs_num,
-        "Number of offsets must be number of inputs + number of outputs.");
-    static_assert(sizeof...(uranks) == sizeof...(ins_t),
-                  "Number of uranks must match number of inputs.");
-
-    using value_t =
-        std::conditional_t<std::is_void_v<dtype>,
-                           common_data_type_t<value_type_t<ins_t>...>, dtype>;
-
-    constexpr auto ofst = std::array{offsets...};
-    constexpr auto ur = std::array{uranks...};
-    constexpr auto br = [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return std::array{
-            (std::tuple_element_t<
-                 Is, std::tuple<std::remove_cvref_t<ins_t>...>>::rank() -
-             ur[Is])...};
-    }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-    auto ins_tuple = std::forward_as_tuple(ins...);
-
-    const auto bexts = [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return broadcast_extents(slice_with_offset<ofst[Is], br[Is]>(
-            std::get<Is>(ins_tuple).extents())...);
-    }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-    return [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return std::tuple{create_data<value_t>(concatenate_extents(
-            slice_from_left<ofst[sizeof...(ins_t) + Is]>(
-                std::get<Is>(uout_exts_tuple)),
-            bexts,
-            slice_from_right<
-                std::tuple_element_t<Is, uout_exts_tuple_t>::rank() -
-                ofst[sizeof...(ins_t) + Is]>(
-                std::get<Is>(uout_exts_tuple))))...};
-    }(std::make_index_sequence<outs_num>{});
-}
-
-template <typename dtype = void, size_t... uranks,
-          extents_tuple_c uout_exts_tuple_t, mdspan_c... ins_t>
-[[nodiscard]] inline constexpr auto
-create_outs(std::index_sequence<uranks...>, uout_exts_tuple_t &&uout_exts_tuple,
-            ins_t &&...ins) noexcept {
-    constexpr size_t outs_num =
-        std::tuple_size_v<std::remove_cvref_t<uout_exts_tuple_t>>;
-
-    return [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return create_data<dtype>(
-            std::index_sequence<((void)Is, 0)...>{},
-            std::index_sequence<uranks...>{},
-            std::forward<uout_exts_tuple_t>(uout_exts_tuple),
-            std::forward<ins_t>(ins)...);
-    }(std::make_index_sequence<sizeof...(ins_t) + outs_num>{});
-}
-
-template <typename dtype = void, extents_tuple_c uout_exts_tuple_t,
-          mdspan_c... ins_t>
-[[nodiscard]] inline constexpr auto
-create_outs(uout_exts_tuple_t &&uout_exts_tuple, ins_t &&...ins) noexcept {
-    return [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return create_data<dtype>(
-            std::index_sequence<((void)Is, 0)...>{},
-            std::forward<uout_exts_tuple_t>(uout_exts_tuple),
-            std::forward<ins_t>(ins)...);
-    }(std::make_index_sequence<sizeof...(ins_t)>{});
-}
-
-template <MPMode mpmode, typename func_t, size_t... offsets, size_t... uranks,
-          mdspan_c... ins_t>
-inline constexpr void batch(func_t &&func, std::index_sequence<offsets...>,
-                            std::index_sequence<uranks...>, ins_t &&...ins) {
-    static_assert(sizeof...(offsets) == sizeof...(ins_t));
-    static_assert(sizeof...(uranks) == sizeof...(ins_t));
-
-    constexpr auto fr = std::array{std::remove_cvref_t<ins_t>::rank()...};
-    constexpr auto ofst = std::array{offsets...};
-    constexpr auto ur = std::array{uranks...};
-    constexpr auto br = [&] {
-        std::array<std::size_t, sizeof...(ins_t)> br{};
-        for (size_t i = 0; i < br.size(); i++) {
-            br[i] = fr[i] - ofst[i] - ur[i];
-        }
-        return br;
-    }();
-
-    auto ins_tuple = std::forward_as_tuple(ins...);
-
-    constexpr bool no_branks = [&] {
-        for (auto v : br) {
-            if (v != 0) {
-                return false;
-            }
-        }
-        return true;
-    }();
-
-    constexpr bool all_same_static_bexts = [&]<size_t... Is>(
-                                               std::index_sequence<Is...>) {
-        return same(slice_with_offset<ofst[Is], br[Is]>(
-            typename std::tuple_element_t<
-                Is,
-                std::tuple<std::remove_cvref_t<ins_t>...>>::extents_type{})...);
-    }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-    if constexpr (no_branks) {
-        std::forward<func_t>(func)(ins...);
-        return;
-
-    } else if constexpr (all_same_static_bexts) {
-#ifdef MDTENSOR_USE_AUTOFLAT
-        constexpr bool is_flattable = [&]<size_t... Is>(
-                                          std::index_sequence<Is...>) {
-            return ((std::tuple_element_t<Is, std::tuple<std::remove_cvref_t<
-                                                  ins_t>...>>::rank_dynamic() ==
-                         0 &&
-                     is_always_reshapable<std::tuple_element_t<
-                         Is, std::tuple<std::remove_cvref_t<ins_t>...>>>()) &&
-                    ...);
-        }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-        if constexpr (is_flattable) {
-            constexpr size_t static_bsize =
-                static_size(slice_with_offset<ofst[0], br[0]>(
-                    typename std::tuple_element_t<
-                        0, std::tuple<std::remove_cvref_t<ins_t>...>>::
-                        extents_type{}));
-
-            [&]<size_t... Is>(std::index_sequence<Is...>) {
-                detail::batch_impl<mpmode, 1>(
-                    std::forward<func_t>(func),
-                    std::index_sequence<offsets...>{},
-                    static_reshape(
-                        std::get<Is>(ins_tuple),
-                        concatenate_extents(
-                            slice_from_left<ofst[Is]>(
-                                std::get<Is>(ins_tuple).extents()),
-                            extents<size_t, static_bsize>{static_bsize},
-                            slice_from_right<ur[Is]>(
-                                std::get<Is>(ins_tuple).extents())))...);
-            }(std::make_index_sequence<sizeof...(ins_t)>{});
-            return;
-        }
-#endif
-
-        detail::batch_impl<mpmode, br[0]>(std::forward<func_t>(func),
-                                          std::index_sequence<offsets...>{},
-                                          ins...);
-
-    } else {
-        const auto bexts = [&]<size_t... Is>(std::index_sequence<Is...>) {
-            return broadcast_extents(slice_with_offset<ofst[Is], br[Is]>(
-                std::get<Is>(ins_tuple).extents())...);
-        }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-        [&]<size_t... Is>(std::index_sequence<Is...>) {
-            detail::batch_impl<mpmode, decltype(bexts)::rank()>(
-                std::forward<func_t>(func), std::index_sequence<offsets...>{},
-                broadcast_axes_to<ofst[Is], br[Is]>(std::get<Is>(ins_tuple),
-                                                    bexts)...);
-        }(std::make_index_sequence<sizeof...(ins_t)>{});
-    }
-}
-
-template <MPMode mpmode, typename func_t, size_t... uranks, mdspan_c... ins_t>
-inline constexpr void batch(func_t &&func, std::index_sequence<uranks...>,
-                            ins_t &&...ins) {
-    [&]<size_t... Is>(std::index_sequence<Is...>) {
-        batch<mpmode>(std::forward<func_t>(func),
-                      std::index_sequence<((void)Is, 0)...>{},
-                      std::index_sequence<uranks...>{}, ins...);
-    }(std::make_index_sequence<sizeof...(ins_t)>{});
-}
-
-template <MPMode mpmode, typename func_t, mdspan_c... ins_t>
-inline constexpr void batch(func_t &&func, ins_t &&...ins) {
-    [&]<size_t... Is>(std::index_sequence<Is...>) {
-        batch<mpmode>(std::forward<func_t>(func),
-                      std::index_sequence<((void)Is, 0)...>{}, ins...);
-    }(std::make_index_sequence<sizeof...(ins_t)>{});
-}
-
-template <typename dtype, MPMode mpmode, typename func_t, size_t... offsets,
-          size_t... uranks, extents_c uout_exts_t, mdspan_c... ins_t>
-[[nodiscard]] inline constexpr auto
-batch_out(func_t &&func, std::index_sequence<offsets...>,
-          std::index_sequence<uranks...>, uout_exts_t &&uout_exts,
-          ins_t &&...ins) {
-    static_assert(sizeof...(uranks) == sizeof...(ins_t));
-    static_assert(sizeof...(offsets) == sizeof...(ins_t) + 1);
-
-    auto out = create_out<dtype>(
-        std::index_sequence<offsets...>{}, std::index_sequence<uranks...>{},
-        std::forward<uout_exts_t>(uout_exts), std::forward<ins_t>(ins)...);
-
-    batch<mpmode>(std::forward<func_t>(func), std::index_sequence<offsets...>{},
-                  std::index_sequence<uranks..., uout_exts.rank()>{},
-                  std::forward<ins_t>(ins)..., to_mdspan(out));
-
-    return out;
-}
-
-template <typename dtype, MPMode mpmode, typename func_t, size_t... offsets,
-          size_t... uranks, extents_tuple_c uout_exts_tuple_t,
-          mdspan_c... ins_t>
-[[nodiscard]] inline constexpr auto
-batch_out(func_t &&func, std::index_sequence<offsets...>,
-          std::index_sequence<uranks...>, uout_exts_tuple_t &&uout_exts_tuple,
-          ins_t &&...ins) {
-    constexpr size_t outs_num =
-        std::tuple_size_v<std::remove_cvref_t<uout_exts_tuple_t>>;
-
-    static_assert(sizeof...(uranks) == sizeof...(ins_t));
-    static_assert(sizeof...(offsets) == sizeof...(ins_t) + outs_num);
-
-    auto outs = create_outs<dtype>(
-        std::index_sequence<offsets...>{}, std::index_sequence<uranks...>{},
-        std::forward<uout_exts_tuple_t>(uout_exts_tuple),
-        std::forward<ins_t>(ins)...);
-
-    [&]<size_t... Is>(std::index_sequence<Is...>) {
-        batch<mpmode>(
-            std::forward<func_t>(func), std::index_sequence<offsets...>{},
-            std::index_sequence<
-                uranks...,
-                std::tuple_element_t<
-                    Is, std::remove_cvref_t<uout_exts_tuple_t>>::rank()...>{},
-            std::forward<ins_t>(ins)..., to_mdspan(std::get<Is>(outs))...);
-    }(std::make_index_sequence<outs_num>{});
-
-    return outs;
-}
-
-template <typename dtype, MPMode mpmode, typename func_t, size_t... uranks,
-          extents_info_c uout_info_t, mdspan_c... ins_t>
-[[nodiscard]] inline constexpr auto
-batch_out(func_t &&func, std::index_sequence<uranks...>,
-          uout_info_t &&uout_info, ins_t &&...ins) {
-    constexpr size_t uout_len = [] {
-        using uout_exts_base_t = std::remove_cvref_t<uout_info_t>;
-
-        if constexpr (is_extents_v<uout_exts_base_t>) {
-            return 1;
+template <core::Backend backend, std::size_t brank>
+constexpr void batch(auto &&func, auto &&...ios) {
+    // TODO: assert when backend is not specified in each funciton call
+    // assert(backend != core::Backend::AUTO);
+    [[maybe_unused]] constexpr auto be = [&]() {
+        if constexpr (backend == core::Backend::AUTO) {
+            return core::Backend::NATIVE; // temporary approach.
 
         } else {
-            return std::tuple_size_v<uout_exts_base_t>;
+            return backend;
         }
     }();
 
-    return [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return batch_out<dtype, mpmode>(
-            std::forward<func_t>(func), std::index_sequence<((void)Is, 0)...>{},
-            std::index_sequence<uranks...>{},
-            std::forward<uout_info_t>(uout_info), std::forward<ins_t>(ins)...);
-    }(std::make_index_sequence<sizeof...(ins_t) + uout_len>{});
+    if constexpr (
+#ifdef MDTENSOR_USE_OPENMP
+        be == core::Backend::OPENMP
+#else
+        false
+#endif
+    ) {
+#ifdef MDTENSOR_USE_OPENMP
+        detail::batch_impl_openmp<brank>(
+            std::forward<decltype(func)>(func),
+            core::to_mdspan(std::forward<decltype(ios)>(ios))...);
+#endif
+
+    } else {
+        detail::batch_impl_native<brank>(
+            std::forward<decltype(func)>(func),
+            core::to_mdspan(std::forward<decltype(ios)>(ios))...);
+    }
 }
 
-template <typename dtype, MPMode mpmode, typename func_t,
-          extents_info_c uout_info_t, mdspan_c... ins_t>
-[[nodiscard]] inline constexpr auto
-batch_out(func_t &&func, uout_info_t &&uout_info, ins_t &&...ins) {
-    return [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return batch_out<dtype, mpmode>(
-            std::forward<func_t>(func), std::index_sequence<((void)Is, 0)...>{},
-            std::forward<uout_info_t>(uout_info), std::forward<ins_t>(ins)...);
-    }(std::make_index_sequence<sizeof...(ins_t)>{});
+template <core::Backend backend, std::size_t... uranks, bool... bcast>
+constexpr void batch_with_broadcast(auto &&func, std::index_sequence<uranks...>,
+                                    std::integer_sequence<bool, bcast...>,
+                                    auto &&...ios) {
+    // broadcast which bcast = true
+    const auto [ios_bcast, bexts] =
+        broadcast(std::index_sequence<uranks...>{},
+                  std::integer_sequence<bool, bcast...>{},
+                  std::forward<decltype(ios)>(ios)...);
+
+    // batch
+    [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        batch<backend, bexts.rank()>(std::forward<decltype(func)>(func),
+                                     std::get<Is>(ios_bcast)...);
+    }(std::make_index_sequence<sizeof...(ios)>{});
 }
 
-} // namespace core
-} // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/broadcast.hpp
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/eigen/eigen.hpp
+template <core::Backend backend, bool... bcast>
+constexpr void batch_with_broadcast(auto &&func,
+                                    std::integer_sequence<bool, bcast...>,
+                                    auto &&...ios) {
+    [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        batch_with_broadcast<backend>(std::forward<decltype(func)>(func),
+                                      std::index_sequence<((void)Is, 0)...>{},
+                                      std::integer_sequence<bool, bcast...>{},
+                                      std::forward<decltype(ios)>(ios)...);
+    }(std::make_index_sequence<sizeof...(ios)>{});
+}
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/batch.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/container.hpp
 /**
  * @file
- * @brief Eigen interop utilities for mdtensor.
+ * @brief Container utilities for mdtensor.
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -1449,170 +1510,220 @@ batch_out(func_t &&func, uout_info_t &&uout_info, ins_t &&...ins) {
  */
 
 
-#ifdef MDTENSOR_USE_EIGEN
-#include <Eigen/Dense>
-#endif
 
+namespace mdtensor::core {
 
-#ifdef MDTENSOR_USE_EIGEN
+using bool_value_t = std::int8_t;
 
-namespace mdtensor {
-namespace core {
-namespace eigen {
-namespace detail {
+template <typename value_t, extents_c extent_t>
+using container = std::conditional_t<
+    extent_t::rank() == 0, value_t,
+    std::conditional_t<
+        extent_t::rank_dynamic() == 0,
+        core::mdarray<value_t, extent_t, stdex::layout_right,
+                      std::array<value_t, core::extents_size(extent_t{})>>,
+        std::conditional_t<
+            std::is_same_v<value_t, bool>,
+            core::mdarray<bool_value_t, extent_t, stdex::layout_right,
+                          std::vector<bool_value_t>>,
+            core::mdarray<value_t, extent_t, stdex::layout_right,
+                          std::vector<value_t>>>>>;
 
-[[nodiscard]] inline constexpr int ext_to_dyn(size_t &&extent) noexcept {
-    if (extent == dyn) {
-        return Eigen::Dynamic;
+template <typename value_t = double, extents_c exts_t>
+[[nodiscard]] constexpr auto make_container(exts_t &&exts) {
+    using base_t = std::remove_cvref_t<decltype(exts)>;
 
-    } else if (extent < std::numeric_limits<int>::max()) {
-        return static_cast<int>(extent);
+    if constexpr (base_t::rank() == 0) {
+        return container<value_t, base_t>{};
 
     } else {
-        assert(false);
-        return Eigen::Dynamic;
+        return container<value_t, base_t>{std::forward<exts_t>(exts)};
     }
 }
 
-} // namespace detail
+[[nodiscard]] constexpr auto make_container_like(auto &&in) {
+    const auto in_mds = to_const_mdspan(std::forward<decltype(in)>(in));
+
+    using value_t = typename decltype(in_mds)::value_type;
+
+    return make_container<value_t>(in_mds.extents());
+}
 
 template <typename T>
-concept eigen_mappable_mdspan_c =
-    (md_c<T> &&
-     (std::is_same_v<typename std::remove_cvref_t<T>::layout_type,
-                     layout_right> ||
-      std::is_same_v<typename std::remove_cvref_t<T>::layout_type,
-                     layout_left>) &&
-     std::remove_cvref_t<T>::rank() == 2 &&
-     std::remove_cvref_t<T>::is_always_unique() &&
-     std::remove_cvref_t<T>::is_always_exhaustive() &&
-     std::remove_cvref_t<T>::is_always_strided());
+using make_container_like_t = decltype(make_container_like(std::declval<T>()));
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/container.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/manipulation.hpp
+/**
+ * @file
+ * @brief Manipulation utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor::core {
+namespace detail {
 
 template <typename in_t>
-[[nodiscard]] inline constexpr auto to_eigen(in_t &&in) noexcept {
-    static_assert(eigen_mappable_mdspan_c<in_t>,
-                  "Input mdspan is not eigen mappable");
-
-    const auto in_mds = core::to_mdspan(std::forward<in_t>(in));
-    using in_mds_t = decltype(in_mds);
-
-    using Scalar = typename in_mds_t::element_type;
-    using Lay = typename in_mds_t::layout_type;
-
-    constexpr int RowsAtCompileTime =
-        detail::ext_to_dyn(in_mds_t::static_extent(0));
-
-    constexpr int ColsAtCompileTime =
-        detail::ext_to_dyn(in_mds_t::static_extent(1));
-
-    constexpr auto Options = []() {
-        if constexpr (ColsAtCompileTime == 1 && RowsAtCompileTime != 1) {
-            return Eigen::ColMajor;
-
-        } else if constexpr (std::is_same_v<Lay, layout_right>) {
-            return Eigen::RowMajor;
-
-        } else if constexpr (std::is_same_v<Lay, layout_left>) {
-            return Eigen::ColMajor;
-
-        } else {
-            static_assert(false, "Invalid layout type for Eigen mapping");
-        }
-    }();
-
-    const int Rows = detail::ext_to_dyn(in_mds.extent(0));
-    const int Cols = detail::ext_to_dyn(in_mds.extent(1));
-
-    using eigen_t = std::conditional_t<
-        std::is_const_v<Scalar>,
-        const Eigen::Matrix<std::remove_const_t<Scalar>, RowsAtCompileTime,
-                            ColsAtCompileTime, Options>,
-        Eigen::Matrix<Scalar, RowsAtCompileTime, ColsAtCompileTime, Options>>;
-
-    return Eigen::Map<eigen_t>{in_mds.data_handle(), Rows, Cols};
+    requires(mdspan_c<in_t> || mdarray_c<in_t>)
+[[nodiscard]] consteval bool is_always_c_contiguous() noexcept {
+    return std::same_as<typename std::remove_cvref_t<in_t>::layout_type,
+                        stdex::layout_right>;
 }
 
-} // namespace eigen
-} // namespace core
-} // namespace mdtensor
+template <mdspan_c in_t>
+[[nodiscard]] constexpr bool is_c_contiguous(const in_t &in) noexcept {
+    if constexpr (in.rank() == 0) {
+        return true;
 
-#endif // MDTENSOR_USE_EIGEN
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/eigen/eigen.hpp
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/core.hpp
+    } else {
+        // Empty tensors have no observable element ordering.
+        if (extents_size(in.extents()) == 0) {
+            return true;
+        }
 
-namespace mdtensor {
+        if (!in.is_unique() || !in.is_exhaustive() || !in.is_strided()) {
+            return false;
+        }
 
-/**
- * @brief Generate a 1-D range of values with a given step (out-of-place).
- *
- * @tparam data_t (optional) Output value type. If void, deduced from inputs.
- * @tparam start_t Arithmetic type of start.
- * @tparam stop_t Arithmetic type of stop.
- * @tparam step_t (optional) Arithmetic type of step. Default is double.
- *
- * @param start Start value (inclusive).
- * @param stop Stop value (exclusive in intent; number of elements is computed
- *             from (stop - start) / step).
- * @param step Step size. Default is 1.
- *
- * @return 1-D mdarray containing the generated range.
- *
- * @note The output length is computed as ceil((stop - start) / step).
- * @note The effective step is computed in the output value type to reduce
- *       accumulation drift when `start_t`/`step_t` differ from `data_t`.
- *
- * @warning This implementation does not currently guard against invalid input
- *          such as step == 0 or mismatched sign between (stop - start) and
- *          step. Callers should ensure the range definition is valid.
- */
-template <typename data_t = void, arithmetic_c start_t, arithmetic_c stop_t,
-          arithmetic_c step_t = double>
-[[nodiscard]] inline constexpr auto arange(start_t &&start, stop_t &&stop,
-                                           step_t &&step = (step_t)1) noexcept {
-    using value_t =
-        std::conditional_t<!std::is_void_v<data_t>, data_t,
-                           core::common_data_type_t<start_t, stop_t>>;
+        std::size_t expected_stride = 1;
 
-    const size_t num = std::ceil((stop - start) / step);
-    const value_t step_actual =
-        static_cast<value_t>(start + step) - static_cast<value_t>(start);
+        for (std::size_t i = in.rank(); i-- > 0;) {
+            const std::size_t extent = static_cast<std::size_t>(in.extent(i));
 
-    auto out = mdarray<value_t, mdtensor::dims<1>>{mdtensor::dims<1>{num}};
+            if (extent > 1 &&
+                static_cast<std::size_t>(in.stride(i)) != expected_stride) {
+                return false;
+            }
 
-    out(0) = start;
-    for (size_t i = 1; i < num; i++) {
-        out(i) = out(i - 1) + step_actual;
+            expected_stride *= extent;
+        }
+
+        return true;
     }
+}
+
+template <extents_c exts_t>
+[[nodiscard]] constexpr auto make_reshape_view(auto &&in, exts_t &&exts) {
+    const auto in_mds = to_mdspan(std::forward<decltype(in)>(in));
+
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
+    using new_exts_t = std::remove_cvref_t<exts_t>;
+
+    using out_mds_t =
+        mdspan<typename in_mds_t::element_type, new_exts_t, stdex::layout_right,
+               typename in_mds_t::accessor_type>;
+
+    if constexpr (is_always_same_extents<typename in_mds_t::extents_type,
+                                         new_exts_t>()) {
+        return in_mds;
+
+    } else {
+        return out_mds_t{
+            in_mds.data_handle(),
+            typename out_mds_t::mapping_type{std::forward<exts_t>(exts)},
+            in_mds.accessor()};
+    }
+}
+
+template <extents_c exts_t>
+[[nodiscard]] constexpr auto make_reshape_copy(auto &&in, exts_t &&exts) {
+    const auto in_mds = to_const_mdspan(std::forward<decltype(in)>(in));
+
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
+    using value_t = typename in_mds_t::value_type;
+
+    auto out = make_container<value_t>(std::forward<exts_t>(exts));
+
+    batch<Backend::NATIVE, in_mds.rank()>(
+        [&](auto &&in, auto &&out) { out() = in(); }, in_mds,
+        make_reshape_view(out, in_mds.extents()));
 
     return out;
 }
 
-/**
- * @brief Generate a 1-D range [0, stop) with step 1 (out-of-place).
- *
- * @tparam data_t (optional) Output value type. If void, deduced from input.
- * @tparam stop_t Arithmetic type of stop.
- *
- * @param stop Stop value (exclusive in intent).
- *
- * @return 1-D mdarray containing the generated range.
- *
- * @see mdtensor::arange(start, stop, step) for the general form.
- */
-template <typename data_t = void, arithmetic_c stop_t>
-[[nodiscard]] inline constexpr auto arange(stop_t &&stop) noexcept {
-    return arange<data_t>(0, std::forward<stop_t>(stop));
+} // namespace detail
+
+template <Copy copy = Copy::AUTO>
+[[nodiscard]] constexpr auto reshape(auto &&in, auto &&shape) {
+    const auto in_mds = to_mdspan(std::forward<decltype(in)>(in));
+    const auto exts = to_extents(std::forward<decltype(shape)>(shape));
+
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
+    using in_exts_t = typename in_mds_t::extents_type;
+    using exts_t = std::remove_cvref_t<decltype(exts)>;
+
+    if constexpr (in_exts_t::rank_dynamic() == 0 &&
+                  exts_t::rank_dynamic() == 0) {
+        static_assert(extents_size(in_exts_t{}) == extents_size(exts_t{}),
+                      "Reshape error: input and output extents "
+                      "must have the same size.");
+
+    } else if (extents_size(in_mds.extents()) != extents_size(exts)) {
+        throw std::invalid_argument("Reshape error: input and output "
+                                    "extents must have the same size.");
+    }
+
+    constexpr bool can_borrow =
+        std::is_lvalue_reference_v<decltype(in)> || mdspan_c<decltype(in)>;
+
+    if constexpr (copy == Copy::AUTO) {
+        if constexpr (can_borrow &&
+                      detail::is_always_c_contiguous<in_mds_t>()) {
+            return reshape<Copy::FALSE>(in_mds, exts);
+
+        } else {
+            return reshape<Copy::TRUE>(in_mds, exts);
+        }
+
+    } else if constexpr (copy == Copy::TRUE) {
+        return detail::make_reshape_copy(in_mds, exts);
+
+    } else if constexpr (copy == Copy::FALSE) {
+        static_assert(can_borrow, "Reshape error: zero-copy reshape cannot "
+                                  "bind to a temporary owning tensor.");
+
+        if (!detail::is_c_contiguous(in_mds)) {
+            throw std::invalid_argument("Reshape error: zero-copy reshape "
+                                        "requires a C-contiguous input.");
+        }
+
+        if constexpr (is_always_same_extents<in_exts_t, exts_t>()) {
+            return std::forward<decltype(in)>(in);
+
+        } else {
+            return detail::make_reshape_view(in_mds, exts);
+        }
+    }
 }
 
-// TODO: Develop arange that works in compile-time contexts (e.g., constexpr
-// mdarray) and/or with static extents.
+template <std::integral axes_t, axes_t... axes>
+[[nodiscard]] constexpr auto
+expand_dims(auto &&in, std::integer_sequence<axes_t, axes...>) {
+    const auto in_mds = to_mdspan(std::forward<decltype(in)>(in));
 
-} // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/creation/arange.hpp
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/creation/copy.hpp
+    return reshape<Copy::FALSE>(
+        in_mds, expand_extents_dims(in_mds.extents(),
+                                    std::integer_sequence<axes_t, axes...>{}));
+}
+
+template <std::int64_t... axes>
+[[nodiscard]] constexpr auto expand_dims(auto &&in) {
+    return expand_dims(std::forward<decltype(in)>(in),
+                       std::integer_sequence<std::int64_t, axes...>{});
+}
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/manipulation.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/output.hpp
 /**
  * @file
- * @brief Copy utilities for mdtensor.
+ * @brief Output utilities for mdtensor.
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -1621,68 +1732,506 @@ template <typename data_t = void, arithmetic_c stop_t>
 
 
 
-namespace mdtensor {
+namespace mdtensor::core {
 namespace detail {
 
-template <typename in_t, typename out_t>
-inline constexpr void copy_impl(in_t &&in, out_t &&out) {
-    out() = in();
+template <typename dtype, typename... Ts> struct output_value {
+    using type = dtype;
+};
+
+template <typename... Ts> struct output_value<void, Ts...> {
+    using type = common_data_type_t<
+        typename std::remove_cvref_t<to_mdspan_t<Ts>>::value_type...>;
+};
+
+template <typename dtype, typename Tuple> struct output_value_from_tuple;
+
+template <typename dtype, typename... Ts>
+struct output_value_from_tuple<dtype, std::tuple<Ts...>>
+    : output_value<dtype, Ts...> {};
+
+template <typename T> struct unwrap_optional {
+    using type = std::remove_cvref_t<T>;
+};
+
+template <typename T> struct unwrap_optional<std::optional<T>> {
+    using type = std::remove_cvref_t<T>;
+};
+
+template <typename... Ts> struct filter_nullopt;
+
+template <> struct filter_nullopt<> {
+    using type = std::tuple<>;
+};
+
+template <typename T, typename... Ts> struct filter_nullopt<T, Ts...> {
+  private:
+    using arg_t = typename unwrap_optional<std::remove_cvref_t<T>>::type;
+    using tail_t = typename filter_nullopt<Ts...>::type;
+
+  public:
+    using type = std::conditional_t<
+        std::same_as<std::remove_cvref_t<T>, std::nullopt_t>, tail_t,
+        decltype(std::tuple_cat(std::declval<std::tuple<arg_t>>(),
+                                std::declval<tail_t>()))>;
+};
+
+} // namespace detail
+
+template <typename dtype, typename... Ts>
+using output_value_t = typename detail::output_value<dtype, Ts...>::type;
+
+template <typename dtype, typename... Ts>
+using output_value_with_nullopt_t = typename detail::output_value_from_tuple<
+    dtype, typename detail::filter_nullopt<Ts...>::type>::type;
+
+template <typename dtype = void, std::size_t... uranks, extents_c uout_exts_t>
+[[nodiscard]] constexpr auto make_output(std::index_sequence<uranks...>,
+                                         uout_exts_t &&uout_exts,
+                                         auto &&...ins) {
+    static_assert(sizeof...(uranks) == sizeof...(ins),
+                  "Number of uranks must match number of inputs.");
+
+    constexpr std::size_t ins_num = sizeof...(uranks);
+
+    if constexpr (ins_num == 0) {
+        return make_container<dtype>(std::forward<uout_exts_t>(uout_exts));
+
+    } else {
+        using value_t = output_value_t<dtype, decltype(ins)...>;
+
+        // calculate broadcasted extents
+        const auto bexts = detail::get_broadcast_extents(
+            std::index_sequence<uranks...>{},
+            to_const_mdspan(std::forward<decltype(ins)>(ins))...);
+
+        // make output container
+        return make_container<value_t>(
+            compose_extents(bexts, std::forward<uout_exts_t>(uout_exts)));
+    }
+}
+
+template <typename dtype = void, extents_c uout_exts_t>
+[[nodiscard]] constexpr auto make_output(uout_exts_t &&uout_exts,
+                                         auto &&...ins) {
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return make_output<dtype>(std::index_sequence<((void)Is, 0)...>{},
+                                  std::forward<uout_exts_t>(uout_exts),
+                                  std::forward<decltype(ins)>(ins)...);
+    }(std::make_index_sequence<sizeof...(ins)>{});
+}
+
+template <typename dtype = void, std::size_t... uranks,
+          extents_tuple_c uout_exts_tuple_t>
+[[nodiscard]] constexpr auto make_outputs(std::index_sequence<uranks...>,
+                                          uout_exts_tuple_t &&uout_exts_tuple,
+                                          auto &&...ins) {
+    static_assert(sizeof...(uranks) == sizeof...(ins),
+                  "Number of uranks must match number of inputs.");
+
+    constexpr std::size_t ins_num = sizeof...(uranks);
+    constexpr std::size_t outs_num =
+        std::tuple_size_v<std::remove_cvref_t<uout_exts_tuple_t>>;
+
+    if constexpr (ins_num == 0) {
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            return std::tuple{
+                make_container<dtype>(std::get<Is>(uout_exts_tuple))...};
+        }(std::make_index_sequence<outs_num>{});
+
+    } else {
+        using value_t = output_value_t<dtype, decltype(ins)...>;
+
+        // calculate broadcasted extents
+        const auto bexts = detail::get_broadcast_extents(
+            std::index_sequence<uranks...>{},
+            to_const_mdspan(std::forward<decltype(ins)>(ins))...);
+
+        // make output container
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            return std::tuple{make_container<value_t>(
+                compose_extents(bexts, std::get<Is>(uout_exts_tuple)))...};
+        }(std::make_index_sequence<outs_num>{});
+    }
+}
+
+template <typename dtype = void>
+[[nodiscard]] constexpr auto make_outputs(auto &&uout_exts_tuple,
+                                          auto &&...ins) {
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return make_outputs<dtype>(
+            std::index_sequence<((void)Is, 0)...>{},
+            std::forward<decltype(uout_exts_tuple)>(uout_exts_tuple),
+            std::forward<decltype(ins)>(ins)...);
+    }(std::make_index_sequence<sizeof...(ins)>{});
+}
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/output.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/ufunc.hpp
+/**
+ * @file
+ * @brief Universal function (ufunc) utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor::core {
+namespace detail {
+
+template <bool is_input, std::size_t axis, bool keepdims, mdspan_c io_t,
+          typename index_t>
+[[nodiscard]] constexpr auto reduce_input(io_t &&io, index_t i) {
+    if constexpr (is_input) {
+        return submdspan_from_left<axis>(std::forward<io_t>(io), i);
+
+    } else if constexpr (keepdims) {
+        return submdspan_from_left<axis>(std::forward<io_t>(io), 0);
+
+    } else {
+        return std::forward<io_t>(io);
+    }
+}
+
+template <bool keepdims, extents_c bext_t, bool... is_input, mdspan_c... ios_t>
+constexpr void batch_reduced(auto &&func, bext_t &&, std::index_sequence<>,
+                             std::integer_sequence<bool, is_input...>,
+                             ios_t &&...ios) {
+    func(std::forward<ios_t>(ios)...);
+}
+
+template <bool keepdims, extents_c bext_t, std::size_t axis,
+          std::size_t... axes, bool... is_input, mdspan_c... ios_t>
+constexpr void
+batch_reduced(auto &&func, bext_t &&bext, std::index_sequence<axis, axes...>,
+              std::integer_sequence<bool, is_input...>, ios_t &&...ios) {
+    static_assert(sizeof...(is_input) == sizeof...(ios_t));
+    static_assert(((axis > axes) && ...), "Axes must be in descending order.");
+
+    using index_t = typename std::remove_cvref_t<bext_t>::index_type;
+
+    for (index_t i = 0; i < bext.extent(axis); i++) {
+        batch_reduced<keepdims>(std::forward<decltype(func)>(func),
+                                std::forward<decltype(bext)>(bext),
+                                std::index_sequence<axes...>{},
+                                std::integer_sequence<bool, is_input...>{},
+                                reduce_input<is_input, axis, keepdims>(
+                                    std::forward<ios_t>(ios), i)...);
+    }
+}
+
+template <std::size_t... uranks, bool... is_input>
+[[nodiscard]] constexpr auto
+broadcast_only_input(std::index_sequence<uranks...>,
+                     std::integer_sequence<bool, is_input...>, auto &&...ios) {
+    static_assert(sizeof...(uranks) == sizeof...(ios));
+    static_assert(sizeof...(is_input) == sizeof...(ios));
+
+    // make helpers
+    constexpr auto bin = std::array{is_input...};
+    const auto ios_org =
+        std::tuple{to_mdspan(std::forward<decltype(ios)>(ios))...};
+    constexpr auto ios_num = std::tuple_size_v<decltype(ios_org)>;
+    constexpr auto ios_uranks = std::array{uranks...};
+
+    // separate inputs
+    const auto ins_tuple = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        const auto get_input = [&]<std::size_t I>() {
+            if constexpr (bin[I]) {
+                return std::forward_as_tuple(std::get<I>(ios_org));
+
+            } else {
+                return std::forward_as_tuple();
+            }
+        };
+
+        return std::tuple_cat(get_input.template operator()<Is>()...);
+    }(std::make_index_sequence<sizeof...(ios)>{});
+
+    constexpr auto ins_num = std::tuple_size_v<decltype(ins_tuple)>;
+
+    static_assert(ins_num > 0, "At least one input must be provided.");
+
+    constexpr auto ins_uranks = [&]() {
+        auto ins_uranks = std::array<std::size_t, ins_num>{};
+        std::size_t ins_idx = 0;
+        for (std::size_t i = 0; i < ios_num; i++) {
+            if (bin[i]) {
+                ins_uranks[ins_idx++] = ios_uranks[i];
+            }
+        }
+        return ins_uranks;
+    }();
+
+    // broadcast inputs only
+    const auto [ins_bcast, ins_bexts] =
+        [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            return broadcast(std::index_sequence<ins_uranks[Is]...>{},
+                             std::integer_sequence<bool, (void(Is), true)...>{},
+                             std::get<Is>(ins_tuple)...);
+        }(std::make_index_sequence<ins_num>{});
+
+    // return broadcasted inputs and outputs in same order as original inputs
+    return std::make_tuple(
+        [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            const auto get_io = [&]<std::size_t I>() {
+                constexpr std::size_t J =
+                    [&]<std::size_t... Js>(std::index_sequence<Js...>) {
+                        return (std::size_t{0} + ... +
+                                static_cast<std::size_t>(bin[Js]));
+                    }(std::make_index_sequence<I>{});
+
+                if constexpr (bin[I]) {
+                    // pass broadcasted input
+                    return std::get<J>(ins_bcast);
+
+                } else {
+                    // pass through outputs
+                    return std::get<I>(ios_org);
+                }
+            };
+
+            return std::make_tuple(get_io.template operator()<Is>()...);
+        }(std::make_index_sequence<sizeof...(ios)>{}),
+        ins_bexts);
 }
 
 } // namespace detail
 
-/**
- * @brief Copy input to output element-wise (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input (mdspan, mdarray, scalar, etc.).
- * @param out Output (mdspan, mdarray, scalar, etc.).
- *
- * @note Equivalent to out = in in terms of array broadcasting.
- *
- * @see mdtensor::copy for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
-inline constexpr void copy_to(in_t &&in, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::copy_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in_t>(in)),
-        core::to_mdspan(std::forward<out_t>(out)));
+template <bool keepdims = false, std::integral axes_t, axes_t... axes,
+          std::size_t... uranks, bool... is_input>
+constexpr void reduce(auto &&func, std::integer_sequence<axes_t, axes...>,
+                      std::index_sequence<uranks...>,
+                      std::integer_sequence<bool, is_input...>, auto &&...ios) {
+    // broadcast inputs only
+    const auto [ios_bcast, ins_bexts] =
+        detail::broadcast_only_input(std::index_sequence<uranks...>{},
+                                     std::integer_sequence<bool, is_input...>{},
+                                     std::forward<decltype(ios)>(ios)...);
+
+    using ins_bexts_t = decltype(ins_bexts);
+
+    // get sorted array
+    constexpr auto axes_sorted = [&]() {
+        if constexpr (ins_bexts_t::rank() == 0) {
+            return std::array<std::size_t, 0>{};
+
+        } else if constexpr (sizeof...(axes) == 0) {
+            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                return std::array{(ins_bexts_t::rank() - 1 - Is)...};
+            }(std::make_index_sequence<ins_bexts_t::rank()>{});
+
+        } else {
+            return get_sorted_axes<ins_bexts_t::rank()>(
+                std::integer_sequence<axes_t, axes...>{},
+                std::greater<std::size_t>{});
+        }
+    }();
+
+    // batch
+    [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        [&]<std::size_t... Js>(std::index_sequence<Js...>) {
+            detail::batch_reduced<keepdims>(
+                std::forward<decltype(func)>(func), ins_bexts,
+                std::index_sequence<axes_sorted[Js]...>{},
+                std::integer_sequence<bool, is_input...>{},
+                std::get<Is>(ios_bcast)...);
+        }(std::make_index_sequence<axes_sorted.size()>{});
+    }(std::make_index_sequence<sizeof...(ios)>{});
 }
 
-/**
- * @brief Copy input element-wise (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- * input.
- *
- * @param in Input (mdspan, mdarray, scalar, etc.).
- *
- * @return mdarray or scalar.
- *
- * @note Equivalent to out = in in terms of array broadcasting.
- *
- * @see mdtensor::copy_to for the in-place version that writes into an output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto copy(in_t &&in) {
-    return core::batch_out<dtype, mpmode>(
-        [](auto &&...elems) {
-            detail::copy_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in_t>(in)));
+template <typename dtype = void, bool keepdims = false, std::integral axes_t,
+          axes_t... axes, std::size_t... uranks, extents_c uout_exts_t>
+[[nodiscard]] constexpr auto
+make_reduce_output(std::integer_sequence<axes_t, axes...>,
+                   std::index_sequence<uranks...>, uout_exts_t &&uout_exts,
+                   auto &&...ins) {
+    static_assert(sizeof...(ins) > 0, "At least one input must be provided.");
+    static_assert(sizeof...(uranks) == sizeof...(ins),
+                  "Number of uranks must match number of inputs.");
+
+    // calculate input broadcasted extents
+    const auto ins_bexts = detail::get_broadcast_extents(
+        std::index_sequence<uranks...>{},
+        to_const_mdspan(std::forward<decltype(ins)>(ins))...);
+
+    using ins_bexts_t = decltype(ins_bexts);
+
+    // get sorted array
+    constexpr auto axes_sorted = [&]() {
+        if constexpr (ins_bexts_t::rank() == 0) {
+            return std::array<std::size_t, 0>{};
+
+        } else if constexpr (sizeof...(axes) == 0) {
+            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                return std::array{(ins_bexts_t::rank() - 1 - Is)...};
+            }(std::make_index_sequence<ins_bexts_t::rank()>{});
+
+        } else {
+            return get_sorted_axes<ins_bexts_t::rank()>(
+                std::integer_sequence<axes_t, axes...>{},
+                std::greater<std::size_t>{});
+        }
+    }();
+
+    // generate out_bexts
+    constexpr auto not_axes_size = ins_bexts_t::rank() - axes_sorted.size();
+
+    const auto out_bexts = [&]() {
+        using index_t = typename ins_bexts_t::index_type;
+
+        if constexpr (keepdims) {
+            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                return extents<index_t,
+                               (contains(axes_sorted, Is)
+                                    ? std::size_t{1}
+                                    : ins_bexts_t::static_extent(Is))...>{
+                    (contains(axes_sorted, Is)
+                         ? index_t{1}
+                         : static_cast<index_t>(ins_bexts.extent(Is)))...};
+            }(std::make_index_sequence<ins_bexts_t::rank()>{});
+
+        } else {
+            // generate unselected axes sequence
+            constexpr auto not_axes_arr = [&]() {
+                auto not_axes_arr = std::array<std::size_t, not_axes_size>{};
+
+                std::size_t not_axes_idx = 0;
+                for (std::size_t i = 0; i < ins_bexts_t::rank(); i++) {
+                    if (!contains(axes_sorted, i)) {
+                        not_axes_arr[not_axes_idx++] = i;
+                    }
+                }
+
+                return not_axes_arr;
+            }();
+
+            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                return extents<index_t,
+                               ins_bexts_t::static_extent(not_axes_arr[Is])...>{
+                    ins_bexts.extent(not_axes_arr[Is])...};
+            }(std::make_index_sequence<not_axes_arr.size()>{});
+        }
+    }();
+
+    // generate out
+    using value_t = output_value_t<dtype, decltype(ins)...>;
+
+    return make_container<value_t>(
+        compose_extents(out_bexts, std::forward<uout_exts_t>(uout_exts)));
+}
+
+// TODO: develop make_reduce_outputs
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/ufunc.hpp
+
+namespace mdtensor {
+
+constexpr auto dyn = core::dyn;
+
+template <typename T>
+concept extents_c = core::extents_c<T>;
+
+template <typename T>
+concept mdspan_c = core::mdspan_c<T>;
+
+template <typename T>
+concept mdarray_c = core::mdarray_c<T>;
+
+template <std::size_t start, std::size_t end>
+using slice = core::slice<start, end>;
+
+template <typename IndexType, std::size_t... Extents>
+using extents = core::extents<IndexType, Extents...>;
+
+template <typename IndexType, std::size_t Rank>
+using dextents = core::dextents<IndexType, Rank>;
+
+// dims: will be included in C++23
+// (https://en.cppreference.com/w/cpp/container/mdspan/extents)
+template <std::size_t Rank, class IndexType = std::size_t>
+using dims = core::dims<Rank, IndexType>;
+
+template <typename ElementType, typename Extents,
+          typename LayoutPolicy = core::stdex::layout_right,
+          typename AccessorPolicy = core::stdex::default_accessor<ElementType>>
+using mdspan = core::mdspan<ElementType, Extents, LayoutPolicy, AccessorPolicy>;
+
+constexpr auto full_extent = core::full_extent;
+
+template <typename value_t, extents_c extent_t>
+using container = core::container<value_t, extent_t>;
+
+using Backend = core::Backend;
+
+template <extents_c... ins_t>
+[[nodiscard]] constexpr bool is_always_same_extents() noexcept {
+    return core::is_always_same_extents<ins_t...>();
+}
+
+template <extents_c... ins_t>
+[[nodiscard]] constexpr bool is_same_extents(ins_t &&...ins) noexcept {
+    return core::is_same_extents(std::forward<ins_t>(ins)...);
+}
+
+[[nodiscard]] constexpr auto to_mdspan(auto &&io) {
+    return core::to_mdspan(std::forward<decltype(io)>(io));
+}
+
+[[nodiscard]] constexpr auto to_const_mdspan(auto &&in) {
+    return core::to_const_mdspan(std::forward<decltype(in)>(in));
+}
+
+[[nodiscard]] constexpr auto to_output_mdspan(auto &&out) {
+    return core::to_output_mdspan(std::forward<decltype(out)>(out));
+}
+
+[[nodiscard]] constexpr auto submdspan(auto &&io, auto &&...slices) {
+    return core::submdspan(std::forward<decltype(io)>(io),
+                           std::forward<decltype(slices)>(slices)...);
+}
+
+template <std::size_t lspace = 0, std::size_t rspace = 0>
+[[nodiscard]] constexpr auto submdspan_with_space(auto &&io, auto &&...slices) {
+    return core::submdspan_with_space<lspace, rspace>(
+        std::forward<decltype(io)>(io),
+        std::forward<decltype(slices)>(slices)...);
+}
+
+template <std::size_t lspace = 0>
+[[nodiscard]] constexpr auto submdspan_from_left(auto &&io, auto &&...slices) {
+    return core::submdspan_from_left<lspace>(
+        std::forward<decltype(io)>(io),
+        std::forward<decltype(slices)>(slices)...);
+}
+
+template <std::size_t rspace = 0>
+[[nodiscard]] constexpr auto submdspan_from_right(auto &&io, auto &&...slices) {
+    return core::submdspan_from_right<rspace>(
+        std::forward<decltype(io)>(io),
+        std::forward<decltype(slices)>(slices)...);
+}
+
+template <extents_c exts_t>
+[[nodiscard]] constexpr std::string to_string(exts_t &&exts) {
+    return core::to_string(std::forward<exts_t>(exts));
+}
+
+[[nodiscard]] constexpr std::string to_string(auto &&in) {
+    return core::to_string(std::forward<decltype(in)>(in));
 }
 
 } // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/creation/copy.hpp
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/creation/copy_like.hpp
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/core.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/creation/creation.hpp
 /**
  * @file
- * @brief Copy-into-like utilities for mdtensor (copy_like).
+ * @brief Creation module header aggregation for mdtensor.
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -1690,10 +2239,10 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
  */
 
 
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/creation/empty_like.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/creation/arange.hpp
 /**
  * @file
- * @brief Empty-like tensor creation utilities for mdtensor.
+ * @brief Range generation utilities for mdtensor (arange).
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -1715,27 +2264,10 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 
 namespace mdtensor {
 
-/**
- * @brief Create an uninitialized tensor with the given extents.
- *
- * @tparam dtype Element type of the created tensor.
- * @tparam exts_t (optional) Extents type describing the tensor shape.
- *         Default is extents<uint8_t>.
- *
- * @param exts Tensor extents (shape). If omitted, creates a scalar-like tensor.
- *
- * @return A newly allocated mdarray-like tensor of type `dtype` with the given
- * extents.
- *
- * @note This function does not initialize memory. Use `zeros`, `ones`, or
- *       `full` if initialization is required.
- *
- * @see mdtensor::empty_like for creating an uninitialized tensor matching the
- * shape of an existing tensor.
- */
-template <typename dtype, extents_c exts_t = extents<uint8_t>>
-[[nodiscard]] inline constexpr auto empty(exts_t &&exts = exts_t{}) noexcept {
-    return core::create_data<dtype>(std::forward<exts_t>(exts));
+template <typename dtype = double>
+[[nodiscard]] constexpr auto empty(auto &&shape) {
+    return core::make_container<dtype>(
+        core::to_extents(std::forward<decltype(shape)>(shape)));
 }
 
 } // namespace mdtensor
@@ -1743,28 +2275,109 @@ template <typename dtype, extents_c exts_t = extents<uint8_t>>
 
 namespace mdtensor {
 
-/**
- * @brief Create an uninitialized tensor with the same shape as the input.
- *
- * @tparam dtype (optional) Element type of the result. If void, the value type
- *         is deduced from the input.
- *
- * @param in Input tensor-like object (mdspan, mdarray, etc.).
- *
- * @return A new tensor allocated with the same extents as `in`.
- *
- * @note This function does not initialize memory. Use `zeros_like` or
- *       `full_like` if initialization is required.
- *
- * @see mdtensor::empty for creating an uninitialized tensor from explicit
- * extents.
- */
-template <typename dtype = void, typename in_t>
-[[nodiscard]] inline constexpr auto empty_like(in_t &&in) noexcept {
-    using value_t = std::conditional_t<std::is_void_v<dtype>,
-                                       core::value_type_t<in_t>, dtype>;
+template <typename dtype = void, core::extents_c exts_t,
+          core::arithmetic_c start_t = int, core::arithmetic_c step_t = int,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto arange(exts_t &&exts, start_t &&start = start_t{0},
+                                    step_t &&step = step_t{1},
+                                    out_t &&out = out_t{std::nullopt}) {
+    static_assert(exts.rank() == 1, "arange only supports rank-1 extents");
 
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            using value_t = core::output_value_t<dtype, start_t, step_t>;
+
+            return empty<value_t>(std::forward<decltype(exts)>(exts));
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    using value_t = typename decltype(out_md)::value_type;
+    using index_t = typename decltype(out_md)::index_type;
+
+    const value_t actual_step =
+        static_cast<value_t>(start + step) - static_cast<value_t>(start);
+
+    out_md(0) = static_cast<value_t>(start);
+
+    for (index_t i = 1; i < out_md.extent(0); i++) {
+        out_md(i) = out_md(i - 1) + static_cast<value_t>(actual_step);
+    }
+
+    return out_md;
+}
+
+template <typename dtype = void, core::arithmetic_c start_t,
+          core::arithmetic_c stop_t, core::arithmetic_c step_t = int,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto arange(start_t &&start, stop_t &&stop,
+                                    step_t &&step = step_t{1},
+                                    out_t &&out = out_t{std::nullopt}) {
+    const std::int64_t num = std::ceil((stop - start) / step);
+
+    if (num < 0) {
+        throw std::invalid_argument(
+            "calculated number of elements is negative");
+    }
+
+    return arange<dtype>(core::dims<1>{static_cast<std::size_t>(num)},
+                         std::forward<start_t>(start),
+                         std::forward<step_t>(step), std::forward<out_t>(out));
+}
+
+template <typename dtype = void, core::arithmetic_c stop_t>
+[[nodiscard]] constexpr auto arange(stop_t &&stop) {
+    using start_t = typename std::remove_cvref_t<stop_t>;
+
+    return arange<dtype>(start_t{0}, std::forward<stop_t>(stop), start_t{1});
+}
+
+template <std::size_t num, typename dtype = void,
+          core::arithmetic_c start_t = int, core::arithmetic_c step_t = int,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto arange(start_t &&start = start_t{0},
+                                    step_t &&step = step_t{1},
+                                    out_t &&out = out_t{std::nullopt}) {
+    return arange<dtype>(core::extents<std::size_t, num>{},
+                         std::forward<start_t>(start),
+                         std::forward<step_t>(step), std::forward<out_t>(out));
+}
+
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/creation/arange.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/creation/copy.hpp
+/**
+ * @file
+ * @brief Copy utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/creation/empty_like.hpp
+/**
+ * @file
+ * @brief Empty-like tensor creation utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor {
+
+template <typename dtype = void>
+[[nodiscard]] constexpr auto empty_like(auto &&in) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    using value_t = core::output_value_t<dtype, decltype(in_mds)>;
+
     return empty<value_t>(in_mds.extents());
 }
 
@@ -1772,40 +2385,39 @@ template <typename dtype = void, typename in_t>
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/creation/empty_like.hpp
 
 namespace mdtensor {
+namespace ufunc {
 
-/**
- * @brief Allocate an output like `in1` and copy `in2` into it (out-of-place).
- *
- * @tparam dtype (optional) Output value type. If void, deduced by
- *         empty_like.
- * @tparam mpmode (optional) Parallel execution mode for the copy operation.
- *         Default is MPMode::NONE.
- *
- * @param in1 Shape/layout reference (mdspan, mdarray, etc.). The output is
- *            allocated to be "like" this input.
- * @param in2 Source data to copy from (mdspan, mdarray, scalar, etc.).
- *
- * @return Newly allocated container (typically mdarray-like) that has the same
- *         shape/layout as `in1` and contains the copied values from `in2`.
- *
- * @note This is equivalent to:
- *       - out = empty_like(in1)
- *       - copy_to(in2, out)
- *       in terms of allocation + broadcasting semantics provided by copy_to.
- *
- * @see mdtensor::empty_like
- * @see mdtensor::copy_to
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
-[[nodiscard]] inline constexpr auto copy_like(in1_t &&in1, in2_t &&in2) {
-    auto out = empty_like<dtype>(std::forward<in1_t>(in1));
-    copy_to<mpmode>(std::forward<in2_t>(in2), out);
-    return out;
+constexpr void copy_ufunc(auto &&in, auto &&out) { out() = in(); }
+
+} // namespace ufunc
+
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto copy(auto &&in,
+                                  out_t &&out = out_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return empty_like<dtype>(in_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
+        [](auto &&...elems) {
+            ufunc::copy_ufunc(std::forward<decltype(elems)>(elems)...);
+        },
+        std::integer_sequence<bool, true, false>{},
+        std::forward<decltype(in)>(in), out_md);
+
+    return out_md;
 }
 
 } // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/creation/copy_like.hpp
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/creation/copy.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/creation/eye.hpp
 /**
  * @file
@@ -1819,114 +2431,77 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
 
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in_t> inline constexpr void eye_impl(in_t &&in) {
-    using in_base_t = std::remove_cvref_t<in_t>;
-    using index_t = typename in_base_t::index_type;
+constexpr void eye_ufunc(auto &&out, const int &k) {
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
 
-    for (index_t i = 0; i < in.extent(0); i++) {
-        for (index_t j = 0; j < in.extent(1); j++) {
-            in(i, j) = (i == j) ? 1 : 0;
+    using index_t = typename decltype(out_mds)::index_type;
+
+    for (index_t i = 0; i < out_mds.extent(0); i++) {
+        for (index_t j = 0; j < out_mds.extent(1); j++) {
+            out_mds(i, j) = (i + k == j) ? 1 : 0;
         }
     }
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Fill a 2D tensor with an identity matrix pattern (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Output matrix to fill (mdspan, mdarray, etc.). Rank must be greater
- *        than or equal to 2.
- *
- * @note This function writes `1` on the main diagonal and `0` elsewhere.
- *
- * @see mdtensor::eye for the out-of-place version that allocates and returns
- * an identity matrix.
- */
-template <MPMode mpmode = MPMode::NONE, typename in_t>
-inline constexpr void eye_to(in_t &&in) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::eye_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<2>{}, core::to_mdspan(std::forward<in_t>(in)));
+template <typename dtype = double, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto eye(auto &&shape, const int &k = 0,
+                                 out_t &&out = out_t{std::nullopt}) {
+    using shape_t = std::remove_cvref_t<decltype(shape)>;
+
+    if constexpr (core::extents_c<shape_t>) {
+        const auto exts =
+            core::to_extents(std::forward<decltype(shape)>(shape));
+
+        static_assert(exts.rank() >= 2, "eye requires rank >= 2");
+
+        auto out_md = [&]() {
+            if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+                return empty<dtype>(exts);
+
+            } else {
+                return core::to_output_mdspan(std::forward<decltype(out)>(out));
+            }
+        }();
+
+        core::batch<backend, exts.rank() - 2>(
+            [&](auto &&...elems) {
+                ufunc::eye_ufunc(std::forward<decltype(elems)>(elems)..., k);
+            },
+            out_md);
+
+        return out_md;
+
+    } else if constexpr (core::integral_c<shape_t>) {
+        if (shape < shape_t{0}) {
+            throw std::invalid_argument("exts must be non-negative");
+        }
+
+        using index_t = std::make_unsigned_t<shape_t>;
+
+        return eye<dtype, backend>(
+            core::dextents<index_t, 2>{static_cast<index_t>(shape),
+                                       static_cast<index_t>(shape)},
+            k);
+    }
 }
 
-/**
- * @brief Create an identity matrix (out-of-place).
- *
- * @tparam dtype Element type of the created matrix.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam exts_t (optional) Extents type describing the matrix shape. Default
- * is extents<uint8_t>.
- *
- * @param exts Output matrix extents (shape). Rank must be greater than or equal
- * to 2.
- *
- * @return A newly allocated matrix filled as an identity matrix.
- *
- * @note Equivalent to allocating `empty<dtype>(exts)` and then calling
- *       `eye_to` on it.
- *
- * @see mdtensor::eye_to for the in-place version that fills an existing output.
- */
-template <typename dtype, MPMode mpmode = MPMode::NONE,
-          extents_c exts_t = extents<uint8_t>>
-[[nodiscard]] inline constexpr auto eye(exts_t &&exts = exts_t{}) {
-    auto out = empty<dtype>(std::forward<exts_t>(exts));
-    eye_to<mpmode>(out);
-    return out;
+template <std::size_t N, typename dtype = double,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto eye(const int &k = 0,
+                                 out_t &&out = out_t{std::nullopt}) {
+    return eye<dtype, backend>(core::extents<std::size_t, N, N>{}, k,
+                               std::forward<out_t>(out));
 }
 
 } // namespace mdtensor
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/creation/eye.hpp
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/creation/fill.hpp
-/**
- * @file
- * @brief Fill utilities for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
-
-namespace mdtensor {
-namespace detail {
-
-template <typename in_t, typename val_t>
-inline constexpr void fill_impl(in_t &&in, val_t &&val) {
-    in() = val;
-}
-
-} // namespace detail
-
-/**
- * @brief Fill all elements of a tensor with a scalar value (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Output tensor to fill (mdspan, mdarray, scalar, etc.).
- * @param val Value to assign to every element.
- *
- * @note Equivalent to `in[...] = val` in terms of array broadcasting.
- */
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename val_t>
-inline constexpr void fill(in_t &&in, val_t &&val) {
-    core::batch<mpmode>(
-        [&](auto &&...elems) {
-            detail::fill_impl(std::forward<decltype(elems)>(elems)..., val);
-        },
-        core::to_mdspan(std::forward<in_t>(in)));
-}
-
-} // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/creation/fill.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/creation/full.hpp
 /**
  * @file
@@ -1940,33 +2515,37 @@ inline constexpr void fill(in_t &&in, val_t &&val) {
 
 
 namespace mdtensor {
+namespace ufunc {
 
-/**
- * @brief Create a new tensor filled with a scalar value (out-of-place).
- *
- * @tparam dtype Element type of the result tensor.
- * @tparam mpmode (optional) Parallel execution mode used for filling. Default
- * is MPMode::NONE.
- * @tparam exts_t (optional) Extents type. Default is extents<uint8_t>.
- *
- * @param val Fill value.
- * @param exts Output extents.
- *
- * @return Newly allocated tensor (mdarray) with extents `exts`, filled with
- * `val`.
- *
- * @note Equivalent to `out = empty<dtype>(exts); fill(out, val);`.
- *
- * @see mdtensor::empty
- * @see mdtensor::fill
- */
-template <typename dtype, MPMode mpmode = MPMode::NONE,
-          extents_c exts_t = extents<uint8_t>>
-[[nodiscard]] inline constexpr auto full(dtype &&val,
-                                         exts_t &&exts = exts_t{}) {
-    auto out = empty<dtype>(std::forward<exts_t>(exts));
-    fill<mpmode>(out, std::forward<dtype>(val));
-    return out;
+constexpr void full_ufunc(auto &&out, auto &&val) { out() = val(); }
+
+} // namespace ufunc
+
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto full(auto &&shape, auto &&val,
+                                  out_t &&out = out_t{std::nullopt}) {
+    const auto val_mds =
+        core::to_const_mdspan(std::forward<decltype(val)>(val));
+
+    using value_t = core::output_value_t<dtype, decltype(val_mds)>;
+
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return empty<value_t>(std::forward<decltype(shape)>(shape));
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
+        [](auto &&...elems) {
+            ufunc::full_ufunc(std::forward<decltype(elems)>(elems)...);
+        },
+        std::integer_sequence<bool, false, true>{}, out_md, val_mds);
+
+    return out_md;
 }
 
 } // namespace mdtensor
@@ -1985,32 +2564,12 @@ template <typename dtype, MPMode mpmode = MPMode::NONE,
 
 namespace mdtensor {
 
-/**
- * @brief Create a new tensor filled with a scalar value, matching an input's
- *        shape (out-of-place).
- *
- * @tparam dtype (optional) Data type of the result. If void, deduced from the
- * input value type.
- * @tparam mpmode (optional) Parallel execution mode used for filling. Default
- * is MPMode::NONE.
- *
- * @param in Reference tensor whose extents are used (mdspan, mdarray, etc.).
- * @param val Fill value.
- *
- * @return Newly allocated tensor (mdarray) with the same extents as `in`,
- * filled with `val`.
- *
- * @note Equivalent to `out = empty_like(in); out[...] = val`.
- *
- * @see mdtensor::empty_like
- * @see mdtensor::fill
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t,
-          typename val_t>
-[[nodiscard]] inline constexpr auto full_like(in_t &&in, val_t &&val) {
-    auto out = empty_like<dtype>(std::forward<in_t>(in));
-    fill<mpmode>(out, std::forward<val_t>(val));
-    return out;
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto full_like(auto &&in, auto &&val) {
+    using value_t = core::output_value_t<dtype, decltype(in)>;
+
+    return full<value_t, backend>(in.extents(),
+                                  std::forward<decltype(val)>(val));
 }
 
 } // namespace mdtensor
@@ -2026,173 +2585,312 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t,
  */
 
 
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/add.hpp
+/**
+ * @file
+ * @brief Element-wise addition utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <md_c start_t, md_c stop_t, md_c out_t>
-    requires(std::remove_cvref_t<start_t>::rank() == 0 &&
-             std::remove_cvref_t<stop_t>::rank() == 0 &&
-             std::remove_cvref_t<out_t>::rank() == 1)
-inline constexpr void linspace_impl(start_t &&start, stop_t &&stop, out_t &&out,
-                                    const bool endpoint = true) noexcept {
-    using out_base_t = std::remove_cvref_t<out_t>;
+constexpr void add_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
 
-    using value_t = typename out_base_t::value_type;
-    using index_t = typename out_base_t::index_type;
+    out() = in1() + in2();
+}
 
-    const index_t num = out.extent(0);
+} // namespace ufunc
 
-    if (num == 0) [[unlikely]] {
-        // do nothing
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto add(auto &&in1, auto &&in2,
+                                 out_t &&out = out_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    } else if (num == 1) [[unlikely]] {
-        out(0) = static_cast<value_t>(start());
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_output<dtype>(core::extents<std::uint8_t>{},
+                                            in1_mds, in2_mds);
+
+        } else {
+            // check that out is not rvalue
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
+        [](auto &&...elems) {
+            ufunc::add_ufunc(std::forward<decltype(elems)>(elems)...);
+        },
+        std::integer_sequence<bool, true, true, false, true>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        out_md, std::forward<decltype(where)>(where));
+
+    return out_md;
+}
+
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/add.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/multiply.hpp
+/**
+ * @file
+ * @brief Element-wise multiplication utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor {
+namespace ufunc {
+
+constexpr void multiply_ufunc(auto &&in1, auto &&in2, auto &&out,
+                              auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
+    out() = in1() * in2();
+}
+
+} // namespace ufunc
+
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto multiply(auto &&in1, auto &&in2,
+                                      out_t &&out = out_t{std::nullopt},
+                                      where_t &&where = where_t{std::nullopt}) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
+
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_output<dtype>(core::extents<std::uint8_t>{},
+                                            in1_mds, in2_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
+        [](auto &&...elems) {
+            ufunc::multiply_ufunc(std::forward<decltype(elems)>(elems)...);
+        },
+        std::integer_sequence<bool, true, true, false, true>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        out_md, std::forward<decltype(where)>(where));
+
+    return out_md;
+}
+
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/multiply.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/subtract.hpp
+/**
+ * @file
+ * @brief Element-wise subtraction utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor {
+namespace ufunc {
+
+constexpr void subtract_ufunc(auto &&in1, auto &&in2, auto &&out,
+                              auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
+    out() = in1() - in2();
+}
+
+} // namespace ufunc
+
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto subtract(auto &&in1, auto &&in2,
+                                      out_t &&out = out_t{std::nullopt},
+                                      where_t &&where = where_t{std::nullopt}) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
+
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_output<dtype>(core::extents<std::uint8_t>{},
+                                            in1_mds, in2_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
+        [](auto &&...elems) {
+            ufunc::subtract_ufunc(std::forward<decltype(elems)>(elems)...);
+        },
+        std::integer_sequence<bool, true, true, false, true>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        out_md, std::forward<decltype(where)>(where));
+
+    return out_md;
+}
+
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/subtract.hpp
+
+namespace mdtensor {
+namespace ufunc {
+
+template <core::Backend backend = core::Backend::AUTO>
+constexpr void linspace_ufunc(auto &&start, auto &&stop, auto &&out,
+                              const bool endpoint = true) {
+    const auto start_mds =
+        core::to_const_mdspan(std::forward<decltype(start)>(start));
+    const auto stop_mds =
+        core::to_const_mdspan(std::forward<decltype(stop)>(stop));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
+
+    using value_t = typename decltype(out_mds)::value_type;
+    using index_t = typename decltype(out_mds)::index_type;
+
+    const index_t num = out_mds.extent(0);
+
+    if (num == 0) {
+        return;
+
+    } else if (num == 1) {
+        if (!endpoint) {
+            static_cast<void>(
+                copy(start_mds, core::submdspan_from_left(out_mds)));
+
+        } else {
+            static_cast<void>(
+                copy(stop_mds, core::submdspan_from_left(out_mds)));
+        }
 
     } else {
-        const value_t start_val = static_cast<value_t>(start());
-        const value_t stop_val = static_cast<value_t>(stop());
-        const value_t step =
-            (stop_val - start_val) / (endpoint ? num - 1 : num);
+        const value_t scale = value_t{1} / (endpoint ? num - 1 : num);
 
-        for (index_t i = 0; i < num; i++) {
-            out(i) = start_val + step * i;
+        const auto step = multiply<value_t, backend>(
+            subtract<value_t, backend>(stop_mds, start_mds), scale);
+
+        static_cast<void>(copy(start_mds, out_mds));
+
+        for (index_t i = 1; i < num; i++) {
+            static_cast<void>(add<void, backend>(
+                core::submdspan_from_left(out_mds, i),
+                multiply<value_t, backend>(step, static_cast<value_t>(i)),
+                core::submdspan_from_left(out_mds, i)));
+        }
+
+        if (endpoint) {
+            // Ensure that the last element is exactly equal to the stop value
+            static_cast<void>(
+                copy(stop_mds, core::submdspan_from_left(out_mds, num - 1)));
         }
     }
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Generate evenly spaced samples along a specified axis (in-place).
- *
- * @tparam Axis (optional) Axis in the output tensor along which samples are
- * generated. Default is 0. Negative values are supported (Numpy-style).
- * @tparam start_t Start values (mdspan, mdarray, scalar, etc.).
- * @tparam stop_t  Stop values (mdspan, mdarray, scalar, etc.).
- * @tparam out_t   Output buffer (mdspan, mdarray, etc.).
- *
- * @param start Start value(s). Must have the same rank as `stop`.
- * @param stop Stop value(s). Must have the same rank as `start`.
- * @param out Output buffer whose rank must be `rank(start) + 1`.
- * @param endpoint If true, include `stop` as the last sample along the linspace
- * axis. If false, exclude `stop`.
- *
- * @details
- * - If `start` and `stop` are scalars (rank 0), `out` must be rank 1 and this
- *   fills `out` directly.
- * - If `start` and `stop` are higher-rank, this function recursively applies
- *   linspace along `Axis` without broadcasting.
- *
- * @note This implementation currently **does not** support broadcasting between
- * `start` and `stop`. Rank must match and `out` must be exactly one higher
- * rank.
- * @note The axis selection is normalized to `[0, out_rank)` using modulo rules.
- *
- * @warning The function uses runtime `assert` checks for certain extent
- * invariants when rank > 0.
- *
- * @see mdtensor::linspace for the out-of-place version that allocates and
- * returns the output.
- */
-template <int64_t Axis = 0, typename start_t, typename stop_t, typename out_t>
-inline constexpr void linspace_to(start_t &&start, stop_t &&stop, out_t &&out,
-                                  const bool endpoint = true) noexcept {
-    const auto start_mds = core::to_const_mdspan(std::forward<start_t>(start));
-    const auto stop_mds = core::to_const_mdspan(std::forward<stop_t>(stop));
-    const auto out_mds = core::to_mdspan(std::forward<out_t>(out));
+template <std::int64_t axis = 0, typename dtype = void,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto linspace(auto &&shape, auto &&start, auto &&stop,
+                                      const bool endpoint = true,
+                                      out_t &&out = out_t{std::nullopt}) {
+    const auto exts = core::to_extents(std::forward<decltype(shape)>(shape));
 
-    using start_mds_t = decltype(start_mds);
-    using stop_mds_t = decltype(stop_mds);
-    using out_mds_t = decltype(out_mds);
+    static_assert(exts.rank() == 1,
+                  "The extents for linspace must be a 1D tensor.");
 
-    static_assert(start_mds_t::rank() == stop_mds_t::rank() &&
-                      start_mds_t::rank() + 1 == out_mds_t::rank(),
-                  "linspace does not support broadcasting");
-    // TODO: support broadcasting without changing rank.
+    const auto [bcasts, bexts] = core::broadcast(
+        std::index_sequence<0, 0>{}, std::integer_sequence<bool, true, true>{},
+        std::forward<decltype(start)>(start),
+        std::forward<decltype(stop)>(stop));
+    const auto start_bcast = std::get<0>(bcasts);
+    const auto stop_bcast = std::get<1>(bcasts);
 
-    if constexpr (start_mds_t::rank() == 0) {
-        detail::linspace_impl(start_mds, stop_mds, out_mds, endpoint);
+    constexpr std::size_t baxis =
+        static_cast<std::size_t>(core::bounding_index(axis, bexts.rank()));
+    constexpr std::size_t out_urank = bexts.rank() + 1 - baxis;
 
-    } else {
-        constexpr size_t out_rank = out_mds_t::rank();
-        constexpr size_t axis = static_cast<size_t>(
-            ((Axis % static_cast<int64_t>(out_rank)) + (out_rank)) % out_rank);
-        constexpr size_t lspace = axis == 0 ? 1 : 0;
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            using value_t =
+                core::output_value_t<dtype,
+                                     typename decltype(start_bcast)::value_type,
+                                     typename decltype(stop_bcast)::value_type>;
 
-        assert(start_mds.extent(0) == stop_mds.extent(0));
-        assert(start_mds.extent(0) == out_mds.extent(lspace));
+            return empty<value_t>(core::compose_extents(
+                core::slice_extents_from_left<baxis>(bexts), exts,
+                core::slice_extents_from_right<out_urank - 1>(bexts)));
 
-        for (typename out_mds_t::index_type i = 0; i < out_mds.extent(lspace);
-             i++) {
-            linspace_to<axis - (lspace == 0 ? 1 : 0)>(
-                core::submdspan_from_left(start_mds, i),
-                core::submdspan_from_left(stop_mds, i),
-                core::submdspan_from_left<lspace>(out_mds, i), endpoint);
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
         }
-    }
+    }();
+
+    core::batch_with_broadcast<backend>(
+        [&](auto &&...elems) {
+            ufunc::linspace_ufunc<core::Backend::NATIVE>(
+                std::forward<decltype(elems)>(elems)..., endpoint);
+        },
+        std::index_sequence<out_urank - 1, out_urank - 1, out_urank>{},
+        std::integer_sequence<bool, true, true, false>{}, start_bcast,
+        stop_bcast, out_md);
+
+    return out_md;
 }
 
-/**
- * @brief Create an array of evenly spaced samples over an interval
- * (out-of-place).
- *
- * @tparam Axis (optional) Axis of the output along which samples are placed.
- * Default is 0. Negative values are supported (Python-style).
- * @tparam exts_t (optional) 1D extents type that determines the number of
- * samples. Default is `extents<uint8_t, 50>` (i.e., static 50 samples).
- * @tparam dtype (optional) Output value type. If `void`, deduced as a common
- * type of start/stop value types.
- * @tparam start_t Start values (mdspan, mdarray, scalar, etc.).
- * @tparam stop_t  Stop values (mdspan, mdarray, scalar, etc.).
- *
- * @param start Start value(s).
- * @param stop Stop value(s).
- * @param exts  1D extents specifying the number of samples (length `num`).
- * @param endpoint If true, include `stop` as the last sample; otherwise
- * exclude.
- *
- * @return An mdarray whose rank is `rank(start) + 1`. The output shape is
- * formed by inserting the 1D `exts` at the specified `Axis` into the base
- * extents of `start`:
- * - `out_extents = concat(slice_left(bexts, axis), exts, slice_right(bexts,
- * ...))`
- *
- * @note Broadcasting between `start` and `stop` is currently not supported.
- * They must have the same rank and compatible extents.
- *
- * @see mdtensor::linspace_to for the in-place version that writes into an
- * existing output.
- */
-template <int64_t Axis = 0, extents_c exts_t = extents<uint8_t, 50>,
-          typename dtype = void, typename start_t, typename stop_t>
-    requires(exts_t::rank() == 1)
-[[nodiscard]] inline constexpr auto
-linspace(start_t &&start, stop_t &&stop, const exts_t &exts = exts_t{},
-         const bool endpoint = true) noexcept {
-    const auto start_mds = core::to_const_mdspan(std::forward<start_t>(start));
-    const auto stop_mds = core::to_const_mdspan(std::forward<stop_t>(stop));
-
-    using start_mds_t = decltype(start_mds);
-    using stop_mds_t = decltype(stop_mds);
-
-    using value_t = std::conditional_t<
-        !std::is_void_v<dtype>, dtype,
-        core::common_data_type_t<typename start_mds_t::value_type,
-                                 typename stop_mds_t::value_type>>;
-
-    constexpr size_t out_rank = start_mds_t::rank() + 1;
-    constexpr size_t axis = static_cast<size_t>(
-        ((Axis % static_cast<int64_t>(out_rank)) + (out_rank)) % out_rank);
-
-    const auto bexts = start_mds.extents();
-    auto out = core::create_data<value_t>(core::concatenate_extents(
-        core::slice_from_left<axis>(bexts), exts,
-        core::slice_from_right<decltype(bexts)::rank() - axis>(bexts)));
-
-    linspace_to<Axis>(start_mds, stop_mds, out, endpoint);
-
-    return out;
+template <std::size_t num, std::int64_t axis = 0, typename dtype = void,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto linspace(auto &&start, auto &&stop,
+                                      const bool endpoint = true,
+                                      out_t &&out = out_t{std::nullopt}) {
+    return linspace<axis, dtype, backend>(
+        core::extents<std::size_t, num>{}, std::forward<decltype(start)>(start),
+        std::forward<decltype(stop)>(stop), endpoint,
+        std::forward<decltype(out)>(out));
 }
 
 } // namespace mdtensor
@@ -2211,45 +2909,12 @@ linspace(start_t &&start, stop_t &&stop, const exts_t &exts = exts_t{},
 
 namespace mdtensor {
 
-/**
- * @brief Create a tensor filled with ones (general extents overload).
- *
- * @tparam dtype Output value type.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam exts_t (optional) Extents type specifying the tensor shape.
- * Default is `extents<uint8_t>`.
- *
- * @param exts Extents describing the output shape.
- *
- * @return mdarray filled with ones.
- *
- * @note Equivalent to full(1, exts).
- *
- * @see mdtensor::full for the general fill-value version.
- */
-template <typename dtype, MPMode mpmode = MPMode::NONE,
-          extents_c exts_t = extents<uint8_t>>
-[[nodiscard]] inline constexpr auto ones(exts_t &&exts = exts_t{}) {
-    return full<dtype, mpmode, exts_t>(1, std::forward<exts_t>(exts));
-}
-
-/**
- * @brief Create a 1D tensor filled with ones (length overload).
- *
- * @tparam dtype Output value type.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param len Length of the output 1D tensor.
- *
- * @return 1D mdarray of length `len`, filled with ones.
- *
- * @note Equivalent to full(1, dims<1>{len}).
- *
- * @see mdtensor::ones(extents) for the general extents version.
- */
-template <typename dtype, MPMode mpmode = MPMode::NONE>
-[[nodiscard]] inline constexpr auto ones(const size_t &len) {
-    return full<dtype, mpmode>(1, mdtensor::dims<1>{len});
+template <typename dtype = double, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto ones(auto &&shape,
+                                  out_t &&out = out_t{std::nullopt}) {
+    return full<dtype, backend>(std::forward<decltype(shape)>(shape), 1,
+                                std::forward<decltype(out)>(out));
 }
 
 } // namespace mdtensor
@@ -2268,24 +2933,9 @@ template <typename dtype, MPMode mpmode = MPMode::NONE>
 
 namespace mdtensor {
 
-/**
- * @brief Create a tensor filled with ones, matching the shape of the input.
- *
- * @tparam dtype (optional) Output value type. If void, deduced from input.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam in_t Input tensor type (mdspan, mdarray, etc.).
- *
- * @param in Input tensor whose extents determine the output shape.
- *
- * @return mdarray with the same extents as `in`, filled with ones.
- *
- * @note Equivalent to full_like(in, 1).
- *
- * @see mdtensor::full_like for the general fill-value version.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto ones_like(in_t &&in) {
-    return full_like<dtype, mpmode>(std::forward<in_t>(in), 1);
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto ones_like(auto &&in) {
+    return full_like<dtype, backend>(std::forward<decltype(in)>(in), 1);
 }
 
 } // namespace mdtensor
@@ -2304,45 +2954,12 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 
 namespace mdtensor {
 
-/**
- * @brief Create a tensor filled with zeros (general extents overload).
- *
- * @tparam dtype Output value type.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam exts_t (optional) Extents type specifying the tensor shape.
- * Default is `extents<uint8_t>`.
- *
- * @param exts Extents describing the output shape.
- *
- * @return mdarray filled with zeros.
- *
- * @note Equivalent to full(0, exts).
- *
- * @see mdtensor::full for the general fill-value version.
- */
-template <typename dtype, MPMode mpmode = MPMode::NONE,
-          extents_c exts_t = extents<uint8_t>>
-[[nodiscard]] inline constexpr auto zeros(exts_t &&exts = exts_t{}) {
-    return full<dtype, mpmode, exts_t>(0, std::forward<exts_t>(exts));
-}
-
-/**
- * @brief Create a 1D tensor filled with zeros (length overload).
- *
- * @tparam dtype Output value type.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param len Length of the output 1D tensor.
- *
- * @return 1D mdarray of length `len`, filled with zeros.
- *
- * @note Equivalent to full(0, dims<1>{len}).
- *
- * @see mdtensor::zeros(extents) for the general extents version.
- */
-template <typename dtype, MPMode mpmode = MPMode::NONE>
-[[nodiscard]] inline constexpr auto zeros(const size_t &len) {
-    return full<dtype, mpmode>(0, mdtensor::dims<1>{len});
+template <typename dtype = double, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto zeros(auto &&shape,
+                                   out_t &&out = out_t{std::nullopt}) {
+    return full<dtype, backend>(std::forward<decltype(shape)>(shape), 0,
+                                std::forward<decltype(out)>(out));
 }
 
 } // namespace mdtensor
@@ -2361,24 +2978,9 @@ template <typename dtype, MPMode mpmode = MPMode::NONE>
 
 namespace mdtensor {
 
-/**
- * @brief Create a tensor filled with zeros, matching the shape of the input.
- *
- * @tparam dtype (optional) Output value type. If void, deduced from input.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam in_t Input tensor type (mdspan, mdarray, etc.).
- *
- * @param in Input tensor whose extents determine the output shape.
- *
- * @return mdarray with the same extents as `in`, filled with zeros.
- *
- * @note Equivalent to full_like(in, 0).
- *
- * @see mdtensor::full_like for the general fill-value version.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto zeros_like(in_t &&in) {
-    return full_like<dtype, mpmode>(std::forward<in_t>(in), 0);
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto zeros_like(auto &&in) {
+    return full_like<dtype, backend>(std::forward<decltype(in)>(in), 0);
 }
 
 } // namespace mdtensor
@@ -2398,7 +3000,7 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/cholesky.hpp
 /**
  * @file
- * @brief Linear system solve utilities for mdtensor (linalg).
+ * @brief Cholesky decomposition utilities for mdtensor (linalg).
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -2419,103 +3021,148 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 
 
 namespace mdtensor {
-namespace detail {
-
-#ifndef REAL_GCC
+namespace ufunc {
 
 template <std::floating_point dtype>
-[[nodiscard]] inline constexpr dtype
-sqrt_newton_raphson(dtype &&x, dtype &&curr, dtype &&prev) {
+[[nodiscard]] constexpr dtype
+sqrt_newton_raphson(const dtype &x, const dtype &curr, const dtype &prev) {
     return (curr == prev)
                ? curr
                : sqrt_newton_raphson(x, (curr + x / curr) / (dtype)2, curr);
 }
 
-#endif
+constexpr void sqrt_ufunc_native(auto &&in, auto &&out) {
+    using calc_t = core::common_data_type_t<decltype(in()), float>;
 
-template <typename in_t, typename out_t>
-inline constexpr void sqrt_impl(in_t &&in, out_t &&out) {
+    if constexpr (requires {
+                      { std::isnan(in()) } -> std::convertible_to<bool>;
+                  }) {
+        if (std::isnan(in())) {
+            out() = in();
+            return;
+        }
+    }
+
+    if constexpr (requires {
+                      { std::isinf(in()) } -> std::convertible_to<bool>;
+                  }) {
+        if (std::isinf(in())) {
+            out() = in();
+            return;
+        }
+    }
+
+    if constexpr (std::is_same_v<std::remove_cvref_t<decltype(in())>, bool>) {
+        out() = static_cast<calc_t>(in());
+        return;
+
+    } else {
+        out() = (in() >= 0 && in() < std::numeric_limits<calc_t>::infinity())
+                    ? sqrt_newton_raphson(static_cast<calc_t>(in()),
+                                          static_cast<calc_t>(in()),
+                                          static_cast<calc_t>(0))
+                    : std::numeric_limits<calc_t>::quiet_NaN();
+    }
+}
+
+constexpr void sqrt_ufunc(auto &&in, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
 #ifdef REAL_GCC
-    out() = std::sqrt(in());
-
-#else
-    using value_t = core::common_data_type_t<decltype(in()), float>;
-
-    out() = (in() >= 0 && in() < std::numeric_limits<value_t>::infinity())
-                ? sqrt_newton_raphson(static_cast<value_t>(in()),
-                                      static_cast<value_t>(in()),
-                                      static_cast<value_t>(0))
-                : std::numeric_limits<value_t>::quiet_NaN();
+    if (!std::is_constant_evaluated()) {
+        if constexpr (requires { out() = std::sqrt(in()); }) {
+            out() = std::sqrt(in());
+            return;
+        }
+    }
 
 #endif
+
+    sqrt_ufunc_native(std::forward<decltype(in)>(in),
+                      std::forward<decltype(out)>(out));
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compute square root element-wise (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note Equivalent to out = std::sqrt(in) in terms of array broadcasting.
- *
- * @see mdtensor::sqrt for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
-inline constexpr void sqrt_to(in_t &&in, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::sqrt_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in_t>(in)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto sqrt(auto &&in, out_t &&out = out_t{std::nullopt},
+                                  where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-/**
- * @brief Compute square root element-wise (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- *         input.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar.
- *
- * @note Equivalent to out = std::sqrt(in) in terms of array broadcasting.
- *
- * @see mdtensor::sqrt_to for the in-place version that writes into an output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto sqrt(in_t &&in) {
-    return core::batch_out<dtype, mpmode>(
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return empty_like<dtype>(in_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::sqrt_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::sqrt_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in_t>(in)));
+        std::integer_sequence<bool, true, false, true>{},
+        std::forward<decltype(in)>(in), out_md,
+        std::forward<decltype(where)>(where));
+
+    return out_md;
 }
 
 } // namespace mdtensor
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/sqrt.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/util/fill.hpp
+/**
+ * @file
+ * @brief Fill utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
 
 namespace mdtensor {
-namespace linalg {
-namespace detail {
+namespace ufunc {
 
-template <md_c in_t, md_c out_t>
-[[nodiscard]] inline constexpr bool cholesky_upper_impl(in_t &&in,
-                                                        out_t &&out) {
-    auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-    auto out_mds = core::to_mdspan(std::forward<out_t>(out));
+constexpr void fill_ufunc(auto &&out, auto &&val) { out() = val; }
 
-    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
-    using out_mds_t = std::remove_cvref_t<decltype(out_mds)>;
+} // namespace ufunc
 
-    using index_t = typename in_mds_t::index_type;
-    using value_t = typename out_mds_t::value_type;
+template <core::Backend backend = core::Backend::AUTO>
+constexpr void fill(auto &&out, auto &&val) {
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
+
+    core::batch<backend, out_mds.rank()>(
+        [&](auto &&...elems) {
+            ufunc::fill_ufunc(std::forward<decltype(elems)>(elems)...,
+                              std::forward<decltype(val)>(val));
+        },
+        out_mds);
+}
+
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/util/fill.hpp
+
+namespace mdtensor::linalg {
+namespace ufunc {
+
+[[nodiscard]] constexpr bool cholesky_upper_ufunc(auto &&in, auto &&out) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
+
+    using index_t = typename decltype(in_mds)::index_type;
+    using value_t = typename decltype(out_mds)::value_type;
 
     const index_t n = in_mds.extent(0);
 
@@ -2553,17 +3200,13 @@ template <md_c in_t, md_c out_t>
     return true;
 }
 
-template <md_c in_t, md_c out_t>
-[[nodiscard]] inline constexpr bool cholesky_lower_impl(in_t &&in,
-                                                        out_t &&out) {
-    auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-    auto out_mds = core::to_mdspan(std::forward<out_t>(out));
+[[nodiscard]] constexpr bool cholesky_lower_ufunc(auto &&in, auto &&out) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
 
-    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
-    using out_mds_t = std::remove_cvref_t<decltype(out_mds)>;
-
-    using index_t = typename in_mds_t::index_type;
-    using value_t = typename out_mds_t::value_type;
+    using index_t = typename decltype(in_mds)::index_type;
+    using value_t = typename decltype(out_mds)::value_type;
 
     const index_t n = in_mds.extent(0);
 
@@ -2601,35 +3244,34 @@ template <md_c in_t, md_c out_t>
     return true;
 }
 
-template <bool upper, md_c in_t, md_c out_t>
-[[nodiscard]] inline constexpr bool cholesky_impl(in_t &&in, out_t &&out) {
+template <bool upper>
+[[nodiscard]] constexpr bool cholesky_ufunc(auto &&in, auto &&out) {
     if constexpr (upper) {
-        return cholesky_upper_impl(std::forward<in_t>(in),
-                                   std::forward<out_t>(out));
+        return cholesky_upper_ufunc(std::forward<decltype(in)>(in),
+                                    std::forward<decltype(out)>(out));
 
     } else {
-        return cholesky_lower_impl(std::forward<in_t>(in),
-                                   std::forward<out_t>(out));
+        return cholesky_lower_ufunc(std::forward<decltype(in)>(in),
+                                    std::forward<decltype(out)>(out));
     }
 }
 
-} // namespace detail
+} // namespace ufunc
 
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t,
-          typename valid_t>
-inline constexpr void cholesky_to(in_t &&in, out_t &&out, valid_t &&valid,
-                                  const bool upper = false) {
+template <core::Backend backend = core::Backend::AUTO>
+constexpr void cholesky_to(auto &&in, auto &&out, auto &&valid,
+                           const bool upper = false) {
     const auto run_batch = [&]<bool upper_v>() {
-        core::batch<mpmode>(
+        core::batch_with_broadcast<backend>(
             [](auto &&in, auto &&out, auto &&valid) {
-                valid() = detail::cholesky_impl<upper_v>(
+                valid() = ufunc::cholesky_ufunc<upper_v>(
                     std::forward<decltype(in)>(in),
                     std::forward<decltype(out)>(out));
             },
             std::index_sequence<2, 2, 0>{},
-            core::to_const_mdspan(std::forward<in_t>(in)),
-            core::to_mdspan(std::forward<out_t>(out)),
-            core::to_mdspan(std::forward<valid_t>(valid)));
+            std::integer_sequence<bool, true, false, false>{},
+            std::forward<decltype(in)>(in), std::forward<decltype(out)>(out),
+            std::forward<decltype(valid)>(valid));
     };
 
     if (upper) {
@@ -2640,22 +3282,20 @@ inline constexpr void cholesky_to(in_t &&in, out_t &&out, valid_t &&valid,
     }
 }
 
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto cholesky(in_t &&in,
-                                             const bool upper = false) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto cholesky(auto &&in, const bool upper = false) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out = empty_like(in_mds);
-    auto valid = core::create_out<bool>(std::index_sequence<2>{},
-                                        extents<uint8_t>{}, in_mds);
+    auto valid = core::make_output<bool>(std::index_sequence<2>{},
+                                         core::extents<std::uint8_t>{}, in_mds);
 
-    cholesky_to<mpmode>(in_mds, out, valid, upper);
+    cholesky_to<backend>(in_mds, out, valid, upper);
 
     return std::pair{out, valid};
 }
 
-} // namespace linalg
-} // namespace mdtensor
+} // namespace mdtensor::linalg
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/cholesky.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/inv.hpp
 /**
@@ -2681,101 +3321,208 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in_t, typename out_t>
-inline constexpr void absolute_impl(in_t &&in, out_t &&out) {
-#ifdef REAL_GCC
-    out() = std::abs(in());
+constexpr void absolute_ufunc(auto &&in, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
 
-#else
-    // NOTE: std::abs is not constexpr in clang 16.
     if constexpr (std::is_signed_v<std::remove_cvref_t<decltype(in())>>) {
+#ifdef REAL_GCC // NOTE: std::abs is not constexpr in clang 16.
+        out() = std::abs(in());
+#else
         out() = in() < 0 ? -in() : in();
+#endif
 
     } else {
         out() = in();
     }
-
-#endif
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compute absolute value element-wise (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note Equivalent to out = std::abs(in) in terms of array broadcasting.
- *
- * @see mdtensor::absolute for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
-inline constexpr void absolute_to(in_t &&in, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::absolute_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in_t>(in)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto absolute(auto &&in,
+                                      out_t &&out = out_t{std::nullopt},
+                                      where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-/**
- * @brief Compute absolute value element-wise (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- *         input.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar.
- *
- * @note Equivalent to out = std::abs(in) in terms of array broadcasting.
- *
- * @see mdtensor::absolute_to for the in-place version that writes into an
- *      output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto absolute(in_t &&in) {
-    return core::batch_out<dtype, mpmode>(
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return empty_like<dtype>(in_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::absolute_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::absolute_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in_t>(in)));
+        std::integer_sequence<bool, true, false, true>{},
+        std::forward<decltype(in)>(in), out_md,
+        std::forward<decltype(where)>(where));
+
+    return out_md;
 }
 
 } // namespace mdtensor
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/absolute.hpp
 
-namespace mdtensor {
-namespace linalg {
+#ifdef MDTENSOR_USE_EIGEN
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/eigen/eigen.hpp
+/**
+ * @file
+ * @brief Eigen interop utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+#include <Eigen/Dense>
+
+
+namespace mdtensor::core::eigen {
 namespace detail {
 
-template <md_c in_t, md_c out_t>
-[[nodiscard]] inline constexpr bool inv_naive(in_t &&in, out_t &&out) {
-    auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-    auto out_mds = core::to_mdspan(std::forward<out_t>(out));
+template <std::size_t Extent>
+[[nodiscard]] consteval int to_eigen_static_extent() {
+    static_assert(
+        Extent == core::dyn ||
+            Extent <= static_cast<std::size_t>(std::numeric_limits<int>::max()),
+        "Static extent value exceeds maximum int value for Eigen mapping.");
 
-    static_assert(decltype(in_mds)::rank() == 2);
-    static_assert(decltype(out_mds)::rank() == 2);
+    if constexpr (Extent == core::dyn) {
+        return Eigen::Dynamic;
+
+    } else {
+        return static_cast<int>(Extent);
+    }
+}
+
+template <core::integral_c ext_t>
+[[nodiscard]] constexpr Eigen::Index to_eigen_extent(ext_t &&ext) {
+    if constexpr (std::signed_integral<ext_t>) {
+        if (ext < 0) {
+            throw std::invalid_argument(
+                "Negative extent value is invalid for Eigen mapping.");
+        }
+    }
+
+    if (!std::in_range<Eigen::Index>(ext)) {
+        throw std::invalid_argument(
+            "Extent value exceeds maximum int value for Eigen mapping.");
+    }
+
+    return static_cast<Eigen::Index>(ext);
+}
+
+template <typename Layout, int Rows, int Cols>
+consteval int get_storage_option() {
+    if constexpr (Rows == 1 && Cols != 1) {
+        return Eigen::RowMajor;
+
+    } else if constexpr (Cols == 1 && Rows != 1) {
+        return Eigen::ColMajor;
+
+    } else if constexpr (std::same_as<Layout, core::stdex::layout_right>) {
+        return Eigen::RowMajor;
+
+    } else {
+        return Eigen::ColMajor;
+    }
+}
+
+template <typename T> consteval bool evaluate_eigen_mappable() {
+    using mds_t = core::to_mdspan_t<T>;
+
+    if constexpr (!mdspan_c<mds_t>) {
+        return false;
+
+    } else {
+        return (std::same_as<typename mds_t::layout_type,
+                             core::stdex::layout_right> ||
+                std::same_as<typename mds_t::layout_type,
+                             core::stdex::layout_left>) &&
+               mds_t::rank() == 2 && mds_t::is_always_unique() &&
+               mds_t::is_always_exhaustive() && mds_t::is_always_strided();
+    }
+}
+
+template <typename T, typename = void>
+struct is_eigen_mappable_impl : std::false_type {};
+
+template <typename T>
+struct is_eigen_mappable_impl<T, std::void_t<core::to_mdspan_t<T>>>
+    : std::bool_constant<evaluate_eigen_mappable<T>()> {};
+
+} // namespace detail
+
+template <typename T>
+struct is_eigen_mappable
+    : detail::is_eigen_mappable_impl<std::remove_cvref_t<T>> {};
+
+template <typename T>
+inline constexpr bool is_eigen_mappable_v = is_eigen_mappable<T>::value;
+
+template <typename T>
+concept eigen_mappable_c = is_eigen_mappable_v<T>;
+
+template <eigen_mappable_c in_t> [[nodiscard]] auto to_eigen(in_t &&in) {
+    const auto in_mds = core::to_mdspan(std::forward<in_t>(in));
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
+
+    constexpr int static_rows =
+        detail::to_eigen_static_extent<in_mds_t::static_extent(0)>();
+
+    constexpr int static_cols =
+        detail::to_eigen_static_extent<in_mds_t::static_extent(1)>();
+
+    constexpr auto option =
+        detail::get_storage_option<typename in_mds_t::layout_type, static_rows,
+                                   static_cols>();
+
+    const Eigen::Index rows = detail::to_eigen_extent(in_mds.extent(0));
+    const Eigen::Index cols = detail::to_eigen_extent(in_mds.extent(1));
+
+    using matrix_t = Eigen::Matrix<typename in_mds_t::value_type, static_rows,
+                                   static_cols, option>;
+
+    using mapped_matrix_t =
+        std::conditional_t<std::is_const_v<typename in_mds_t::element_type>,
+                           const matrix_t, matrix_t>;
+
+    return Eigen::Map<mapped_matrix_t, Eigen::Unaligned>{in_mds.data_handle(),
+                                                         rows, cols};
+}
+
+} // namespace mdtensor::core::eigen
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/eigen/eigen.hpp
+#endif
+
+namespace mdtensor::linalg {
+namespace ufunc {
+
+[[nodiscard]] constexpr bool inv_native(auto &&in, auto &&out) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
 
     using index_t = typename decltype(in_mds)::index_type;
 
     const index_t n = in_mds.extent(0);
 
-    if (in_mds.extent(0) != in_mds.extent(1) ||
-        in_mds.extent(0) != out_mds.extent(0) ||
-        in_mds.extent(0) != out_mds.extent(1)) {
-        return false;
-    }
-
     auto in_copy = copy(in_mds);
-    eye_to(out_mds);
+    static_cast<void>(eye(out_mds.extents(), 0, out_mds));
 
     for (index_t i = 0; i < n; i++) {
         index_t pivot_row = i;
@@ -2830,16 +3577,12 @@ template <md_c in_t, md_c out_t>
     return true;
 }
 
-template <md_c in_t, md_c out_t>
-[[nodiscard]] inline constexpr bool inv_impl(in_t &&in, out_t &&out) {
-    static_assert(std::remove_cvref_t<in_t>::rank() == 2);
-    static_assert(std::remove_cvref_t<out_t>::rank() == 2);
-
+[[nodiscard]] constexpr bool inv_ufunc(auto &&in, auto &&out) {
 #ifdef MDTENSOR_USE_EIGEN
 #if __cplusplus >= 202302L // TODO: Impliement for C++20
-    if constexpr (core::eigen::eigen_mappable_mdspan_c<in_t> &&
-                  core::eigen::eigen_mappable_mdspan_c<out_t>) {
-        if (!std::is_constant_evaluated()) [[likely]] {
+    if constexpr (core::eigen::eigen_mappable_c<in_t> &&
+                  core::eigen::eigen_mappable_c<out_t>) {
+        if (!std::is_constant_evaluated()) {
             const auto ein = core::eigen::to_eigen(in);
             auto eout = core::eigen::to_eigen(out);
 
@@ -2855,80 +3598,43 @@ template <md_c in_t, md_c out_t>
 #endif
 #endif
 
-    return inv_naive(in, out);
+    return inv_native(in, out);
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compute matrix inverse (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input matrix (mdspan, mdarray, etc.) (... x N x N).
- * @param out Output matrix (mdspan, mdarray, etc.) (... x N x N).
- * @param valid Output mdspan, mdarray, or scalar indicating validity of the
- * inverse.
- *
- * @note The inverse is computed per-matrix when `in` is batched. The `valid`
- *       flag is produced per matrix instance.
- *
- * @see mdtensor::linalg::inv for the out-of-place version that returns the
- * result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t,
-          typename valid_t>
-inline constexpr void inv_to(in_t &&in, out_t &&out, valid_t &&valid) {
-    core::batch<mpmode>(
+template <core::Backend backend = core::Backend::AUTO>
+constexpr void inv_to(auto &&in, auto &&out, auto &&valid) {
+    core::batch_with_broadcast<backend>(
         [](auto &&in, auto &&out, auto &&valid) {
-            valid() = detail::inv_impl(std::forward<decltype(in)>(in),
+            valid() = ufunc::inv_ufunc(std::forward<decltype(in)>(in),
                                        std::forward<decltype(out)>(out));
         },
         std::index_sequence<2, 2, 0>{},
-        core::to_const_mdspan(std::forward<in_t>(in)),
-        core::to_mdspan(std::forward<out_t>(out)),
-        core::to_mdspan(std::forward<valid_t>(valid)));
+        std::integer_sequence<bool, true, false, false>{},
+        std::forward<decltype(in)>(in), std::forward<decltype(out)>(out),
+        std::forward<decltype(valid)>(valid));
 }
 
-/**
- * @brief Compute matrix inverse (out-of-place).
- *
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- * input.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input matrix (mdspan, mdarray, etc.) (... x N x N).
- *
- * @return A tuple-like output from batch_out consisting of:
- *         - inverse matrix (mdarray) (... x N x N).
- *         - validity flag (mdarray or scalar) (...), indicating if the inverse
- *        was successfully computed for each matrix instance.
- *
- * @see mdtensor::linalg::inv_to for the in-place version that writes into an
- * output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto inv(in_t &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto inv(auto &&in) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out = core::create_out<dtype>(
-        std::index_sequence<2>{}, core::slice_from_right<2>(in_mds.extents()),
-        in_mds);
-    auto valid = core::create_out<bool>(std::index_sequence<2>{},
-                                        extents<uint8_t>{}, in_mds);
+    auto out = empty_like<dtype>(in_mds);
+    auto valid = core::make_output<bool>(std::index_sequence<2>{},
+                                         core::extents<std::uint8_t>{}, in_mds);
 
-    inv_to<mpmode>(in_mds, out, valid);
+    inv_to<backend>(in_mds, out, valid);
 
     return std::pair{out, valid};
 }
 
-} // namespace linalg
-} // namespace mdtensor
+} // namespace mdtensor::linalg
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/inv.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/lu.hpp
 /**
  * @file
- * @brief SciPy-like LU decomposition utilities for mdtensor (linalg).
+ * @brief LU decomposition utilities for mdtensor (linalg).
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -2937,32 +3643,23 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 
 
 
-namespace mdtensor {
-namespace linalg {
-namespace detail {
+namespace mdtensor::linalg {
+namespace ufunc {
 
-template <md_c in_t, md_c p_indices_t, md_c l_t, md_c u_t>
-inline constexpr void lu_p_indices_impl(in_t &&in, p_indices_t &&p_indices,
-                                        l_t &&l, u_t &&u) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+constexpr void lu_p_indices_ufunc(auto &&in, auto &&p_indices, auto &&l,
+                                  auto &&u) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
     const auto p_indices_mds =
-        core::to_mdspan(std::forward<p_indices_t>(p_indices));
-    const auto l_mds = core::to_mdspan(std::forward<l_t>(l));
-    const auto u_mds = core::to_mdspan(std::forward<u_t>(u));
+        core::to_output_mdspan(std::forward<decltype(p_indices)>(p_indices));
+    const auto l_mds = core::to_output_mdspan(std::forward<decltype(l)>(l));
+    const auto u_mds = core::to_output_mdspan(std::forward<decltype(u)>(u));
 
-    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
-    using p_indices_mds_t = std::remove_cvref_t<decltype(p_indices_mds)>;
-    using l_mds_t = std::remove_cvref_t<decltype(l_mds)>;
-    using u_mds_t = std::remove_cvref_t<decltype(u_mds)>;
-
-    static_assert(in_mds_t::rank() == 2);
-    static_assert(p_indices_mds_t::rank() == 1);
-    static_assert(l_mds_t::rank() == 2);
-    static_assert(u_mds_t::rank() == 2);
+    using in_mds_t = decltype(in_mds);
+    using p_indices_mds_t = decltype(p_indices_mds);
 
     using index_t = typename in_mds_t::index_type;
 
-    constexpr size_t m_s = in_mds_t::static_extent(0);
+    constexpr std::size_t m_s = in_mds_t::static_extent(0);
 
     const index_t m = in_mds.extent(0);
     const index_t n = in_mds.extent(1);
@@ -2976,7 +3673,7 @@ inline constexpr void lu_p_indices_impl(in_t &&in, p_indices_t &&p_indices,
 
     // initialize
     auto in_copy = copy(in_mds);
-    auto row_order = core::create_data<index_t>(extents<index_t, m_s>{m});
+    auto row_order = empty<index_t>(core::extents<index_t, m_s>{m});
     for (index_t i = 0; i < m; i++) {
         row_order(i) = i;
     }
@@ -3054,32 +3751,24 @@ inline constexpr void lu_p_indices_impl(in_t &&in, p_indices_t &&p_indices,
     }
 }
 
-template <md_c in_t, md_c p_t, md_c l_t, md_c u_t>
-inline constexpr void lu_full_impl(in_t &&in, p_t &&p, l_t &&l, u_t &&u) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-    const auto p_mds = core::to_mdspan(std::forward<p_t>(p));
-    const auto l_mds = core::to_mdspan(std::forward<l_t>(l));
-    const auto u_mds = core::to_mdspan(std::forward<u_t>(u));
+constexpr void lu_full_ufunc(auto &&in, auto &&p, auto &&l, auto &&u) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+    const auto p_mds = core::to_output_mdspan(std::forward<decltype(p)>(p));
+    const auto l_mds = core::to_output_mdspan(std::forward<decltype(l)>(l));
+    const auto u_mds = core::to_output_mdspan(std::forward<decltype(u)>(u));
 
-    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
-    using p_mds_t = std::remove_cvref_t<decltype(p_mds)>;
-    using l_mds_t = std::remove_cvref_t<decltype(l_mds)>;
-    using u_mds_t = std::remove_cvref_t<decltype(u_mds)>;
-
-    static_assert(in_mds_t::rank() == 2);
-    static_assert(p_mds_t::rank() == 2);
-    static_assert(l_mds_t::rank() == 2);
-    static_assert(u_mds_t::rank() == 2);
+    using in_mds_t = decltype(in_mds);
+    using p_mds_t = decltype(p_mds);
 
     using index_t = typename p_mds_t::index_type;
 
-    constexpr size_t m_s = in_mds_t::static_extent(0);
+    constexpr std::size_t m_s = in_mds_t::static_extent(0);
 
     const index_t m = in_mds.extent(0);
 
-    auto p_indices = core::create_data<index_t>(extents<index_t, m_s>{m});
+    auto p_indices = empty<index_t>(core::extents<index_t, m_s>{m});
 
-    lu_p_indices_impl(in_mds, p_indices, l_mds, u_mds);
+    lu_p_indices_ufunc(in_mds, p_indices, l_mds, u_mds);
 
     for (index_t i = 0; i < m; i++) {
         for (index_t j = 0; j < m; j++) {
@@ -3088,26 +3777,20 @@ inline constexpr void lu_full_impl(in_t &&in, p_t &&p, l_t &&l, u_t &&u) {
     }
 }
 
-template <md_c in_t, md_c pl_t, md_c u_t>
-inline constexpr void lu_permute_l_impl(in_t &&in, pl_t &&pl, u_t &&u) {
-    auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-    auto pl_mds = core::to_mdspan(std::forward<pl_t>(pl));
-    auto u_mds = core::to_mdspan(std::forward<u_t>(u));
+constexpr void lu_permute_l_ufunc(auto &&in, auto &&pl, auto &&u) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+    const auto pl_mds = core::to_output_mdspan(std::forward<decltype(pl)>(pl));
+    const auto u_mds = core::to_output_mdspan(std::forward<decltype(u)>(u));
 
-    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
-    using pl_mds_t = std::remove_cvref_t<decltype(pl_mds)>;
-    using u_mds_t = std::remove_cvref_t<decltype(u_mds)>;
-
-    static_assert(in_mds_t::rank() == 2);
-    static_assert(pl_mds_t::rank() == 2);
-    static_assert(u_mds_t::rank() == 2);
+    using in_mds_t = decltype(in_mds);
+    using pl_mds_t = decltype(pl_mds);
 
     using index_t = typename in_mds_t::index_type;
     using value_t = typename pl_mds_t::value_type;
 
-    constexpr size_t m_s = in_mds_t::static_extent(0);
-    constexpr size_t n_s = in_mds_t::static_extent(1);
-    constexpr size_t k_s = [] {
+    constexpr std::size_t m_s = in_mds_t::static_extent(0);
+    constexpr std::size_t n_s = in_mds_t::static_extent(1);
+    constexpr std::size_t k_s = [] {
         if constexpr (m_s == dyn || n_s == dyn) {
             return dyn;
 
@@ -3120,10 +3803,10 @@ inline constexpr void lu_permute_l_impl(in_t &&in, pl_t &&pl, u_t &&u) {
     const index_t n = in_mds.extent(1);
     const index_t k = m < n ? m : n;
 
-    auto p_indices = core::create_data<index_t>(extents<index_t, m_s>{m});
-    auto l = core::create_data<value_t>(extents<index_t, m_s, k_s>{m, k});
+    auto p_indices = empty<index_t>(core::extents<index_t, m_s>{m});
+    auto l = empty<value_t>(core::extents<index_t, m_s, k_s>{m, k});
 
-    lu_p_indices_impl(in_mds, p_indices, l, u_mds);
+    lu_p_indices_ufunc(in_mds, p_indices, l, u_mds);
 
     // Apply the permutation to L
     for (index_t i = 0; i < m; i++) {
@@ -3133,63 +3816,58 @@ inline constexpr void lu_permute_l_impl(in_t &&in, pl_t &&pl, u_t &&u) {
     }
 }
 
-} // namespace detail
+} // namespace ufunc
 
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename p_indices_t,
-          typename l_t, typename u_t>
-inline constexpr void lu_p_indices_to(in_t &&in, p_indices_t &&p_indices,
-                                      l_t &&l, u_t &&u) {
-    core::batch<mpmode>(
+template <core::Backend backend = core::Backend::AUTO>
+constexpr void lu_p_indices_to(auto &&in, auto &&p_indices, auto &&l,
+                               auto &&u) {
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::lu_p_indices_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::lu_p_indices_ufunc(std::forward<decltype(elems)>(elems)...);
         },
         std::index_sequence<2, 1, 2, 2>{},
-        core::to_const_mdspan(std::forward<in_t>(in)),
-        core::to_mdspan(std::forward<p_indices_t>(p_indices)),
-        core::to_mdspan(std::forward<l_t>(l)),
-        core::to_mdspan(std::forward<u_t>(u)));
+        std::integer_sequence<bool, true, false, false, false>{},
+        std::forward<decltype(in)>(in),
+        std::forward<decltype(p_indices)>(p_indices),
+        std::forward<decltype(l)>(l), std::forward<decltype(u)>(u));
 }
 
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename p_t,
-          typename l_t, typename u_t>
-inline constexpr void lu_full_to(in_t &&in, p_t &&p, l_t &&l, u_t &&u) {
-    core::batch<mpmode>(
+template <core::Backend backend = core::Backend::AUTO>
+constexpr void lu_full_to(auto &&in, auto &&p, auto &&l, auto &&u) {
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::lu_full_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::lu_full_ufunc(std::forward<decltype(elems)>(elems)...);
         },
         std::index_sequence<2, 2, 2, 2>{},
-        core::to_const_mdspan(std::forward<in_t>(in)),
-        core::to_mdspan(std::forward<p_t>(p)),
-        core::to_mdspan(std::forward<l_t>(l)),
-        core::to_mdspan(std::forward<u_t>(u)));
+        std::integer_sequence<bool, true, false, false, false>{},
+        std::forward<decltype(in)>(in), std::forward<decltype(p)>(p),
+        std::forward<decltype(l)>(l), std::forward<decltype(u)>(u));
 }
 
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename pl_t,
-          typename u_t>
-inline constexpr void lu_permute_l_to(in_t &&in, pl_t &&pl, u_t &&u) {
-    core::batch<mpmode>(
+template <core::Backend backend = core::Backend::AUTO>
+constexpr void lu_permute_l_to(auto &&in, auto &&pl, auto &&u) {
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::lu_permute_l_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::lu_permute_l_ufunc(std::forward<decltype(elems)>(elems)...);
         },
         std::index_sequence<2, 2, 2>{},
-        core::to_const_mdspan(std::forward<in_t>(in)),
-        core::to_mdspan(std::forward<pl_t>(pl)),
-        core::to_mdspan(std::forward<u_t>(u)));
+        std::integer_sequence<bool, true, false, false>{},
+        std::forward<decltype(in)>(in), std::forward<decltype(pl)>(pl),
+        std::forward<decltype(u)>(u));
 }
 
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto lu_p_indices(in_t &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto lu_p_indices(auto &&in) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
-
+    using in_mds_t = decltype(in_mds);
     using index_t = typename in_mds_t::index_type;
 
-    constexpr size_t rank = in_mds_t::rank();
+    constexpr std::size_t rank = in_mds_t::rank();
 
-    constexpr size_t m_s = in_mds_t::static_extent(rank - 2);
-    constexpr size_t n_s = in_mds_t::static_extent(rank - 1);
-    constexpr size_t k_s = [] {
+    constexpr std::size_t m_s = in_mds_t::static_extent(rank - 2);
+    constexpr std::size_t n_s = in_mds_t::static_extent(rank - 1);
+    constexpr std::size_t k_s = [] {
         if constexpr (m_s == dyn || n_s == dyn) {
             return dyn;
 
@@ -3202,31 +3880,31 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
     const index_t n = in_mds.extent(rank - 1);
     const index_t k = m < n ? m : n;
 
-    auto p_indices = core::create_out<index_t>(
-        std::index_sequence<2>{}, extents<index_t, m_s>{m}, in_mds);
-    auto l = core::create_out<dtype>(std::index_sequence<2>{},
-                                     extents<index_t, m_s, k_s>{m, k}, in_mds);
-    auto u = core::create_out<dtype>(std::index_sequence<2>{},
-                                     extents<index_t, k_s, n_s>{k, n}, in_mds);
+    auto outs = core::make_outputs<dtype>(
+        std::index_sequence<2>{},
+        std::tuple{extents<index_t, m_s>{m},
+                   core::extents<index_t, m_s, k_s>{m, k},
+                   core::extents<index_t, k_s, n_s>{k, n}},
+        in_mds);
 
-    lu_p_indices_to<mpmode>(in_mds, p_indices, l, u);
+    lu_p_indices_to<backend>(in_mds, std::get<0>(outs), std::get<1>(outs),
+                             std::get<2>(outs));
 
-    return std::tuple{p_indices, l, u};
+    return outs;
 }
 
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto lu_full(in_t &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto lu_full(auto &&in) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
-
+    using in_mds_t = decltype(in_mds);
     using index_t = typename in_mds_t::index_type;
 
-    constexpr size_t rank = in_mds_t::rank();
+    constexpr std::size_t rank = in_mds_t::rank();
 
-    constexpr size_t m_s = in_mds_t::static_extent(rank - 2);
-    constexpr size_t n_s = in_mds_t::static_extent(rank - 1);
-    constexpr size_t k_s = [] {
+    constexpr std::size_t m_s = in_mds_t::static_extent(rank - 2);
+    constexpr std::size_t n_s = in_mds_t::static_extent(rank - 1);
+    constexpr std::size_t k_s = [] {
         if constexpr (m_s == dyn || n_s == dyn) {
             return dyn;
 
@@ -3239,31 +3917,31 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
     const index_t n = in_mds.extent(rank - 1);
     const index_t k = m < n ? m : n;
 
-    auto p = core::create_out<index_t>(
-        std::index_sequence<2>{}, extents<index_t, m_s, m_s>{m, m}, in_mds);
-    auto l = core::create_out<dtype>(std::index_sequence<2>{},
-                                     extents<index_t, m_s, k_s>{m, k}, in_mds);
-    auto u = core::create_out<dtype>(std::index_sequence<2>{},
-                                     extents<index_t, k_s, n_s>{k, n}, in_mds);
+    auto outs = core::make_outputs<dtype>(
+        std::index_sequence<2>{},
+        std::tuple{extents<index_t, m_s, m_s>{m, m},
+                   core::extents<index_t, m_s, k_s>{m, k},
+                   core::extents<index_t, k_s, n_s>{k, n}},
+        in_mds);
 
-    lu_full_to<mpmode>(in_mds, p, l, u);
+    lu_full_to<backend>(in_mds, std::get<0>(outs), std::get<1>(outs),
+                        std::get<2>(outs));
 
-    return std::tuple{p, l, u};
+    return outs;
 }
 
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto lu_permute_l(in_t &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto lu_permute_l(auto &&in) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
-
+    using in_mds_t = decltype(in_mds);
     using index_t = typename in_mds_t::index_type;
 
-    constexpr size_t rank = in_mds_t::rank();
+    constexpr std::size_t rank = in_mds_t::rank();
 
-    constexpr size_t m_s = in_mds_t::static_extent(rank - 2);
-    constexpr size_t n_s = in_mds_t::static_extent(rank - 1);
-    constexpr size_t k_s = [] {
+    constexpr std::size_t m_s = in_mds_t::static_extent(rank - 2);
+    constexpr std::size_t n_s = in_mds_t::static_extent(rank - 1);
+    constexpr std::size_t k_s = [] {
         if constexpr (m_s == dyn || n_s == dyn) {
             return dyn;
 
@@ -3276,35 +3954,35 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
     const index_t n = in_mds.extent(rank - 1);
     const index_t k = m < n ? m : n;
 
-    auto pl = core::create_out<dtype>(std::index_sequence<2>{},
-                                      extents<index_t, m_s, k_s>{m, k}, in_mds);
-    auto u = core::create_out<dtype>(std::index_sequence<2>{},
-                                     extents<index_t, k_s, n_s>{k, n}, in_mds);
+    auto outs = core::make_outputs<dtype>(
+        std::index_sequence<2>{},
+        std::tuple{extents<index_t, m_s, k_s>{m, k},
+                   core::extents<index_t, k_s, n_s>{k, n}},
+        in_mds);
 
-    lu_permute_l_to<mpmode>(in_mds, pl, u);
+    lu_permute_l_to<backend>(in_mds, std::get<0>(outs), std::get<1>(outs));
 
-    return std::pair{pl, u};
+    return outs;
 }
 
 template <bool permute_l = false, bool p_indices = false, typename dtype = void,
-          MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto lu(in_t &&in) {
+          core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto lu(auto &&in) {
     static_assert(!(permute_l && p_indices),
                   "lu cannot return both permuted L and P indices.");
 
     if constexpr (permute_l) {
-        return lu_permute_l<dtype, mpmode>(std::forward<in_t>(in));
+        return lu_permute_l<dtype, backend>(std::forward<decltype(in)>(in));
 
     } else if constexpr (p_indices) {
-        return lu_p_indices<dtype, mpmode>(std::forward<in_t>(in));
+        return lu_p_indices<dtype, backend>(std::forward<decltype(in)>(in));
 
     } else {
-        return lu_full<dtype, mpmode>(std::forward<in_t>(in));
+        return lu_full<dtype, backend>(std::forward<decltype(in)>(in));
     }
 }
 
-} // namespace linalg
-} // namespace mdtensor
+} // namespace mdtensor::linalg
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/lu.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/matmul.hpp
 /**
@@ -3318,192 +3996,34 @@ template <bool permute_l = false, bool p_indices = false, typename dtype = void,
 
 
 
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/manipulation/expand_dims.hpp
+/**
+ * @file
+ * @brief Dimension expansion utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
 namespace mdtensor {
-namespace linalg {
-namespace detail {
 
-template <md_c in1_t, md_c in2_t, md_c out_t>
-inline constexpr void matmul_naive_noalias(in1_t &&in1, in2_t &&in2,
-                                           out_t &&out) noexcept {
-    using out_index_t = typename std::remove_cvref_t<out_t>::index_type;
-    using in1_index_t = typename std::remove_cvref_t<in1_t>::index_type;
-
-    for (out_index_t i = 0; i < out.extent(0); i++) {
-        for (out_index_t j = 0; j < out.extent(1); j++) {
-            out(i, j) = 0;
-
-            for (in1_index_t k = 0; k < in1.extent(1); k++) {
-                out(i, j) += in1(i, k) * in2(k, j);
-            }
-        }
-    }
+template <std::integral axes_t, axes_t... axes>
+[[nodiscard]] constexpr auto
+expand_dims(auto &&in, std::integer_sequence<axes_t, axes...>) {
+    return core::expand_dims(std::forward<decltype(in)>(in),
+                             std::integer_sequence<axes_t, axes...>{});
 }
 
-template <md_c in1_t, md_c in2_t, md_c out_t>
-inline constexpr void matmul_naive(in1_t &&in1, in2_t &&in2,
-                                   out_t &&out) noexcept {
-    const auto in1_mds = core::to_const_mdspan(std::forward<in1_t>(in1));
-    const auto in2_mds = core::to_const_mdspan(std::forward<in2_t>(in2));
-    auto out_mds = core::to_mdspan(std::forward<out_t>(out));
-
-    if (std::is_constant_evaluated()) {
-        auto out_tmp = empty_like(out_mds);
-        matmul_naive_noalias(in1_mds, in2_mds, out_tmp.to_mdspan());
-        copy_to(out_tmp, out_mds);
-        return;
-    }
-
-    bool need_copy = false;
-
-    if constexpr (requires {
-                      in1_mds.data_handle() == out_mds.data_handle();
-                  }) {
-        if (in1_mds.data_handle() == out_mds.data_handle()) [[unlikely]] {
-            need_copy = true;
-        }
-    }
-
-    if constexpr (requires {
-                      in2_mds.data_handle() == out_mds.data_handle();
-                  }) {
-        if (in2_mds.data_handle() == out_mds.data_handle()) [[unlikely]] {
-            need_copy = true;
-        }
-    }
-
-    if (!need_copy) [[likely]] {
-        matmul_naive_noalias(in1_mds, in2_mds, out_mds);
-
-    } else [[unlikely]] {
-        auto out_tmp = empty_like(out_mds);
-        matmul_naive_noalias(in1_mds, in2_mds, out_tmp.to_mdspan());
-        copy_to(out_tmp, out_mds);
-    }
-}
-
-template <md_c in1_t, md_c in2_t, md_c out_t>
-inline constexpr void matmul_impl(in1_t &&in1, in2_t &&in2,
-                                  out_t &&out) noexcept {
-    static_assert(std::remove_cvref_t<in1_t>::rank() == 2);
-    static_assert(std::remove_cvref_t<in2_t>::rank() == 2);
-    static_assert(std::remove_cvref_t<out_t>::rank() == 2);
-
-#ifdef MDTENSOR_USE_EIGEN
-#if __cplusplus >= 202302L // TODO: Impliement for C++20
-    if constexpr (core::eigen::eigen_mappable_mdspan_c<in1_t> &&
-                  core::eigen::eigen_mappable_mdspan_c<in2_t> &&
-                  core::eigen::eigen_mappable_mdspan_c<out_t>) {
-        if (!std::is_constant_evaluated() && 8 <= out.extent(0) + out.extent(1))
-            [[likely]] {
-            using value_t = core::common_data_type_t<
-                typename std::remove_cvref_t<in1_t>::value_type,
-                typename std::remove_cvref_t<in2_t>::value_type>;
-
-            const auto ein1 =
-                core::eigen::to_eigen(in1).template cast<value_t>();
-            const auto ein2 =
-                core::eigen::to_eigen(in2).template cast<value_t>();
-            auto eout = core::eigen::to_eigen(out);
-
-            eout = (ein1 * ein2)
-                       .template cast<
-                           typename std::remove_cvref_t<out_t>::value_type>();
-
-            return;
-        }
-    }
-
-#else
-    assert(false && "Eigen inverse not implemented for C++20");
-
-#endif
-#endif
-
-    matmul_naive(in1, in2, out);
-}
-
-} // namespace detail
-
-/**
- * @brief Matrix multiplication (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 First input matrix (mdspan, mdarray, etc.) (... x M x K).
- * @param in2 Second input matrix (mdspan, mdarray, etc.) (... x K x N).
- * @param out Output matrix (mdspan, mdarray, etc.) (... x M x N).
- *
- * @note The multiplication is performed per-matrix when inputs are batched.
- *
- * @see mdtensor::linalg::matmul for the out-of-place version that returns the
- * result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
-          typename out_t>
-inline constexpr void matmul_to(in1_t &&in1, in2_t &&in2,
-                                out_t &&out) noexcept {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::matmul_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<2, 2, 2>{},
-        core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
-
-/**
- * @brief Matrix multiplication (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- * input.
- *
- * @param in1 First input matrix (mdspan, mdarray, etc.) (... x M x K).
- * @param in2 Second input matrix (mdspan, mdarray, etc.) (... x K x N).
- *
- * @return matrix (mdarray) matching the batch extents of the inputs.
- *
- * @note The multiplication is performed per-matrix when inputs are batched.
- *
- * @see mdtensor::linalg::matmul_to for the in-place version that writes into an
- * output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
-[[nodiscard]] inline constexpr auto matmul(in1_t &&in1, in2_t &&in2) noexcept {
-    const auto in1_mds = core::to_const_mdspan(std::forward<in1_t>(in1));
-    const auto in2_mds = core::to_const_mdspan(std::forward<in2_t>(in2));
-
-    const auto uin1_exts = core::slice_from_right<2>(in1_mds.extents());
-    const auto uin2_exts = core::slice_from_right<2>(in2_mds.extents());
-    const auto uout_exts = extents<
-        core::common_index_type_t<typename decltype(uin1_exts)::index_type,
-                                  typename decltype(uin2_exts)::index_type>,
-        decltype(uin1_exts)::static_extent(0),
-        decltype(uin2_exts)::static_extent(1)>{uin1_exts.extent(0),
-                                               uin2_exts.extent(1)};
-
-    return core::batch_out<dtype, mpmode>(
-        [](auto &&...elems) {
-            detail::matmul_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<2, 2>{}, uout_exts, in1_mds, in2_mds);
-}
-
-} // namespace linalg
-
-inline constexpr void matmul_to(auto &&...elems) noexcept {
-    linalg::matmul_to(std::forward<decltype(elems)>(elems)...);
-}
-
-template <typename dtype = void>
-[[nodiscard]] inline constexpr auto matmul(auto &&...elems) noexcept {
-    return linalg::matmul<dtype>(std::forward<decltype(elems)>(elems)...);
+template <std::int64_t... axes>
+[[nodiscard]] constexpr auto expand_dims(auto &&in) {
+    return core::expand_dims<axes...>(std::forward<decltype(in)>(in));
 }
 
 } // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/matmul.hpp
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/manipulation/expand_dims.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/matvec.hpp
 /**
  * @file
@@ -3516,36 +4036,44 @@ template <typename dtype = void>
 
 
 
-namespace mdtensor {
-namespace linalg {
-namespace detail {
+#ifdef MDTENSOR_USE_EIGEN
+#endif
 
-template <md_c in1_t, md_c in2_t, md_c out_t>
-inline constexpr void matvec_naive_noalias(in1_t &&in1, in2_t &&in2,
-                                           out_t &&out) noexcept {
-    using out_index_t = typename std::remove_cvref_t<out_t>::index_type;
-    using in1_index_t = typename std::remove_cvref_t<in1_t>::index_type;
+namespace mdtensor::linalg {
+namespace ufunc {
 
-    for (out_index_t i = 0; i < out.extent(0); i++) {
-        out(i) = 0;
+constexpr void matvec_native_noalias(auto &&in1, auto &&in2, auto &&out) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
 
-        for (in1_index_t j = 0; j < in1.extent(1); j++) {
-            out(i) += in1(i, j) * in2(j);
+    using out_index_t = typename decltype(out_mds)::index_type;
+    using in1_index_t = typename decltype(in1_mds)::index_type;
+
+    for (out_index_t i = 0; i < out_mds.extent(0); i++) {
+        out_mds(i) = 0;
+
+        for (in1_index_t j = 0; j < in1_mds.extent(1); j++) {
+            out_mds(i) += in1_mds(i, j) * in2_mds(j);
         }
     }
 }
 
-template <md_c in1_t, md_c in2_t, md_c out_t>
-inline constexpr void matvec_naive(in1_t &&in1, in2_t &&in2,
-                                   out_t &&out) noexcept {
-    const auto in1_mds = core::to_const_mdspan(std::forward<in1_t>(in1));
-    const auto in2_mds = core::to_const_mdspan(std::forward<in2_t>(in2));
-    auto out_mds = core::to_mdspan(std::forward<out_t>(out));
+constexpr void matvec_naive(auto &&in1, auto &&in2, auto &&out) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
 
     if (std::is_constant_evaluated()) {
         auto out_tmp = empty_like(out_mds);
-        matvec_naive_noalias(in1_mds, in2_mds, out_tmp.to_mdspan());
-        copy_to(out_tmp, out_mds);
+        matvec_native_noalias(in1_mds, in2_mds, out_tmp);
+        static_cast<void>(copy(out_tmp, out_mds));
         return;
     }
 
@@ -3554,7 +4082,7 @@ inline constexpr void matvec_naive(in1_t &&in1, in2_t &&in2,
     if constexpr (requires {
                       in1_mds.data_handle() == out_mds.data_handle();
                   }) {
-        if (in1_mds.data_handle() == out_mds.data_handle()) [[unlikely]] {
+        if (in1_mds.data_handle() == out_mds.data_handle()) {
             need_copy = true;
         }
     }
@@ -3562,44 +4090,54 @@ inline constexpr void matvec_naive(in1_t &&in1, in2_t &&in2,
     if constexpr (requires {
                       in2_mds.data_handle() == out_mds.data_handle();
                   }) {
-        if (in2_mds.data_handle() == out_mds.data_handle()) [[unlikely]] {
+        if (in2_mds.data_handle() == out_mds.data_handle()) {
             need_copy = true;
         }
     }
 
-    if (!need_copy) [[likely]] {
-        matvec_naive_noalias(in1_mds, in2_mds, out_mds);
+    if (!need_copy) {
+        matvec_native_noalias(in1_mds, in2_mds, out_mds);
 
-    } else [[unlikely]] {
+    } else {
         auto out_tmp = empty_like(out_mds);
-        matvec_naive_noalias(in1_mds, in2_mds, out_tmp.to_mdspan());
-        copy_to(out_tmp, out_mds);
+        matvec_native_noalias(in1_mds, in2_mds, out_tmp);
+        static_cast<void>(copy(out_tmp, out_mds));
     }
 }
 
-template <md_c in1_t, md_c in2_t, md_c out_t>
-inline constexpr void matvec_impl(in1_t &&in1, in2_t &&in2,
-                                  out_t &&out) noexcept {
+constexpr void matvec_ufunc(auto &&in1, auto &&in2, auto &&out) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
+
 #ifdef MDTENSOR_USE_EIGEN
 #if __cplusplus >= 202302L // TODO: Impliement for C++20
-    if constexpr (core::eigen::eigen_mappable_mdspan_c<in1_t> &&
-                  core::eigen::eigen_mappable_mdspan_c<in2_t> &&
-                  core::eigen::eigen_mappable_mdspan_c<out_t>) {
-        if (!std::is_constant_evaluated() && 8 <= out.extent(0) + out.extent(1))
-            [[likely]] {
+    using in1_mds_t = decltype(in1_mds);
+    using in2_mds_t = decltype(in2_mds);
+    using out_mds_t = decltype(out_mds);
+
+    if constexpr (core::eigen::eigen_mappable_c<in1_mds_t> &&
+                  core::eigen::eigen_mappable_c<in2_mds_t> &&
+                  core::eigen::eigen_mappable_c<out_mds_t>) {
+        if (!std::is_constant_evaluated() &&
+            8 <= out_mds.extent(0) + out_mds.extent(1)) {
             using value_t = core::common_data_type_t<
-                typename std::remove_cvref_t<in1_t>::value_type,
-                typename std::remove_cvref_t<in2_t>::value_type>;
+                typename std::remove_cvref_t<in1_mds_t>::value_type,
+                typename std::remove_cvref_t<in2_mds_t>::value_type>;
 
             const auto ein1 =
-                core::eigen::to_eigen(in1).template cast<value_t>();
+                core::eigen::to_eigen(in1_mds).template cast<value_t>();
             const auto ein2 =
-                core::eigen::to_eigen(in2).template cast<value_t>();
-            auto eout = core::eigen::to_eigen(out);
+                core::eigen::to_eigen(in2_mds).template cast<value_t>();
+            auto eout = core::eigen::to_eigen(out_mds);
 
-            eout = (ein1 * ein2)
-                       .template cast<
-                           typename std::remove_cvref_t<out_t>::value_type>();
+            eout =
+                (ein1 * ein2)
+                    .template cast<
+                        typename std::remove_cvref_t<out_mds_t>::value_type>();
 
             return;
         }
@@ -3611,91 +4149,424 @@ inline constexpr void matvec_impl(in1_t &&in1, in2_t &&in2,
 #endif
 #endif
 
-    matvec_naive(in1, in2, out);
+    matvec_naive(in1_mds, in2_mds, out_mds);
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Matrix-vector multiplication (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 Input matrix (mdspan, mdarray, etc.) (... x M x K).
- * @param in2 Input vector (mdspan, mdarray, etc.) (... x K).
- * @param out Output vector (mdspan, mdarray, etc.) (... x M).
- *
- * @note The multiplication is performed per instance when inputs are batched.
- *       The last 2 axes of `in1` are treated as matrix axes, and the last axis
- *       of `in2` / `out` is treated as the vector axis.
- *
- * @see mdtensor::linalg::matvec for the out-of-place version that returns the
- * result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
-          typename out_t>
-inline constexpr void matvec_to(in1_t &&in1, in2_t &&in2,
-                                out_t &&out) noexcept {
-    core::batch<mpmode>(
+template <core::Backend backend = core::Backend::AUTO>
+constexpr void matvec_to(auto &&in1, auto &&in2, auto &&out) {
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::matvec_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::matvec_ufunc(std::forward<decltype(elems)>(elems)...);
         },
         std::index_sequence<2, 1, 1>{},
-        core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)),
-        core::to_mdspan(std::forward<out_t>(out)));
+        std::integer_sequence<bool, true, true, false>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        std::forward<decltype(out)>(out));
 }
 
-/**
- * @brief Matrix-vector multiplication (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- * inputs.
- *
- * @param in1 Input matrix (mdspan, mdarray, etc.) (... x M x K).
- * @param in2 Input vector (mdspan, mdarray, etc.) (... x K).
- *
- * @return Vector (mdarray) with shape (... x M).
- *
- * @note The multiplication is performed per instance when inputs are batched.
- *
- * @see mdtensor::linalg::matvec_to for the in-place version that writes into an
- * output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
-[[nodiscard]] inline constexpr auto matvec(in1_t &&in1, in2_t &&in2) noexcept {
-    const auto in1_mds = core::to_const_mdspan(std::forward<in1_t>(in1));
-    const auto in2_mds = core::to_const_mdspan(std::forward<in2_t>(in2));
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto matvec(auto &&in1, auto &&in2) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    const auto uin1_exts = core::slice_from_right<2>(in1_mds.extents());
-    const auto uin2_exts = core::slice_from_right<2>(in2_mds.extents());
-    const auto uout_exts = extents<
+    const auto uin1_exts = core::slice_extents_from_right<2>(in1_mds.extents());
+    const auto uin2_exts = core::slice_extents_from_right<2>(in2_mds.extents());
+    const auto uout_exts = core::extents<
         core::common_index_type_t<typename decltype(uin1_exts)::index_type,
                                   typename decltype(uin2_exts)::index_type>,
         decltype(uin1_exts)::static_extent(0)>{uin1_exts.extent(0)};
 
-    return core::batch_out<dtype, mpmode>(
-        [](auto &&...elems) {
-            detail::matvec_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<2, 1>{}, uout_exts, in1_mds, in2_mds);
+    auto out = core::make_output<dtype>(std::index_sequence<2, 1>{}, uout_exts,
+                                        in1_mds, in2_mds);
+
+    matvec_to<backend>(in1_mds, in2_mds, out);
+
+    return out;
 }
 
-} // namespace linalg
-
-inline constexpr void matvec_to(auto &&...elems) noexcept {
-    linalg::matvec_to(std::forward<decltype(elems)>(elems)...);
-}
-
-template <typename dtype = void>
-[[nodiscard]] inline constexpr auto matvec(auto &&...elems) noexcept {
-    return linalg::matvec<dtype>(std::forward<decltype(elems)>(elems)...);
-}
-
-} // namespace mdtensor
+} // namespace mdtensor::linalg
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/matvec.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/vecmat.hpp
+/**
+ * @file
+ * @brief Vector-matrix multiplication utilities for mdtensor (linalg).
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+#ifdef MDTENSOR_USE_EIGEN
+#endif
+
+namespace mdtensor::linalg {
+namespace ufunc {
+
+constexpr void vecmat_naive_noalias(auto &&in1, auto &&in2, auto &&out) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
+
+    using out_index_t = typename decltype(out_mds)::index_type;
+    using in1_index_t = typename decltype(in1_mds)::index_type;
+
+    for (out_index_t i = 0; i < out_mds.extent(0); i++) {
+        out_mds(i) = 0;
+
+        for (in1_index_t j = 0; j < in1_mds.extent(0); j++) {
+            out_mds(i) += in1_mds(j) * in2_mds(j, i);
+        }
+    }
+}
+
+constexpr void vecmat_naive(auto &&in1, auto &&in2, auto &&out) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
+
+    if (std::is_constant_evaluated()) {
+        auto out_tmp = empty_like(out_mds);
+        vecmat_naive_noalias(in1_mds, in2_mds, out_tmp);
+        static_cast<void>(copy(out_tmp, out_mds));
+        return;
+    }
+
+    bool need_copy = false;
+
+    if constexpr (requires {
+                      in1_mds.data_handle() == out_mds.data_handle();
+                  }) {
+        if (in1_mds.data_handle() == out_mds.data_handle()) {
+            need_copy = true;
+        }
+    }
+
+    if constexpr (requires {
+                      in2_mds.data_handle() == out_mds.data_handle();
+                  }) {
+        if (in2_mds.data_handle() == out_mds.data_handle()) {
+            need_copy = true;
+        }
+    }
+
+    if (!need_copy) {
+        vecmat_naive_noalias(in1_mds, in2_mds, out_mds);
+
+    } else {
+        auto out_tmp = empty_like(out_mds);
+        vecmat_naive_noalias(in1_mds, in2_mds, out_tmp);
+        static_cast<void>(copy(out_tmp, out_mds));
+    }
+}
+
+constexpr void vecmat_ufunc(auto &&in1, auto &&in2, auto &&out) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
+
+#ifdef MDTENSOR_USE_EIGEN
+#if __cplusplus >= 202302L // TODO: Impliement for C++20
+    using in1_mds_t = decltype(in1_mds);
+    using in2_mds_t = decltype(in2_mds);
+    using out_mds_t = decltype(out_mds);
+
+    if constexpr (core::eigen::eigen_mappable_c<in1_mds_t> &&
+                  core::eigen::eigen_mappable_c<in2_mds_t> &&
+                  core::eigen::eigen_mappable_c<out_mds_t>) {
+        if (!std::is_constant_evaluated() &&
+            8 <= out_mds.extent(0) + out_mds.extent(1)) {
+            using value_t = core::common_data_type_t<
+                typename std::remove_cvref_t<in1_mds_t>::value_type,
+                typename std::remove_cvref_t<in2_mds_t>::value_type>;
+
+            const auto ein1 =
+                core::eigen::to_eigen(in1_mds).template cast<value_t>();
+            const auto ein2 =
+                core::eigen::to_eigen(in2_mds).template cast<value_t>();
+            auto eout = core::eigen::to_eigen(out_mds);
+
+            eout =
+                (ein1 * ein2)
+                    .template cast<
+                        typename std::remove_cvref_t<out_mds_t>::value_type>();
+
+            return;
+        }
+    }
+
+#else
+    assert(false && "Eigen inverse not implemented for C++20");
+
+#endif
+#endif
+
+    vecmat_naive(in1_mds, in2_mds, out_mds);
+}
+
+} // namespace ufunc
+
+template <core::Backend backend = core::Backend::AUTO>
+constexpr void vecmat_to(auto &&in1, auto &&in2, auto &&out) {
+    core::batch_with_broadcast<backend>(
+        [](auto &&...elems) {
+            ufunc::vecmat_ufunc(std::forward<decltype(elems)>(elems)...);
+        },
+        std::index_sequence<1, 2, 1>{},
+        std::integer_sequence<bool, true, true, false>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        std::forward<decltype(out)>(out));
+}
+
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto vecmat(auto &&in1, auto &&in2) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
+
+    const auto uin1_exts = core::slice_extents_from_right<2>(in1_mds.extents());
+    const auto uin2_exts = core::slice_extents_from_right<2>(in2_mds.extents());
+    const auto uout_exts = core::extents<
+        core::common_data_type_t<typename decltype(uin1_exts)::index_type,
+                                 typename decltype(uin2_exts)::index_type>,
+        decltype(uin2_exts)::static_extent(1)>{uin2_exts.extent(1)};
+
+    auto out = core::make_output<dtype>(std::index_sequence<1, 2>{}, uout_exts,
+                                        in1_mds, in2_mds);
+
+    vecmat_to<backend>(in1_mds, in2_mds, out);
+
+    return out;
+}
+
+} // namespace mdtensor::linalg
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/vecmat.hpp
+
+#ifdef MDTENSOR_USE_EIGEN
+#endif
+
+// TODO: modifiy
+
+namespace mdtensor::linalg {
+namespace ufunc {
+
+constexpr void matmul_ufunc_native_noalias(auto &&in1, auto &&in2, auto &&out) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
+
+    using out_index_t = typename decltype(out_mds)::index_type;
+    using in1_index_t = typename decltype(in1_mds)::index_type;
+
+    for (out_index_t i = 0; i < out_mds.extent(0); i++) {
+        for (out_index_t j = 0; j < out_mds.extent(1); j++) {
+            out_mds(i, j) = 0;
+
+            for (in1_index_t k = 0; k < in1_mds.extent(1); k++) {
+                out_mds(i, j) += in1_mds(i, k) * in2_mds(k, j);
+            }
+        }
+    }
+}
+
+constexpr void matmul_ufunc_native(auto &&in1, auto &&in2, auto &&out) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
+
+    bool need_copy = false;
+
+    if (std::is_constant_evaluated()) {
+        need_copy = true;
+
+    } else if ((void *)in1_mds.data_handle() == (void *)out_mds.data_handle() ||
+               (void *)in2_mds.data_handle() == (void *)out_mds.data_handle()) {
+        need_copy = true;
+    }
+
+    if (!need_copy) {
+        matmul_ufunc_native_noalias(in1_mds, in2_mds, out_mds);
+
+    } else {
+        auto out_tmp = empty_like(out_mds);
+        matmul_ufunc_native_noalias(in1_mds, in2_mds, out_tmp);
+        static_cast<void>(copy(out_tmp, out_mds));
+    }
+}
+
+#ifdef MDTENSOR_USE_EIGEN
+
+template <core::mdspan_c in1_t, core::mdspan_c in2_t, core::mdspan_c out_t>
+    requires(core::eigen::eigen_mappable_c<in1_t> &&
+             core::eigen::eigen_mappable_c<in2_t> &&
+             core::eigen::eigen_mappable_c<out_t>)
+inline void matmul_ufunc_eigen(const in1_t &in1, const in2_t &in2,
+                               const out_t &out) {
+    using value_t = core::common_data_type_t<typename in1_t::value_type,
+                                             typename in2_t::value_type>;
+
+    const auto ein1 = core::eigen::to_eigen(in1);
+    const auto ein2 = core::eigen::to_eigen(in2);
+    auto eout = core::eigen::to_eigen(out);
+
+    eout = (ein1.template cast<value_t>() * ein2.template cast<value_t>())
+               .template cast<typename out_t::value_type>();
+}
+
+#endif
+
+constexpr core::Backend matmul_auto_backend(auto &&in1, auto &&in2,
+                                            auto &&out) {
+    if (std::is_constant_evaluated()) {
+        return core::Backend::NATIVE;
+    }
+
+#ifdef MDTENSOR_USE_EIGEN
+    if constexpr (core::eigen::eigen_mappable_c<decltype(in1)> &&
+                  core::eigen::eigen_mappable_c<decltype(in2)> &&
+                  core::eigen::eigen_mappable_c<decltype(out)>) {
+        return core::Backend::EIGEN;
+    }
+#endif
+
+    return core::Backend::NATIVE;
+}
+
+} // namespace ufunc
+
+template <core::Backend backend = core::Backend::AUTO>
+constexpr void matmul_to(auto &&in1, auto &&in2, auto &&out) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
+
+    constexpr bool is_in1_mds_1d = (in1_mds.rank() == 1);
+    constexpr bool is_in2_mds_1d = (in2_mds.rank() == 1);
+
+    if constexpr (is_in1_mds_1d && !is_in2_mds_1d) {
+        vecmat_to<backend>(in1_mds, in2_mds, out_mds);
+
+    } else if constexpr (!is_in1_mds_1d && is_in2_mds_1d) {
+        matvec_to<backend>(in1_mds, in2_mds, out_mds);
+
+    } else {
+        const auto be = backend;
+        // constexpr auto be =
+        //     (backend == core::Backend::AUTO)
+        //         ?
+        // ufunc::matmul_auto_backend(std::forward<decltype(in1)>(in1),
+        // std::forward<decltype(in2)>(in2),
+        // std::forward<decltype(out)>(out))
+        //         : backend;
+
+        if (
+#ifdef MDTENSOR_USE_EIGEN
+            be == core::Backend::EIGEN
+#else
+            false
+#endif
+        ) {
+#ifdef MDTENSOR_USE_EIGEN
+            core::batch_with_broadcast<core::Backend::NATIVE>(
+                [](auto &&...elems) {
+                    ufunc::matmul_ufunc_eigen(
+                        std::forward<decltype(elems)>(elems)...);
+                },
+                std::index_sequence<2, 2, 2>{},
+                std::integer_sequence<bool, true, true, false>{},
+                std::forward<decltype(in1)>(in1),
+                std::forward<decltype(in2)>(in2),
+                std::forward<decltype(out)>(out));
+#endif
+
+        } else if (be == core::Backend::NATIVE) {
+            core::batch_with_broadcast<core::Backend::NATIVE>(
+                [](auto &&...elems) {
+                    ufunc::matmul_ufunc_native(
+                        std::forward<decltype(elems)>(elems)...);
+                },
+                std::index_sequence<2, 2, 2>{},
+                std::integer_sequence<bool, true, true, false>{},
+                std::forward<decltype(in1)>(in1),
+                std::forward<decltype(in2)>(in2),
+                std::forward<decltype(out)>(out));
+
+        } else {
+            core::batch_with_broadcast<core::Backend::NATIVE>(
+                [](auto &&...elems) {
+                    ufunc::matmul_ufunc_native(
+                        std::forward<decltype(elems)>(elems)...);
+                },
+                std::index_sequence<2, 2, 2>{},
+                std::integer_sequence<bool, true, true, false>{},
+                std::forward<decltype(in1)>(in1),
+                std::forward<decltype(in2)>(in2),
+                std::forward<decltype(out)>(out));
+        }
+    }
+}
+
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto matmul(auto &&in1, auto &&in2) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
+
+    constexpr bool is_in1_mds_1d = (in1_mds.rank() == 1);
+    constexpr bool is_in2_mds_1d = (in2_mds.rank() == 1);
+
+    if constexpr (is_in1_mds_1d && !is_in2_mds_1d) {
+        return vecmat<dtype, backend>(in1_mds, in2_mds);
+
+    } else if constexpr (!is_in1_mds_1d && is_in2_mds_1d) {
+        return matvec<dtype, backend>(in1_mds, in2_mds);
+
+    } else {
+        const auto uin1_exts =
+            core::slice_extents_from_right<2>(in1_mds.extents());
+        const auto uin2_exts =
+            core::slice_extents_from_right<2>(in2_mds.extents());
+        const auto uout_exts =
+            core::compose_extents(core::slice_extents_from_left<1>(uin1_exts),
+                                  core::slice_extents_from_right<1>(uin2_exts));
+
+        auto out = core::make_output<dtype>(
+            std::index_sequence<uin1_exts.rank(), uin2_exts.rank()>{},
+            uout_exts, in1_mds, in2_mds);
+
+        matmul_to<backend>(in1_mds, in2_mds, out);
+
+        return out;
+    }
+}
+
+} // namespace mdtensor::linalg
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/matmul.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/norm.hpp
 /**
  * @file
@@ -3707,83 +4578,6 @@ template <typename dtype = void>
  */
 
 
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/multiply.hpp
-/**
- * @file
- * @brief Element-wise multiplication utilities for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
-
-namespace mdtensor {
-namespace detail {
-
-template <typename in1_t, typename in2_t, typename out_t>
-inline constexpr void multiply_impl(in1_t &&in1, in2_t &&in2, out_t &&out) {
-    out() = in1() * in2();
-}
-
-} // namespace detail
-
-/**
- * @brief Multiply arguments element-wise (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note Equivalent to out = in1 * in2 in terms of array broadcasting.
- *
- * @see mdtensor::multiply for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
-          typename out_t>
-inline constexpr void multiply_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::multiply_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
-
-/**
- * @brief Multiply arguments element-wise (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- *         inputs.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar.
- *
- * @note Equivalent to out = in1 * in2 in terms of array broadcasting.
- *
- * @see mdtensor::multiply_to for the in-place version that writes into an
- *      output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
-[[nodiscard]] inline constexpr auto multiply(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<dtype, mpmode>(
-        [](auto &&...elems) {
-            detail::multiply_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)));
-}
-
-} // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/multiply.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/sum.hpp
 /**
  * @file
@@ -3795,259 +4589,146 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
  */
 
 
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/add.hpp
-/**
- * @file
- * @brief Element-wise addition utilities for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
 
 namespace mdtensor {
-namespace detail {
 
-template <typename in1_t, typename in2_t, typename out_t>
-inline constexpr void add_impl(in1_t &&in1, in2_t &&in2, out_t &&out) {
-    out() = in1() + in2();
-}
+template <typename dtype = void, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO, std::integral axes_t,
+          axes_t... axes, typename out_t = std::nullopt_t,
+          typename initial_t = std::nullopt_t,
+          typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto sum(auto &&in,
+                                 std::integer_sequence<axes_t, axes...>,
+                                 out_t &&out = out_t{std::nullopt},
+                                 initial_t &&initial = initial_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-} // namespace detail
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_reduce_output<dtype, keepdims>(
+                std::integer_sequence<axes_t, axes...>{},
+                std::index_sequence<0>{}, core::extents<std::uint8_t>{},
+                in_mds);
 
-/**
- * @brief Add arguments element-wise (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note Equivalent to out = in1 + in2 in terms of array broadcasting.
- *
- * @see mdtensor::add for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
-          typename out_t>
-inline constexpr void add_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::add_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
 
-/**
- * @brief Add arguments element-wise (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) data type of the result. If void, deduced from
- *         inputs.
- * @param in1 mdspan, mdarray, scalar, etc.
- * @param in2 mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar.
- *
- * @note Equivalent to out = in1 + in2 in terms of array broadcasting.
- *
- * @see mdtensor::add_to for the in-place version that modifies the output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
-[[nodiscard]] inline constexpr auto add(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<dtype, mpmode>(
-        [](auto &&...elems) {
-            detail::add_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)));
-}
+    // TODO: move to reduce
+    if constexpr (core::is_nullopt_t_c<decltype(initial)>) {
+        fill<backend>(out_md, 0);
 
-} // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/add.hpp
-
-namespace mdtensor {
-namespace detail {
-
-template <typename in_t, typename out_t>
-inline constexpr void sum_impl(in_t &&in, out_t &&out) {
-    fill(std::forward<out_t>(out), 0);
-
-    for (typename std::remove_cvref_t<in_t>::index_type i = 0; i < in.extent(0);
-         i++) {
-        add_to(std::forward<out_t>(out),
-               core::submdspan_from_left(std::forward<in_t>(in), i),
-               std::forward<out_t>(out));
+    } else {
+        fill<backend>(out_md, std::forward<decltype(initial)>(initial));
     }
+
+    core::reduce<keepdims>(
+        [](auto &&in, auto &&out, auto &&where) {
+            static_cast<void>(
+                add<void, backend>(std::forward<decltype(in)>(in),
+                                   std::forward<decltype(out)>(out),
+                                   std::forward<decltype(out)>(out),
+                                   std::forward<decltype(where)>(where)));
+        },
+        std::integer_sequence<axes_t, axes...>{},
+        std::index_sequence<0, 0, 0>{},
+        std::integer_sequence<bool, true, false, true>{},
+        std::forward<decltype(in)>(in), out_md,
+        std::forward<decltype(where)>(where));
+
+    return out_md;
 }
 
-} // namespace detail
-
-/**
- * @brief Compute sum along a specified axis (in-place).
- *
- * @tparam Axis Axis to reduce. Negative values are supported and normalized
- *         by the input rank (NumPy-like semantics).
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note The reduction is performed along the specified axis and written to out.
- * @note Broadcasting is not performed; this is a reduction operation.
- *
- * @see mdtensor::sum for the out-of-place axis-reduction version that returns
- *      the result.
- */
-template <int64_t Axis, MPMode mpmode = MPMode::NONE, typename in_t,
-          typename out_t>
-inline constexpr void sum_to(in_t &&in, out_t &&out) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-    const auto out_mds = core::to_mdspan(std::forward<out_t>(out));
-
-    constexpr size_t in_rank = decltype(in_mds)::rank();
-    constexpr size_t rin_rank =
-        in_rank -
-        static_cast<size_t>(
-            ((Axis % static_cast<int64_t>(in_rank)) + (in_rank)) % in_rank);
-
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::sum_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<rin_rank, rin_rank - 1>{}, in_mds, out_mds);
+template <std::int64_t axis, typename dtype = void, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename initial_t = std::nullopt_t,
+          typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto sum(auto &&in, out_t &&out = out_t{std::nullopt},
+                                 initial_t &&initial = initial_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    return sum<dtype, keepdims, backend>(
+        std::forward<decltype(in)>(in),
+        std::integer_sequence<std::int64_t, axis>{},
+        std::forward<decltype(out)>(out),
+        std::forward<decltype(initial)>(initial),
+        std::forward<decltype(where)>(where));
 }
 
-/**
- * @brief Compute sum along a specified axis (out-of-place).
- *
- * @tparam Axis Axis to reduce. Negative values are supported and normalized
- *         by the input rank (NumPy-like semantics).
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- *         input.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar (depending on the input rank and reduction).
- *
- * @note The reduction is performed along the specified axis.
- *
- * @see mdtensor::sum_to for the in-place version that writes into an output.
- */
-template <int64_t Axis, MPMode mpmode = MPMode::NONE, typename dtype = void,
-          typename in_t>
-[[nodiscard]] inline constexpr auto sum(in_t &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-
-    constexpr size_t in_rank = decltype(in_mds)::rank();
-    constexpr size_t rin_rank =
-        in_rank -
-        static_cast<size_t>(
-            ((Axis % static_cast<int64_t>(in_rank)) + (in_rank)) % in_rank);
-
-    return core::batch_out<dtype, mpmode>(
-        [](auto &&...elems) {
-            detail::sum_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<rin_rank>{},
-        core::slice_from_right<rin_rank - 1>(in_mds.extents()), in_mds);
+template <typename dtype = void, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename initial_t = std::nullopt_t,
+          typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto sum(auto &&in, out_t &&out = out_t{std::nullopt},
+                                 initial_t &&initial = initial_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    return sum<dtype, keepdims, backend>(
+        std::forward<decltype(in)>(in), std::index_sequence<>{},
+        std::forward<decltype(out)>(out),
+        std::forward<decltype(initial)>(initial),
+        std::forward<decltype(where)>(where));
 }
 
 } // namespace mdtensor
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/sum.hpp
 
-namespace mdtensor {
-namespace linalg {
-namespace detail {
+namespace mdtensor::linalg {
+namespace ufunc {
 
-template <md_c in_t, md_c out_t>
-inline constexpr void norm_impl(in_t &&in, out_t &&out) noexcept {
-    static_assert(std::remove_cvref_t<in_t>::rank() == 1);
-    static_assert(std::remove_cvref_t<out_t>::rank() == 0);
+constexpr void norm_ufunc(auto &&in, auto &&out) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
 
-    using index_t = typename std::remove_cvref_t<in_t>::index_type;
+    using index_t = typename decltype(in_mds)::index_type;
 
-    out() = 0;
-    for (index_t i = 0; i < in.extent(0); i++) {
-        out() += in(i)*in(i);
+    out_mds() = 0;
+    for (index_t i = 0; i < in_mds.extent(0); i++) {
+        out_mds() += in_mds(i) * in_mds(i);
     }
 
-    if (out() > 0) {
-        out() = sqrt(out());
+    if (out_mds() > 0) {
+        out_mds() = sqrt(out_mds());
     }
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compute Euclidean (L2) norm of a vector (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input tensor (mdspan, mdarray, etc.) (... x N).
- * @param out Output tensor (mdspan, mdarray, scalar, etc.) (...).
- *
- * @note When `mpmode == MPMode::SIMD`, the implementation uses the element-wise
- *       pipeline `sum(multiply(in, in))` followed by `sqrt` to improve
- *       vectorization opportunities.
- *
- * @see mdtensor::linalg::norm for the out-of-place version that returns the
- * result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
-inline constexpr void norm_to(in_t &&in, out_t &&out) noexcept {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-    const auto out_mds = core::to_mdspan(std::forward<out_t>(out));
+template <core::Backend backend = core::Backend::AUTO>
+constexpr void norm_to(auto &&in, auto &&out) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+    const auto out_mds =
+        core::to_output_mdspan(std::forward<decltype(out)>(out));
 
-    if constexpr (mpmode == MPMode::SIMD) [[unlikely]] {
-        sum_to<-1, mpmode>(multiply<void, mpmode>(in_mds, in_mds), out_mds);
-        sqrt_to<mpmode>(out_mds, out_mds);
+    if constexpr (backend == core::Backend::SIMD) {
+        static_cast<void>(sum<-1, void, false, backend>(
+            multiply<void, backend>(in_mds, in_mds), out_mds));
+        static_cast<void>(sqrt<void, backend>(out_mds, out_mds));
 
     } else {
-        core::batch<mpmode>(
+        core::batch_with_broadcast<backend>(
             [](auto &&...elems) {
-                detail::norm_impl(std::forward<decltype(elems)>(elems)...);
+                ufunc::norm_ufunc(std::forward<decltype(elems)>(elems)...);
             },
-            std::index_sequence<1, 0>{}, in_mds, out_mds);
+            std::index_sequence<1, 0>{},
+            std::integer_sequence<bool, true, false>{}, in_mds, out_mds);
     }
 }
 
-/**
- * @brief Compute Euclidean (L2) norm of a vector (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- * input.
- *
- * @param in Input tensor (mdspan, mdarray, etc.) (... x N).
- *
- * @return mdarray or scalar matching the batch extents of the input.
- *
- * @note This function creates a rank-0 output container and then calls
- *       mdtensor::linalg::norm_to.
- *
- * @see mdtensor::linalg::norm_to for the in-place version that writes into an
- * output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto norm(in_t &&in) noexcept {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto norm(auto &&in) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out = core::create_out<dtype>(std::index_sequence<1>{},
-                                       extents<uint8_t>{}, in_mds);
+    auto out = core::make_output<dtype>(std::index_sequence<1>{},
+                                        core::extents<std::uint8_t>{}, in_mds);
 
-    norm_to<mpmode>(in_mds, out);
+    norm_to<backend>(in_mds, out);
 
     return out;
 }
 
-} // namespace linalg
-} // namespace mdtensor
+} // namespace mdtensor::linalg
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/norm.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/solve.hpp
 /**
@@ -4061,32 +4742,17 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 
 
 
-namespace mdtensor {
-namespace linalg {
-namespace detail {
+namespace mdtensor::linalg {
+namespace ufunc {
 
-template <md_c a_t, md_c b_t, md_c x_t>
-[[nodiscard]] inline constexpr bool solve_impl(a_t &&a, b_t &&b,
-                                               x_t &&x) noexcept {
-    auto a_mds = core::to_const_mdspan(std::forward<a_t>(a));
-    auto b_mds = core::to_const_mdspan(std::forward<b_t>(b));
-    auto x_mds = core::to_mdspan(std::forward<x_t>(x));
+[[nodiscard]] constexpr bool solve_ufunc(auto &&a, auto &&b, auto &&x) {
+    const auto a_mds = core::to_const_mdspan(std::forward<decltype(a)>(a));
+    const auto b_mds = core::to_const_mdspan(std::forward<decltype(b)>(b));
+    const auto x_mds = core::to_output_mdspan(std::forward<decltype(x)>(x));
 
-    using a_mds_t = std::remove_cvref_t<decltype(a_mds)>;
-    using b_mds_t = std::remove_cvref_t<decltype(b_mds)>;
-    using x_mds_t = std::remove_cvref_t<decltype(x_mds)>;
-
-    static_assert(a_mds_t::rank() == 2);
-    static_assert(b_mds_t::rank() == 1 || b_mds_t::rank() == 2);
-    static_assert(x_mds_t::rank() == b_mds_t::rank());
-
-    using index_t = typename a_mds_t::index_type;
+    using index_t = typename decltype(a_mds)::index_type;
 
     const index_t n = a_mds.extent(0);
-
-    assert(a_mds.extent(1) == n);
-    assert(b_mds.extent(0) == n);
-    assert(x_mds.extent(0) == n);
 
     // LU decomposition of A
     const auto [p_indices, l, u] = lu_p_indices(a_mds);
@@ -4098,7 +4764,7 @@ template <md_c a_t, md_c b_t, md_c x_t>
         }
     }
 
-    if constexpr (b_mds_t::rank() == 1) {
+    if constexpr (b_mds.rank() == 1) {
         // initialize out
         for (index_t idx = 0; idx < n; idx++) {
             x_mds(p_indices(idx)) = b_mds(idx);
@@ -4164,245 +4830,80 @@ template <md_c a_t, md_c b_t, md_c x_t>
     return true;
 }
 
-} // namespace detail
+} // namespace ufunc
 
-template <MPMode mpmode = MPMode::NONE, typename a_t, typename b_t,
-          typename x_t, typename valid_t>
-inline constexpr void solve_to(a_t &&a, b_t &&b, x_t &&x, valid_t &&valid) {
-    const auto a_mds = core::to_const_mdspan(std::forward<a_t>(a));
-    const auto b_mds = core::to_const_mdspan(std::forward<b_t>(b));
+template <core::Backend backend = core::Backend::AUTO>
+constexpr void solve_to(auto &&a, auto &&b, auto &&x, auto &&valid) {
+    const auto b_mds = core::to_const_mdspan(std::forward<decltype(b)>(b));
 
-    constexpr size_t rhs_rank = decltype(b_mds)::rank() == 1 ? 1 : 2;
+    constexpr std::size_t rhs_rank = b_mds.rank() == 1 ? 1 : 2;
 
-    core::batch<mpmode>(
+    core::batch_with_broadcast<backend>(
         [](auto &&a, auto &&b, auto &&x, auto &&valid) {
-            valid() = detail::solve_impl(std::forward<decltype(a)>(a),
+            valid() = ufunc::solve_ufunc(std::forward<decltype(a)>(a),
                                          std::forward<decltype(b)>(b),
                                          std::forward<decltype(x)>(x));
         },
-        std::index_sequence<2, rhs_rank, rhs_rank, 0>{}, a_mds, b_mds,
-        core::to_mdspan(std::forward<x_t>(x)),
-        core::to_mdspan(std::forward<valid_t>(valid)));
+        std::index_sequence<2, rhs_rank, rhs_rank, 0>{},
+        std::integer_sequence<bool, true, true, false, false>{},
+        std::forward<decltype(a)>(a), b_mds, std::forward<decltype(x)>(x),
+        std::forward<decltype(valid)>(valid));
 }
 
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename a_t,
-          typename b_t>
-[[nodiscard]] inline constexpr auto solve(a_t &&a, b_t &&b) {
-    const auto a_mds = core::to_const_mdspan(std::forward<a_t>(a));
-    const auto b_mds = core::to_const_mdspan(std::forward<b_t>(b));
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+[[nodiscard]] constexpr auto solve(auto &&a, auto &&b) {
+    const auto a_mds = core::to_const_mdspan(std::forward<decltype(a)>(a));
+    const auto b_mds = core::to_const_mdspan(std::forward<decltype(b)>(b));
 
-    constexpr size_t rhs_rank = decltype(b_mds)::rank() == 1 ? 1 : 2;
+    constexpr std::size_t rhs_rank = b_mds.rank() == 1 ? 1 : 2;
 
-    auto x = core::create_out<dtype>(
+    auto x = core::make_output<dtype>(
         std::index_sequence<2, rhs_rank>{},
-        core::slice_from_right<rhs_rank>(b_mds.extents()), a_mds, b_mds);
+        core::slice_extents_from_right<rhs_rank>(b_mds.extents()), a_mds,
+        b_mds);
 
-    auto valid = core::create_out<bool>(std::index_sequence<2, rhs_rank>{},
-                                        extents<uint8_t>{}, a_mds, b_mds);
+    auto valid =
+        core::make_output<bool>(std::index_sequence<2, rhs_rank>{},
+                                core::extents<std::uint8_t>{}, a_mds, b_mds);
 
-    solve_to<mpmode>(a_mds, b_mds, x, valid);
+    solve_to<backend>(a_mds, b_mds, x, valid);
 
     return std::pair{x, valid};
 }
 
-} // namespace linalg
-} // namespace mdtensor
+} // namespace mdtensor::linalg
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/solve.hpp
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/vecmat.hpp
-/**
- * @file
- * @brief Vector-matrix multiplication utilities for mdtensor (linalg).
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
 
 namespace mdtensor {
-namespace linalg {
-namespace detail {
 
-template <md_c in1_t, md_c in2_t, md_c out_t>
-inline constexpr void vecmat_naive_noalias(in1_t &&in1, in2_t &&in2,
-                                           out_t &&out) noexcept {
-    using out_index_t = typename std::remove_cvref_t<out_t>::index_type;
-    using in1_index_t = typename std::remove_cvref_t<in1_t>::index_type;
-
-    for (out_index_t i = 0; i < out.extent(0); i++) {
-        out(i) = 0;
-
-        for (in1_index_t j = 0; j < in1.extent(0); j++) {
-            out(i) += in1(j) * in2(j, i);
-        }
-    }
+constexpr void matmul_to(auto &&...elems) {
+    linalg::matmul_to(std::forward<decltype(elems)>(elems)...);
 }
 
-template <md_c in1_t, md_c in2_t, md_c out_t>
-inline constexpr void vecmat_naive(in1_t &&in1, in2_t &&in2,
-                                   out_t &&out) noexcept {
-    const auto in1_mds = core::to_const_mdspan(std::forward<in1_t>(in1));
-    const auto in2_mds = core::to_const_mdspan(std::forward<in2_t>(in2));
-    auto out_mds = core::to_mdspan(std::forward<out_t>(out));
-
-    if (std::is_constant_evaluated()) {
-        auto out_tmp = empty_like(out_mds);
-        vecmat_naive_noalias(in1_mds, in2_mds, out_tmp.to_mdspan());
-        copy_to(out_tmp, out_mds);
-        return;
-    }
-
-    bool need_copy = false;
-
-    if constexpr (requires {
-                      in1_mds.data_handle() == out_mds.data_handle();
-                  }) {
-        if (in1_mds.data_handle() == out_mds.data_handle()) [[unlikely]] {
-            need_copy = true;
-        }
-    }
-
-    if constexpr (requires {
-                      in2_mds.data_handle() == out_mds.data_handle();
-                  }) {
-        if (in2_mds.data_handle() == out_mds.data_handle()) [[unlikely]] {
-            need_copy = true;
-        }
-    }
-
-    if (!need_copy) [[likely]] {
-        vecmat_naive_noalias(in1_mds, in2_mds, out_mds);
-
-    } else [[unlikely]] {
-        auto out_tmp = empty_like(out_mds);
-        vecmat_naive_noalias(in1_mds, in2_mds, out_tmp.to_mdspan());
-        copy_to(out_tmp, out_mds);
-    }
+template <typename dtype = void>
+[[nodiscard]] constexpr auto matmul(auto &&...elems) {
+    return linalg::matmul<dtype>(std::forward<decltype(elems)>(elems)...);
 }
 
-template <md_c in1_t, md_c in2_t, md_c out_t>
-inline constexpr void vecmat_impl(in1_t &&in1, in2_t &&in2,
-                                  out_t &&out) noexcept {
-    static_assert(std::remove_cvref_t<in1_t>::rank() == 1);
-    static_assert(std::remove_cvref_t<in2_t>::rank() == 2);
-    static_assert(std::remove_cvref_t<out_t>::rank() == 1);
-
-#ifdef MDTENSOR_USE_EIGEN
-#if __cplusplus >= 202302L // TODO: Impliement for C++20
-    if constexpr (core::eigen::eigen_mappable_mdspan_c<in1_t> &&
-                  core::eigen::eigen_mappable_mdspan_c<in2_t> &&
-                  core::eigen::eigen_mappable_mdspan_c<out_t>) {
-        if (!std::is_constant_evaluated() && 8 <= out.extent(0) + out.extent(1))
-            [[likely]] {
-            using value_t = core::common_data_type_t<
-                typename std::remove_cvref_t<in1_t>::value_type,
-                typename std::remove_cvref_t<in2_t>::value_type>;
-
-            const auto ein1 =
-                core::eigen::to_eigen(in1).template cast<value_t>();
-            const auto ein2 =
-                core::eigen::to_eigen(in2).template cast<value_t>();
-            auto eout = core::eigen::to_eigen(out);
-
-            eout = (ein1 * ein2)
-                       .template cast<
-                           typename std::remove_cvref_t<out_t>::value_type>();
-
-            return;
-        }
-    }
-
-#else
-    assert(false && "Eigen inverse not implemented for C++20");
-
-#endif
-#endif
-
-    vecmat_naive(in1, in2, out);
+constexpr void matvec_to(auto &&...elems) {
+    linalg::matvec_to(std::forward<decltype(elems)>(elems)...);
 }
 
-} // namespace detail
-
-/**
- * @brief Vector-matrix multiplication (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 Input vector (rank-1 mdspan, mdarray, etc.) (... x K).
- * @param in2 Input matrix (rank-2 mdspan, mdarray, etc.) (... x K x N).
- * @param out Output vector (rank-1 mdspan, mdarray, etc.) (... x N).
- *
- * @note The multiplication is performed per-instance when inputs are batched.
- *       The last dimension of `in1` must match the first dimension of `in2`.
- *
- * @see mdtensor::linalg::vecmat for the out-of-place version that returns the
- * result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
-          typename out_t>
-inline constexpr void vecmat_to(in1_t &&in1, in2_t &&in2,
-                                out_t &&out) noexcept {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::vecmat_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<1, 2, 1>{},
-        core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)),
-        core::to_mdspan(std::forward<out_t>(out)));
+template <typename dtype = void>
+[[nodiscard]] constexpr auto matvec(auto &&...elems) {
+    return linalg::matvec<dtype>(std::forward<decltype(elems)>(elems)...);
 }
 
-/**
- * @brief Vector-matrix multiplication (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- * inputs.
- *
- * @param in1 Input vector (rank-1 mdspan, mdarray, etc.) (... x K).
- * @param in2 Input matrix (rank-2 mdspan, mdarray, etc.) (... x K x N).
- *
- * @return Vector (mdarray) with shape (... x N).
- *
- * @note The multiplication is performed per-instance when inputs are batched.
- *
- * @see mdtensor::linalg::vecmat_to for the in-place version that writes into an
- * output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
-[[nodiscard]] inline constexpr auto vecmat(in1_t &&in1, in2_t &&in2) noexcept {
-    const auto in1_mds = core::to_const_mdspan(std::forward<in1_t>(in1));
-    const auto in2_mds = core::to_const_mdspan(std::forward<in2_t>(in2));
-
-    const auto uin1_exts = core::slice_from_right<2>(in1_mds.extents());
-    const auto uin2_exts = core::slice_from_right<2>(in2_mds.extents());
-    const auto uout_exts = extents<
-        core::common_data_type_t<typename decltype(uin1_exts)::index_type,
-                                 typename decltype(uin2_exts)::index_type>,
-        decltype(uin2_exts)::static_extent(1)>{uin2_exts.extent(1)};
-
-    return core::batch_out<dtype, mpmode>(
-        [](auto &&...elems) {
-            detail::vecmat_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<1, 2>{}, uout_exts, in1_mds, in2_mds);
-}
-
-} // namespace linalg
-
-inline constexpr void vecmat_to(auto &&...elems) noexcept {
+constexpr void vecmat_to(auto &&...elems) {
     linalg::vecmat_to(std::forward<decltype(elems)>(elems)...);
 }
 
 template <typename dtype = void>
-[[nodiscard]] inline constexpr auto vecmat(auto &&...elems) noexcept {
+[[nodiscard]] constexpr auto vecmat(auto &&...elems) {
     return linalg::vecmat<dtype>(std::forward<decltype(elems)>(elems)...);
 }
 
 } // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/vecmat.hpp
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/linalg.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/logic.hpp
 /**
@@ -4426,140 +4927,133 @@ template <typename dtype = void>
  */
 
 
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/logical_and.hpp
+/**
+ * @file
+ * @brief Element-wise logical AND utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in_t, typename out_t>
-inline constexpr void all_impl(in_t &&in, out_t &&out) {
-    using in_base_t = std::remove_cvref_t<in_t>;
-    using out_base_t = std::remove_cvref_t<out_t>;
-
-    static_assert(in_base_t::rank() == out_base_t::rank() + 1,
-                  "Input rank must be one greater than output rank.");
-
-    if constexpr (in_base_t::rank() == 1) {
-        for (typename in_base_t::index_type i = 0; i < in.extent(0); i++) {
-            if (!static_cast<bool>(in(i))) {
-                out() = false;
-                return;
-            }
-        }
-
-        out() = true;
-
-    } else {
-        for (typename in_base_t::index_type i = 0;
-             i < in.extent(in_base_t::rank() - 1); i++) {
-            all_impl(core::submdspan_from_right(std::forward<in_t>(in), i),
-                     core::submdspan_from_right(std::forward<out_t>(out), i));
+constexpr void logical_and_ufunc(auto &&in1, auto &&in2, auto &&out,
+                                 auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
         }
     }
+
+    out() = (static_cast<bool>(in1()) && static_cast<bool>(in2()));
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compute logical all along a specified axis (in-place).
- *
- * @tparam Axis Axis to reduce. Negative values are supported and normalized
- *         by the input rank (NumPy-like semantics).
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc. (rank reduced by 1).
- *
- * @note The output values are written as boolean results (true/false) into out.
- *
- * @see mdtensor::all<Axis, dtype>(in) for the out-of-place axis-reduction
- *      version.
- * @see mdtensor::all(in) for full-tensor reduction returning bool.
- */
-template <int64_t Axis, MPMode mpmode = MPMode::NONE, typename in_t,
-          typename out_t>
-inline constexpr void all(in_t &&in, out_t &&out) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-    const auto out_mds = core::to_mdspan(std::forward<out_t>(out));
+template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+logical_and(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
+            where_t &&where = where_t{std::nullopt}) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    constexpr size_t in_rank = decltype(in_mds)::rank();
-    constexpr size_t rin_rank =
-        in_rank -
-        static_cast<size_t>(
-            ((Axis % static_cast<int64_t>(in_rank)) + (in_rank)) % in_rank);
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_output<dtype>(core::extents<std::uint8_t>{},
+                                            in1_mds, in2_mds);
 
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::all_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<rin_rank, rin_rank - 1>{}, in_mds, out_mds);
-}
-
-/**
- * @brief Compute logical all along a specified axis (out-of-place).
- *
- * @tparam Axis Axis to reduce. Negative values are supported and normalized
- *         by the input rank (NumPy-like semantics).
- * @tparam dtype (optional) Data type of the result tensor. Default is int8_t.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- *
- * @return Reduced tensor (mdarray or scalar), with rank reduced by 1.
- *
- * @note dtype controls the storage type of the output tensor. The produced
- *       values represent boolean results (0/1) when dtype is integral.
- *
- * @see mdtensor::all<Axis>(in, out) for the in-place version.
- * @see mdtensor::all(in) for full-tensor reduction returning bool.
- */
-template <int64_t Axis, typename dtype = int8_t, MPMode mpmode = MPMode::NONE,
-          typename in_t>
-[[nodiscard]] inline constexpr auto all(in_t &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-
-    constexpr size_t in_rank = decltype(in_mds)::rank();
-    constexpr size_t rin_rank =
-        in_rank -
-        static_cast<size_t>(
-            ((Axis % static_cast<int64_t>(in_rank)) + (in_rank)) % in_rank);
-
-    return core::batch_out<dtype, mpmode>(
-        [](auto &&...elems) {
-            detail::all_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<rin_rank>{},
-        core::slice_from_right<rin_rank - 1>(in_mds.extents()), in_mds);
-}
-
-/**
- * @brief Compute logical all over the entire input (full reduction).
- *
- * @tparam in_t Input type (mdspan, mdarray, scalar, etc.).
- *
- * @param in Input tensor-like object.
- *
- * @return true if all elements are truthy, otherwise false.
- *
- * @note For rank-0 inputs, this returns static_cast<bool>(in()).
- * @note For rank>0 inputs, the reduction is performed recursively.
- */
-template <typename in_t> [[nodiscard]] inline constexpr bool all(in_t &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-
-    if constexpr (decltype(in_mds)::rank() == 0) {
-        return static_cast<bool>(in_mds());
-
-    } else {
-        using index_t = typename decltype(in_mds)::index_type;
-
-        for (index_t i = 0; i < in_mds.extent(0); i++) {
-            if (!all(core::submdspan_from_left(in_mds, i))) {
-                return false;
-            }
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
         }
+    }();
 
-        return true;
-    }
+    core::batch_with_broadcast<backend>(
+        [](auto &&...elems) {
+            ufunc::logical_and_ufunc(std::forward<decltype(elems)>(elems)...);
+        },
+        std::integer_sequence<bool, true, true, false, true>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        out_md, std::forward<decltype(where)>(where));
+
+    return out_md;
+}
+
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/logical_and.hpp
+
+namespace mdtensor {
+
+template <typename dtype = bool, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO, std::integral axes_t,
+          axes_t... axes, typename out_t = std::nullopt_t,
+          typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto all(auto &&in,
+                                 std::integer_sequence<axes_t, axes...>,
+                                 out_t &&out = out_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_reduce_output<dtype, keepdims>(
+                std::integer_sequence<axes_t, axes...>{},
+                std::index_sequence<0>{}, core::extents<std::uint8_t>{},
+                in_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    // TODO: move to reduce
+    fill<backend>(out_md, true);
+
+    core::reduce<keepdims>(
+        [](auto &&in, auto &&out, auto &&where) {
+            static_cast<void>(logical_and<void, backend>(
+                std::forward<decltype(in)>(in),
+                std::forward<decltype(out)>(out),
+                std::forward<decltype(out)>(out),
+                std::forward<decltype(where)>(where)));
+        },
+        std::integer_sequence<axes_t, axes...>{},
+        std::index_sequence<0, 0, 0>{},
+        std::integer_sequence<bool, true, false, true>{},
+        std::forward<decltype(in)>(in), out_md,
+        std::forward<decltype(where)>(where));
+
+    return out_md;
+}
+
+template <std::int64_t axis, typename dtype = void, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto all(auto &&in, out_t &&out = out_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    return all<dtype, keepdims, backend>(
+        std::forward<decltype(in)>(in),
+        std::integer_sequence<std::int64_t, axis>{},
+        std::forward<decltype(out)>(out), std::forward<decltype(where)>(where));
+}
+
+template <typename dtype = void, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto all(auto &&in, out_t &&out = out_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    return all<dtype, keepdims, backend>(
+        std::forward<decltype(in)>(in), std::index_sequence<>{},
+        std::forward<decltype(out)>(out), std::forward<decltype(where)>(where));
 }
 
 } // namespace mdtensor
@@ -4588,84 +5082,96 @@ template <typename in_t> [[nodiscard]] inline constexpr bool all(in_t &&in) {
 
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in1_t, typename in2_t, typename out_t>
-inline constexpr void isclose_impl(in1_t &&in1, in2_t &&in2, out_t &&out,
-                                   const double &rtol = 1e-05,
-                                   const double &atol = 1e-08) {
-    out() = absolute(in1() - in2()) <=
-            (atol + rtol * static_cast<double>(absolute(in2())));
+constexpr void isclose_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&rtol,
+                             auto &&atol, const bool equal_nan) {
+    if constexpr (requires {
+                      { std::isnan(in1()) } -> std::convertible_to<bool>;
+                      { std::isnan(in2()) } -> std::convertible_to<bool>;
+                  }) {
+        if (equal_nan) {
+            if (std::isnan(in1()) && std::isnan(in2())) {
+                out() = true;
+                return;
+            }
+        }
+    }
+
+    // if both inputs are inf and same sign, return true (numpy-like)
+    if constexpr (requires {
+                      { std::isinf(in1()) } -> std::convertible_to<bool>;
+                      { std::isinf(in2()) } -> std::convertible_to<bool>;
+                      { std::signbit(in1()) } -> std::convertible_to<bool>;
+                      { std::signbit(in2()) } -> std::convertible_to<bool>;
+                  }) {
+        if (std::isinf(in1()) && std::isinf(in2()) &&
+            std::signbit(in1()) == std::signbit(in2())) {
+            out() = true;
+            return;
+        }
+    }
+
+    using out_t = std::remove_cvref_t<decltype(out())>;
+    using calc_t = core::common_data_type_t<decltype(in1()), decltype(in2()),
+                                            decltype(rtol()), decltype(atol())>;
+
+    out() = static_cast<out_t>(
+        absolute(static_cast<calc_t>(in1()) - static_cast<calc_t>(in2())) <=
+        (static_cast<calc_t>(atol()) +
+         static_cast<calc_t>(rtol()) * absolute(static_cast<calc_t>(in2()))));
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compare two inputs element-wise for approximate equality (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- * @param rtol Relative tolerance. Default is 1e-05.
- * @param atol Absolute tolerance. Default is 1e-08.
- *
- * @note Equivalent to out = (|in1 - in2| <= (atol + rtol * |in2|)) in terms of
- * array broadcasting.
- *
- * @see mdtensor::isclose for the out-of-place version that returns the result.
- * @see mdtensor::allclose for full-tensor reduction using isclose.
- */
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
-          typename out_t>
-inline constexpr void isclose_to(in1_t &&in1, in2_t &&in2, out_t &&out,
-                                 const double &rtol = 1e-05,
-                                 const double &atol = 1e-08) {
-    core::batch<mpmode>(
-        [&](auto &&...elems) {
-            detail::isclose_impl(std::forward<decltype(elems)>(elems)..., rtol,
-                                 atol);
-        },
-        core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
+template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+          typename rtol_t = double, typename atol_t = double,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+isclose(auto &&in1, auto &&in2, rtol_t &&rtol = rtol_t{1e-05},
+        atol_t &&atol = atol_t{1e-08}, out_t &&out = out_t{std::nullopt},
+        const bool equal_nan = false) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
+    const auto rtol_mds =
+        core::to_const_mdspan(std::forward<decltype(rtol)>(rtol));
+    const auto atol_mds =
+        core::to_const_mdspan(std::forward<decltype(atol)>(atol));
 
-/**
- * @brief Compare two inputs element-wise for approximate equality
- * (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. Default is int8_t.
- *         If an integral type is used, results represent boolean values (0/1).
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- * @param rtol Relative tolerance. Default is 1e-05.
- * @param atol Absolute tolerance. Default is 1e-08.
- *
- * @return mdarray or scalar containing element-wise comparison results.
- *
- * @note Equivalent to out = (|in1 - in2| <= (atol + rtol * |in2|)) in terms of
- * array broadcasting.
- *
- * @see mdtensor::isclose_to for the in-place version that writes into an
- * output.
- * @see mdtensor::allclose for full-tensor reduction using isclose.
- */
-template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
-[[nodiscard]] inline constexpr auto isclose(in1_t &&in1, in2_t &&in2,
-                                            const double &rtol = 1e-05,
-                                            const double &atol = 1e-08) {
-    return core::batch_out<dtype, mpmode>(
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_output<dtype>(core::extents<std::uint8_t>{},
+                                            in1_mds, in2_mds, rtol_mds,
+                                            atol_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    // choose backend
+    constexpr auto be = [&]() {
+        if constexpr (backend != core::Backend::AUTO) {
+            return backend;
+
+        } else {
+            return core::Backend::NATIVE;
+        }
+    }();
+
+    core::batch_with_broadcast<be>(
         [&](auto &&...elems) {
-            detail::isclose_impl(std::forward<decltype(elems)>(elems)..., rtol,
-                                 atol);
+            ufunc::isclose_ufunc(std::forward<decltype(elems)>(elems)...,
+                                 equal_nan);
         },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)));
+        std::integer_sequence<bool, true, true, false, true, true>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        out_md, std::forward<decltype(rtol)>(rtol),
+        std::forward<decltype(atol)>(atol));
+
+    return out_md;
 }
 
 } // namespace mdtensor
@@ -4673,33 +5179,15 @@ template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
 
 namespace mdtensor {
 
-/**
- * @brief Return whether two inputs are element-wise close for all elements.
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam in1_t First input type (mdspan, mdarray, scalar, etc.).
- * @tparam in2_t Second input type (mdspan, mdarray, scalar, etc.).
- *
- * @param in1 First input tensor-like object.
- * @param in2 Second input tensor-like object.
- * @param rtol Relative tolerance.
- * @param atol Absolute tolerance.
- *
- * @return true if all elements satisfy isclose(in1, in2, rtol, atol),
- *         otherwise false.
- *
- * @note This is equivalent to all(isclose(in1, in2, rtol, atol)).
- * @note Broadcasting semantics follow those of mdtensor::isclose.
- *
- * @see mdtensor::isclose for the element-wise predicate.
- * @see mdtensor::all for logical reduction utilities.
- */
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t>
-[[nodiscard]] inline constexpr bool allclose(in1_t &&in1, in2_t &&in2,
-                                             const double &rtol = 1e-05,
-                                             const double &atol = 1e-08) {
-    return all(isclose<int8_t, mpmode>(std::forward<in1_t>(in1),
-                                       std::forward<in2_t>(in2), rtol, atol));
+template <core::Backend backend = core::Backend::AUTO, typename rtol_t = double,
+          typename atol_t = double>
+[[nodiscard]] constexpr bool
+allclose(auto &&in1, auto &&in2, rtol_t &&rtol = rtol_t{1e-05},
+         atol_t &&atol = atol_t{1e-08}, const bool equal_nan = false) {
+    return all<void, false, core::Backend::NATIVE>(isclose<bool, backend>(
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        std::forward<decltype(rtol)>(rtol), std::forward<decltype(atol)>(atol),
+        std::nullopt, equal_nan));
 }
 
 } // namespace mdtensor
@@ -4715,140 +5203,133 @@ template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t>
  */
 
 
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/logical_or.hpp
+/**
+ * @file
+ * @brief Element-wise logical OR utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <md_c in_t, md_c out_t>
-    requires(std::remove_cvref_t<out_t>::rank() == 0)
-inline constexpr void any_impl(in_t &&in, out_t &&out) {
-    using in_base_t = std::remove_cvref_t<in_t>;
-    using index_t = typename in_base_t::index_type;
-
-    for (index_t i = 0; i < in.extent(0); i++) {
-        if (static_cast<bool>(in(i))) {
-            out() = true;
+constexpr void logical_or_ufunc(auto &&in1, auto &&in2, auto &&out,
+                                auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
             return;
         }
     }
 
-    out() = false;
+    out() = (static_cast<bool>(in1()) || static_cast<bool>(in2()));
 }
 
-template <md_c in_t, md_c out_t>
-    requires(std::remove_cvref_t<out_t>::rank() > 0)
-inline constexpr void any_impl(in_t &&in, out_t &&out) {
-    using in_base_t = std::remove_cvref_t<in_t>;
-    using index_t = typename in_base_t::index_type;
+} // namespace ufunc
 
-    for (index_t i = 0; i < in.extent(in_base_t::rank() - 1); i++) {
-        any_impl(core::submdspan_from_right(in, i),
-                 core::submdspan_from_right(out, i));
-    }
-}
+template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+logical_or(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
+           where_t &&where = where_t{std::nullopt}) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-} // namespace detail
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_output<dtype>(core::extents<std::uint8_t>{},
+                                            in1_mds, in2_mds);
 
-/**
- * @brief Compute logical any along a specified axis (in-place).
- *
- * @tparam Axis Axis to reduce. Negative values are supported and normalized
- *         by the input rank (NumPy-like semantics).
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc. (rank reduced by 1).
- *
- * @note The output values are written as boolean results (true/false) into out.
- *
- * @see mdtensor::any<Axis, dtype>(in) for the out-of-place axis-reduction
- *      version.
- * @see mdtensor::any(in) for full-tensor reduction returning bool.
- */
-template <int64_t Axis, MPMode mpmode = MPMode::NONE, typename in_t,
-          typename out_t>
-inline constexpr void any(in_t &&in, out_t &&out) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-    const auto out_mds = core::to_mdspan(std::forward<out_t>(out));
-
-    constexpr size_t in_rank = decltype(in_mds)::rank();
-    constexpr size_t rin_rank =
-        in_rank -
-        static_cast<size_t>(
-            ((Axis % static_cast<int64_t>(in_rank)) + (in_rank)) % in_rank);
-
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::any_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<rin_rank, rin_rank - 1>{}, in_mds, out_mds);
-}
-
-/**
- * @brief Compute logical any along a specified axis (out-of-place).
- *
- * @tparam Axis Axis to reduce. Negative values are supported and normalized
- *         by the input rank (NumPy-like semantics).
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result tensor. Default is int8_t.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- *
- * @return Reduced tensor (mdarray or scalar), with rank reduced by 1.
- *
- * @note dtype controls the storage type of the output tensor. The produced
- *       values represent boolean results (0/1) when dtype is integral.
- *
- * @see mdtensor::any<Axis>(in, out) for the in-place version.
- * @see mdtensor::any(in) for full-tensor reduction returning bool.
- */
-template <int64_t Axis, MPMode mpmode = MPMode::NONE, typename dtype = int8_t,
-          typename in_t>
-[[nodiscard]] inline constexpr auto any(in_t &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-
-    constexpr size_t in_rank = decltype(in_mds)::rank();
-    constexpr size_t rin_rank =
-        in_rank -
-        static_cast<size_t>(
-            ((Axis % static_cast<int64_t>(in_rank)) + (in_rank)) % in_rank);
-
-    return core::batch_out<dtype, mpmode>(
-        [](auto &&...elems) {
-            detail::any_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<rin_rank>{},
-        core::slice_from_right<rin_rank - 1>(in_mds.extents()), in_mds);
-}
-
-/**
- * @brief Compute logical any over the entire input (full reduction).
- *
- * @tparam in_t Input type (mdspan, mdarray, scalar, etc.).
- *
- * @param in Input tensor-like object.
- *
- * @return true if any element is truthy, otherwise false.
- *
- * @note For rank-0 inputs, this returns static_cast<bool>(in()).
- * @note For rank>0 inputs, the reduction is performed recursively.
- */
-template <typename in_t> [[nodiscard]] inline constexpr bool any(in_t &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-    using in_mds_t = decltype(in_mds);
-
-    if constexpr (in_mds_t::rank() == 0) {
-        return static_cast<bool>(in_mds());
-
-    } else {
-        for (typename in_mds_t::index_type i = 0; i < in_mds.extent(0); i++) {
-            if (any(core::submdspan_from_left(in_mds, i))) {
-                return true;
-            }
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
         }
+    }();
 
-        return false;
-    }
+    core::batch_with_broadcast<backend>(
+        [](auto &&...elems) {
+            ufunc::logical_or_ufunc(std::forward<decltype(elems)>(elems)...);
+        },
+        std::integer_sequence<bool, true, true, false, true>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        out_md, std::forward<decltype(where)>(where));
+
+    return out_md;
+}
+
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/logical_or.hpp
+
+namespace mdtensor {
+
+template <typename dtype = bool, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO, std::integral axes_t,
+          axes_t... axes, typename out_t = std::nullopt_t,
+          typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto any(auto &&in,
+                                 std::integer_sequence<axes_t, axes...>,
+                                 out_t &&out = out_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_reduce_output<dtype, keepdims>(
+                std::integer_sequence<axes_t, axes...>{},
+                std::index_sequence<0>{}, core::extents<std::uint8_t>{},
+                in_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    // TODO: move to reduce
+    fill<backend>(out_md, false);
+
+    core::reduce<keepdims>(
+        [](auto &&in, auto &&out, auto &&where) {
+            static_cast<void>(logical_or<void, backend>(
+                std::forward<decltype(in)>(in),
+                std::forward<decltype(out)>(out),
+                std::forward<decltype(out)>(out),
+                std::forward<decltype(where)>(where)));
+        },
+        std::integer_sequence<axes_t, axes...>{},
+        std::index_sequence<0, 0, 0>{},
+        std::integer_sequence<bool, true, false, true>{},
+        std::forward<decltype(in)>(in), out_md,
+        std::forward<decltype(where)>(where));
+
+    return out_md;
+}
+
+template <std::int64_t axis, typename dtype = void, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto any(auto &&in, out_t &&out = out_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    return any<dtype, keepdims, backend>(
+        std::forward<decltype(in)>(in),
+        std::integer_sequence<std::int64_t, axis>{},
+        std::forward<decltype(out)>(out), std::forward<decltype(where)>(where));
+}
+
+template <typename dtype = void, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto any(auto &&in, out_t &&out = out_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    return any<dtype, keepdims, backend>(
+        std::forward<decltype(in)>(in), std::index_sequence<>{},
+        std::forward<decltype(out)>(out), std::forward<decltype(where)>(where));
 }
 
 } // namespace mdtensor
@@ -4866,57 +5347,77 @@ template <typename in_t> [[nodiscard]] inline constexpr bool any(in_t &&in) {
 
 
 namespace mdtensor {
+namespace ufunc {
 
-/**
- * @brief Return whether two inputs are exactly equal in shape and values.
- *
- * @tparam in1_t First input type (mdspan, mdarray, scalar, etc.).
- * @tparam in2_t Second input type (mdspan, mdarray, scalar, etc.).
- *
- * @param in1 First input tensor-like object.
- * @param in2 Second input tensor-like object.
- *
- * @return true if rank, extents, and all elements match exactly; otherwise
- *         false.
- *
- * @note This function does not apply broadcasting. Shapes must be identical.
- * @note For rank-0 inputs, this compares the two scalar values directly.
- * @note For rank>0 inputs, this checks extents and then recurses by slicing
- *       from the left.
- *
- * @see mdtensor::isclose for tolerant element-wise comparison.
- * @see mdtensor::allclose for tolerant full-tensor comparison.
- */
-template <typename in1_t, typename in2_t>
-[[nodiscard]] inline constexpr bool array_equal(in1_t &&in1, in2_t &&in2) {
-    const auto in1_mds = core::to_const_mdspan(std::forward<in1_t>(in1));
-    const auto in2_mds = core::to_const_mdspan(std::forward<in2_t>(in2));
-    using in1_mds_t = decltype(in1_mds);
-    using in2_mds_t = decltype(in2_mds);
-
-    if constexpr (in1_mds_t::rank() != in2_mds_t::rank()) {
-        return false;
-    }
-
-    for (size_t i = 0; i < in1_mds_t::rank(); i++) {
-        if (in1_mds.extent(i) != in2_mds.extent(i)) {
-            return false;
+template <bool equal_nan>
+constexpr bool array_equal_ufunc(auto &&in1, auto &&in2) {
+    if constexpr (equal_nan && requires {
+                      { std::isnan(in1()) } -> std::convertible_to<bool>;
+                      { std::isnan(in2()) } -> std::convertible_to<bool>;
+                  }) {
+        if (std::isnan(in1()) && std::isnan(in2())) {
+            return true;
         }
     }
 
-    if constexpr (in1_mds_t::rank() == 0) {
-        return in1_mds() == in2_mds();
+    using value_t = core::common_data_type_t<decltype(in1()), decltype(in2())>;
+
+    return static_cast<value_t>(in1()) == static_cast<value_t>(in2());
+}
+
+} // namespace ufunc
+
+namespace {
+
+template <bool equal_nan>
+[[nodiscard]] constexpr bool array_equal_impl_(auto &&in1, auto &&in2) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
+
+    if constexpr (in1_mds.rank() == 0) {
+        return ufunc::array_equal_ufunc<equal_nan>(in1_mds, in2_mds);
 
     } else {
-        for (typename in1_mds_t::index_type i = 0; i < in1_mds.extent(0); i++) {
-            if (!array_equal(core::submdspan_from_left(in1_mds, i),
-                             core::submdspan_from_left(in2_mds, i))) {
+        using index_t = typename decltype(in1_mds)::index_type;
+
+        for (index_t i = 0; i < in1_mds.extent(0); ++i) {
+            if (!array_equal_impl_<equal_nan>(
+                    core::submdspan_from_left(in1_mds, i),
+                    core::submdspan_from_left(in2_mds, i))) {
                 return false;
             }
         }
-    }
 
-    return true;
+        return true;
+    }
+}
+
+} // namespace
+
+[[nodiscard]] constexpr bool array_equal(auto &&in1, auto &&in2,
+                                         const bool equal_nan = false) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
+
+    if constexpr (in1_mds.rank() != in2_mds.rank()) {
+        return false;
+
+    } else {
+        if (!core::is_same_extents(in1_mds.extents(), in2_mds.extents())) {
+            return false;
+        }
+
+        if (equal_nan) {
+            return array_equal_impl_<true>(in1_mds, in2_mds);
+
+        } else {
+            return array_equal_impl_<false>(in1_mds, in2_mds);
+        }
+    }
 }
 
 } // namespace mdtensor
@@ -4932,6 +5433,25 @@ template <typename in1_t, typename in2_t>
  */
 
 
+
+namespace mdtensor {
+
+[[nodiscard]] constexpr bool array_equiv(auto &&in1, auto &&in2) {
+    try {
+        const auto [in1_bcast, in2_bcast] = std::get<0>(
+            core::broadcast(std::index_sequence<0, 0>{},
+                            std::integer_sequence<bool, true, true>{},
+                            std::forward<decltype(in1)>(in1),
+                            std::forward<decltype(in2)>(in2)));
+        return array_equal(in1_bcast, in2_bcast);
+
+    } catch (const std::exception &e) {
+        return false;
+    }
+}
+
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/array_equiv.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/equal.hpp
 /**
  * @file
@@ -4945,104 +5465,55 @@ template <typename in1_t, typename in2_t>
 
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in1_t, typename in2_t, typename out_t>
-inline constexpr void equal_impl(in1_t &&in1, in2_t &&in2, out_t &&out) {
+constexpr void equal_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
     out() = (in1() == in2());
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compare two inputs element-wise for equality (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note Equivalent to out = (in1 == in2) in terms of array broadcasting.
- *
- * @see mdtensor::equal for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
-          typename out_t>
-inline constexpr void equal_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
-    core::batch(
-        [](auto &&...elems) {
-            detail::equal_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
+template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto equal(auto &&in1, auto &&in2,
+                                   out_t &&out = out_t{std::nullopt},
+                                   where_t &&where = where_t{std::nullopt}) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-/**
- * @brief Compare two inputs element-wise for equality (out-of-place).
- *
- * @tparam dtype (optional) Data type of the result. Default is int8_t.
- *         If an integral type is used, results represent boolean values (0/1).
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar containing element-wise equality results.
- *
- * @note Equivalent to out = (in1 == in2) in terms of array broadcasting.
- *
- * @see mdtensor::equal_to for the in-place version that writes into an output.
- * @see mdtensor::array_equiv for full-tensor reduction with broadcasting.
- * @see mdtensor::array_equal for exact equality without broadcasting.
- */
-template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
-[[nodiscard]] inline constexpr auto equal(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<dtype, mpmode>(
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_output<dtype>(core::extents<std::uint8_t>{},
+                                            in1_mds, in2_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::equal_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::equal_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)));
+        std::integer_sequence<bool, true, true, false, true>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        out_md, std::forward<decltype(where)>(where));
+
+    return out_md;
 }
 
 } // namespace mdtensor
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/equal.hpp
-
-namespace mdtensor {
-
-/**
- * @brief Return whether two inputs are element-wise equal for all elements,
- *        with broadcasting.
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam in1_t First input type (mdspan, mdarray, scalar, etc.).
- * @tparam in2_t Second input type (mdspan, mdarray, scalar, etc.).
- *
- * @param in1 First input tensor-like object.
- * @param in2 Second input tensor-like object.
- *
- * @return true if all elements satisfy equal(in1, in2) after broadcasting;
- *         otherwise false.
- *
- * @note This is equivalent to all(equal(in1, in2)).
- * @note Broadcasting semantics follow those of mdtensor::equal.
- *
- * @see mdtensor::equal for the element-wise predicate.
- * @see mdtensor::all for logical reduction utilities.
- * @see mdtensor::array_equal for exact shape-and-value equality without
- *      broadcasting.
- */
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t>
-[[nodiscard]] inline constexpr bool array_equiv(in1_t &&in1, in2_t &&in2) {
-    return all(equal<int8_t, mpmode>(std::forward<in1_t>(in1),
-                                     std::forward<in2_t>(in2)));
-}
-
-} // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/array_equiv.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/greater.hpp
 /**
  * @file
@@ -5056,66 +5527,51 @@ template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t>
 
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in1_t, typename in2_t, typename out_t>
-inline constexpr void greater_impl(in1_t &&in1, in2_t &&in2, out_t &&out) {
+constexpr void greater_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
     out() = (in1() > in2());
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compare two inputs element-wise for greater-than (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note Equivalent to out = (in1 > in2) in terms of array broadcasting.
- *
- * @see mdtensor::greater for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
-          typename out_t>
-inline constexpr void greater_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::greater_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
+template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto greater(auto &&in1, auto &&in2,
+                                     out_t &&out = out_t{std::nullopt},
+                                     where_t &&where = where_t{std::nullopt}) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-/**
- * @brief Compare two inputs element-wise for greater-than (out-of-place).
- *
- * @tparam dtype (optional) Data type of the result. Default is int8_t.
- *         If an integral type is used, results represent boolean values (0/1).
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar containing element-wise comparison results.
- *
- * @note Equivalent to out = (in1 > in2) in terms of array broadcasting.
- *
- * @see mdtensor::greater_to for the in-place version that writes into an
- *      output.
- */
-template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
-[[nodiscard]] inline constexpr auto greater(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<dtype, mpmode>(
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_output<dtype>(core::extents<std::uint8_t>{},
+                                            in1_mds, in2_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::greater_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::greater_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)));
+        std::integer_sequence<bool, true, true, false, true>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        out_md, std::forward<decltype(where)>(where));
+
+    return out_md;
 }
 
 } // namespace mdtensor
@@ -5133,72 +5589,188 @@ template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
 
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in1_t, typename in2_t, typename out_t>
-inline constexpr void greater_equal_impl(in1_t &&in1, in2_t &&in2,
-                                         out_t &&out) {
+constexpr void greater_equal_ufunc(auto &&in1, auto &&in2, auto &&out,
+                                   auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
     out() = (in1() >= in2());
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compare two inputs element-wise for greater-or-equal (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note Equivalent to out = (in1 >= in2) in terms of array broadcasting.
- *
- * @see mdtensor::greater_equal for the out-of-place version that returns the
- *      result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
-          typename out_t>
-inline constexpr void greater_equal_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::greater_equal_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
+template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+greater_equal(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
+              where_t &&where = where_t{std::nullopt}) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-/**
- * @brief Compare two inputs element-wise for greater-or-equal (out-of-place).
- *
- * @tparam dtype (optional) Data type of the result. Default is int8_t.
- *         If an integral type is used, results represent boolean values (0/1).
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar containing element-wise comparison results.
- *
- * @note Equivalent to out = (in1 >= in2) in terms of array broadcasting.
- *
- * @see mdtensor::greater_equal_to for the in-place version that writes into an
- *      output.
- */
-template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
-[[nodiscard]] inline constexpr auto greater_equal(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<dtype, mpmode>(
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_output<dtype>(core::extents<std::uint8_t>{},
+                                            in1_mds, in2_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::greater_equal_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::greater_equal_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)));
+        std::integer_sequence<bool, true, true, false, true>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        out_md, std::forward<decltype(where)>(where));
+
+    return out_md;
 }
 
 } // namespace mdtensor
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/greater_equal.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/isinf.hpp
+/**
+ * @file
+ * @brief Element-wise isinf check for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor {
+namespace ufunc {
+
+constexpr void isinf_ufunc(auto &&in, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
+    if constexpr (requires {
+                      { std::isinf(in()) } -> std::convertible_to<bool>;
+                  }) {
+        if (std::isinf(in())) {
+            out() = true;
+            return;
+        }
+    }
+
+    out() = false;
+}
+
+} // namespace ufunc
+
+template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto isinf(auto &&in, out_t &&out = out_t{std::nullopt},
+                                   where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return empty_like<dtype>(in_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
+        [](auto &&...elems) {
+            ufunc::isinf_ufunc(std::forward<decltype(elems)>(elems)...);
+        },
+        std::integer_sequence<bool, true, false, true>{},
+        std::forward<decltype(in)>(in), out_md,
+        std::forward<decltype(where)>(where));
+
+    return out_md;
+}
+
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/isinf.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/isnan.hpp
+/**
+ * @file
+ * @brief Element-wise isnan check for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor {
+namespace ufunc {
+
+constexpr void isnan_ufunc(auto &&in, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
+    if constexpr (requires {
+                      { std::isnan(in()) } -> std::convertible_to<bool>;
+                  }) {
+        if (std::isnan(in())) {
+            out() = true;
+            return;
+        }
+    }
+
+    out() = false;
+}
+
+} // namespace ufunc
+
+template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto isnan(auto &&in, out_t &&out = out_t{std::nullopt},
+                                   where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return empty_like<dtype>(in_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
+        [](auto &&...elems) {
+            ufunc::isnan_ufunc(std::forward<decltype(elems)>(elems)...);
+        },
+        std::integer_sequence<bool, true, false, true>{},
+        std::forward<decltype(in)>(in), out_md,
+        std::forward<decltype(where)>(where));
+
+    return out_md;
+}
+
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/isnan.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/less.hpp
 /**
  * @file
@@ -5212,65 +5784,51 @@ template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
 
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in1_t, typename in2_t, typename out_t>
-inline constexpr void less_impl(in1_t &&in1, in2_t &&in2, out_t &&out) {
+constexpr void less_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
     out() = (in1() < in2());
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compare two inputs element-wise for less-than (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note Equivalent to out = (in1 < in2) in terms of array broadcasting.
- *
- * @see mdtensor::less for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
-          typename out_t>
-inline constexpr void less_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::less_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
+template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto less(auto &&in1, auto &&in2,
+                                  out_t &&out = out_t{std::nullopt},
+                                  where_t &&where = where_t{std::nullopt}) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-/**
- * @brief Compare two inputs element-wise for less-than (out-of-place).
- *
- * @tparam dtype (optional) Data type of the result. Default is int8_t.
- *         If an integral type is used, results represent boolean values (0/1).
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar containing element-wise comparison results.
- *
- * @note Equivalent to out = (in1 < in2) in terms of array broadcasting.
- *
- * @see mdtensor::less_to for the in-place version that writes into an output.
- */
-template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
-[[nodiscard]] inline constexpr auto less(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<dtype, mpmode>(
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_output<dtype>(core::extents<std::uint8_t>{},
+                                            in1_mds, in2_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::less_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::less_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)));
+        std::integer_sequence<bool, true, true, false, true>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        out_md, std::forward<decltype(where)>(where));
+
+    return out_md;
 }
 
 } // namespace mdtensor
@@ -5288,71 +5846,177 @@ template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
 
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in1_t, typename in2_t, typename out_t>
-inline constexpr void less_equal_impl(in1_t &&in1, in2_t &&in2, out_t &&out) {
+constexpr void less_equal_ufunc(auto &&in1, auto &&in2, auto &&out,
+                                auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
     out() = (in1() <= in2());
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compare two inputs element-wise for less-or-equal (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note Equivalent to out = (in1 <= in2) in terms of array broadcasting.
- *
- * @see mdtensor::less_equal for the out-of-place version that returns the
- * result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
-          typename out_t>
-inline constexpr void less_equal_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::less_equal_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
+template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+less_equal(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
+           where_t &&where = where_t{std::nullopt}) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-/**
- * @brief Compare two inputs element-wise for less-or-equal (out-of-place).
- *
- * @tparam dtype (optional) Data type of the result. Default is int8_t.
- *         If an integral type is used, results represent boolean values (0/1).
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar containing element-wise comparison results.
- *
- * @note Equivalent to out = (in1 <= in2) in terms of array broadcasting.
- *
- * @see mdtensor::less_equal_to for the in-place version that writes into an
- * output.
- */
-template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
-[[nodiscard]] inline constexpr auto less_equal(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<dtype, mpmode>(
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_output<dtype>(core::extents<std::uint8_t>{},
+                                            in1_mds, in2_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::less_equal_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::less_equal_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)));
+        std::integer_sequence<bool, true, true, false, true>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        out_md, std::forward<decltype(where)>(where));
+
+    return out_md;
 }
 
 } // namespace mdtensor
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/less_equal.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/logical_not.hpp
+/**
+ * @file
+ * @brief Element-wise logical NOT utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor {
+namespace ufunc {
+
+constexpr void logical_not_ufunc(auto &&in, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
+    out() = (!static_cast<bool>(in()));
+}
+
+} // namespace ufunc
+
+template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+logical_not(auto &&in, out_t &&out = out_t{std::nullopt},
+            where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return empty_like<dtype>(in_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
+        [](auto &&...elems) {
+            ufunc::logical_not_ufunc(std::forward<decltype(elems)>(elems)...);
+        },
+        std::integer_sequence<bool, true, false, true>{},
+        std::forward<decltype(in)>(in), out_md,
+        std::forward<decltype(where)>(where));
+
+    return out_md;
+}
+
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/logical_not.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/logical_xor.hpp
+/**
+ * @file
+ * @brief Element-wise logical XOR utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor {
+namespace ufunc {
+
+constexpr void logical_xor_ufunc(auto &&in1, auto &&in2, auto &&out,
+                                 auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
+    out() = (static_cast<bool>(in1()) != static_cast<bool>(in2()));
+}
+
+} // namespace ufunc
+
+template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+logical_xor(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
+            where_t &&where = where_t{std::nullopt}) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
+
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_output<dtype>(core::extents<std::uint8_t>{},
+                                            in1_mds, in2_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
+        [](auto &&...elems) {
+            ufunc::logical_xor_ufunc(std::forward<decltype(elems)>(elems)...);
+        },
+        std::integer_sequence<bool, true, true, false, true>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        out_md, std::forward<decltype(where)>(where));
+
+    return out_md;
+}
+
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/logical_xor.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/not_equal.hpp
 /**
  * @file
@@ -5366,67 +6030,52 @@ template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
 
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in1_t, typename in2_t, typename out_t>
-inline constexpr void not_equal_impl(in1_t &&in1, in2_t &&in2, out_t &&out) {
+constexpr void not_equal_ufunc(auto &&in1, auto &&in2, auto &&out,
+                               auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
     out() = (in1() != in2());
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compare two inputs element-wise for inequality (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note Equivalent to out = (in1 != in2) in terms of array broadcasting.
- *
- * @see mdtensor::not_equal for the out-of-place version that returns the
- * result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
-          typename out_t>
-inline constexpr void not_equal_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::not_equal_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
+template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+not_equal(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
+          where_t &&where = where_t{std::nullopt}) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-/**
- * @brief Compare two inputs element-wise for inequality (out-of-place).
- *
- * @tparam dtype (optional) Data type of the result. Default is int8_t.
- *         If an integral type is used, results represent boolean values (0/1).
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar containing element-wise comparison results.
- *
- * @note Equivalent to out = (in1 != in2) in terms of array broadcasting.
- *
- * @see mdtensor::not_equal_to for the in-place version that writes into an
- * output.
- */
-template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
-[[nodiscard]] inline constexpr auto not_equal(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<dtype, mpmode>(
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_output<dtype>(core::extents<std::uint8_t>{},
+                                            in1_mds, in2_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::not_equal_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::not_equal_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)));
+        std::integer_sequence<bool, true, true, false, true>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        out_md, std::forward<decltype(where)>(where));
+
+    return out_md;
 }
 
 } // namespace mdtensor
@@ -5443,10 +6092,10 @@ template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
  */
 
 
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/manipulation/broadcast_arrays.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/manipulation/broadcast.hpp
 /**
  * @file
- * @brief Broadcast_arrays utilities for mdtensor.
+ * @brief Broadcast utilities for mdtensor.
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -5454,6 +6103,20 @@ template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
  */
 
 
+
+namespace mdtensor {
+
+[[nodiscard]] constexpr auto broadcast(auto &&...ins) {
+    return std::get<0>([&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return core::broadcast(
+            std::index_sequence<((void)Is, 0)...>{},
+            std::integer_sequence<bool, (void(Is), true)...>{},
+            std::forward<decltype(ins)>(ins)...);
+    }(std::make_index_sequence<sizeof...(ins)>{}));
+}
+
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/manipulation/broadcast.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/manipulation/broadcast_to.hpp
 /**
  * @file
@@ -5468,120 +6131,13 @@ template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in1_t,
 
 namespace mdtensor {
 
-template <typename in_t, extents_c new_extents_t>
-[[nodiscard]] inline constexpr auto
-broadcast_to(in_t &&in,
-             new_extents_t &&new_extents = new_extents_t{}) noexcept {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-
-    using in_mds_base_t = std::remove_cvref_t<decltype(in_mds)>;
-    using new_extents_base_t = std::remove_cvref_t<new_extents_t>;
-
-    constexpr size_t org_rank = in_mds_base_t::rank();
-    constexpr size_t new_rank = new_extents_base_t::rank();
-
-    static_assert(org_rank <= new_rank, "Incompatible ranks for broadcasting.");
-
-    if constexpr (core::same<typename in_mds_base_t::extents_type,
-                             new_extents_base_t>()) {
-        return in_mds;
-
-    } else if constexpr (org_rank == 0) {
-        using index_t = typename new_extents_base_t::index_type;
-
-        auto new_strides = std::array<index_t, new_rank>{};
-
-        for (size_t i = 0; i < new_rank; i++) {
-            new_strides[i] = 0;
-        }
-
-        return mdspan<typename in_mds_base_t::element_type, new_extents_base_t,
-                      layout_stride, typename in_mds_base_t::accessor_type>{
-            in_mds.data_handle(),
-            layout_stride::mapping{std::forward<new_extents_t>(new_extents),
-                                   new_strides}};
-
-    } else {
-        using index_t = typename new_extents_base_t::index_type;
-
-        // ni = new_rank - org_rank + oi
-        const auto get_ni = [](size_t i) { return new_rank - org_rank + i; };
-
-        // assertion
-        static_assert(
-            [&] {
-                for (size_t i = 0; i < org_rank; i++) {
-                    if (in_mds_base_t::static_extent(i) !=
-                            new_extents_base_t::static_extent(get_ni(i)) &&
-                        in_mds_base_t::static_extent(i) != 1 &&
-                        new_extents_base_t::static_extent(get_ni(i)) != dyn) {
-                        return false;
-                    }
-                }
-                return true;
-            }(),
-            "Incompatible extents for broadcasting.");
-
-        for (size_t i = 0; i < org_rank; i++) {
-            assert(static_cast<size_t>(in_mds.extent(i)) ==
-                       static_cast<size_t>(new_extents.extent(get_ni(i))) ||
-                   static_cast<size_t>(in_mds.extent(i)) == 1);
-        }
-
-        // calculation
-        auto new_strides = std::array<index_t, new_rank>{};
-
-        for (size_t i = 0; i < new_rank - org_rank; i++) {
-            new_strides[i] = 0;
-        }
-
-        for (size_t i = 0; i < org_rank; i++) {
-            if (static_cast<size_t>(in_mds.extent(i)) ==
-                static_cast<size_t>(new_extents.extent(get_ni(i)))) {
-                new_strides[get_ni(i)] = static_cast<index_t>(in_mds.stride(i));
-
-            } else {
-                new_strides[get_ni(i)] = 0;
-            }
-        }
-
-        return mdspan<typename in_mds_base_t::element_type, new_extents_base_t,
-                      layout_stride, typename in_mds_base_t::accessor_type>{
-            in_mds.data_handle(),
-            layout_stride::mapping{std::forward<new_extents_t>(new_extents),
-                                   new_strides}};
-    }
+[[nodiscard]] constexpr auto broadcast_to(auto &&in, auto &&shape) {
+    return core::broadcast_to(std::forward<decltype(in)>(in),
+                              std::forward<decltype(shape)>(shape));
 }
 
 } // namespace mdtensor
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/manipulation/broadcast_to.hpp
-
-namespace mdtensor {
-
-template <typename... ins_t>
-[[nodiscard]] inline constexpr auto broadcast_arrays(ins_t &&...ins) noexcept {
-    if constexpr (sizeof...(ins_t) == 0) {
-        return core::to_const_mdspan(std::forward<ins_t>(ins)...);
-
-    } else {
-        const auto ins_mds = [&]<size_t... Is>(std::index_sequence<Is...>) {
-            return std::make_tuple(
-                core::to_const_mdspan(std::forward<ins_t>(ins))...);
-        }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-        const auto bexts = [&]<size_t... Is>(std::index_sequence<Is...>) {
-            return core::broadcast_extents(std::get<Is>(ins_mds).extents()...);
-        }(std::make_index_sequence<sizeof...(ins_t)>{});
-
-        return [&]<size_t... Is>(std::index_sequence<Is...>) {
-            return std::make_tuple(
-                broadcast_to(std::get<Is>(ins_mds), bexts)...);
-        }(std::make_index_sequence<sizeof...(ins_t)>{});
-    }
-}
-
-} // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/manipulation/broadcast_arrays.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/manipulation/concatenate.hpp
 /**
  * @file
@@ -5593,10 +6149,154 @@ template <typename... ins_t>
  */
 
 
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/manipulation/expand_dims.hpp
+
+namespace mdtensor {
+namespace detail {
+
+template <bool concatenate, std::size_t... Extents>
+[[nodiscard]] consteval std::size_t concatenate_static_extent() noexcept {
+    static_assert(sizeof...(Extents) > 0,
+                  "At least one extent must be provided for concatenation.");
+
+    if constexpr (concatenate) {
+        if constexpr (((Extents == core::dyn) || ...)) {
+            return core::dyn;
+
+        } else {
+            return (Extents + ...);
+        }
+
+    } else {
+        if constexpr (((Extents == core::dyn) && ...)) {
+            return core::dyn;
+
+        } else {
+            constexpr std::size_t cext =
+                std::max({((Extents != core::dyn) ? Extents : 0)...});
+
+            static_assert(((Extents == cext || Extents == core::dyn) && ...),
+                          "Incompatible static extents for concatenation.");
+
+            return cext;
+        }
+    }
+}
+
+template <bool concatenate, typename index_t,
+          std::convertible_to<index_t>... exts_t>
+[[nodiscard]] constexpr index_t concatenate_extent(exts_t &&...exts) {
+    static_assert(sizeof...(exts) > 0,
+                  "At least one extent must be provided for concatenation.");
+
+    if constexpr (concatenate) {
+        return (exts + ...);
+
+    } else {
+        const index_t cext = std::get<0>(std::forward_as_tuple(exts...));
+
+        if (((cext != static_cast<index_t>(exts)) && ...)) {
+            throw std::invalid_argument(
+                "Incompatible extents for concatenation.");
+        }
+
+        return cext;
+    }
+}
+
+template <std::int64_t axis, core::extents_c... ins_t>
+[[nodiscard]] constexpr auto concatenate_extents(ins_t &&...ins) {
+    static_assert(sizeof...(ins) > 0,
+                  "At least one extents must be provided for concatenation.");
+
+    using index_t = core::common_index_type_t<
+        typename std::remove_cvref_t<ins_t>::index_type...>;
+
+    constexpr std::size_t rank = std::remove_cvref_t<
+        std::tuple_element_t<0, std::tuple<ins_t...>>>::rank();
+
+    static_assert(((ins.rank() == rank) && ...),
+                  "All input extents must have the same rank.");
+
+    if constexpr (rank == 0) {
+        return core::extents<index_t>{};
+
+    } else {
+        constexpr std::size_t baxis =
+            static_cast<std::size_t>(core::bounding_index(axis, rank - 1));
+
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            const auto static_extent_at = [&]<std::size_t I>() {
+                return concatenate_static_extent<
+                    I == baxis,
+                    std::remove_cvref_t<ins_t>::static_extent(I)...>();
+            };
+
+            const auto extent_at = [&]<std::size_t I>() {
+                return concatenate_extent<I == baxis, index_t>(
+                    ins.extent(I)...);
+            };
+
+            return core::extents<
+                index_t, static_extent_at.template operator()<Is>()...> {
+                extent_at.template operator()<Is>()...
+            };
+        }(std::make_index_sequence<rank>{});
+    }
+}
+
+} // namespace detail
+
+template <std::int64_t axis = 0, typename dtype = void>
+[[nodiscard]] constexpr auto concatenate(auto &&...ins) {
+    if constexpr ((!core::mdspan_c<decltype(ins)> || ...)) {
+        return concatenate<axis>(
+            core::to_const_mdspan(std::forward<decltype(ins)>(ins))...);
+
+    } else {
+        constexpr std::size_t rank = std::remove_cvref_t<
+            std::tuple_element_t<0, std::tuple<decltype(ins)...>>>::rank();
+        constexpr std::size_t baxis =
+            static_cast<std::size_t>(core::bounding_index(axis, rank - 1));
+
+        // generate out extents
+        const auto out_extents =
+            detail::concatenate_extents<axis>(ins.extents()...);
+
+        // generate out
+        using value_t = core::output_value_t<
+            dtype, typename std::remove_cvref_t<decltype(ins)>::value_type...>;
+        auto out = empty<value_t>(out_extents);
+
+        // concatenate
+        using index_t = typename decltype(out_extents)::index_type;
+        index_t offset = 0;
+
+        [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            (([&] {
+                 const auto in = std::get<Is>(std::forward_as_tuple(
+                     std::forward<decltype(ins)>(ins)...));
+
+                 const index_t extent = static_cast<index_t>(in.extent(baxis));
+
+                 static_cast<void>(copy(in, core::submdspan_from_left<baxis>(
+                                                out, core::stdex::strided_slice{
+                                                         offset, extent, 1})));
+
+                 offset += extent;
+             })(),
+             ...);
+        }(std::make_index_sequence<sizeof...(ins)>{});
+
+        return out;
+    }
+}
+
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/manipulation/concatenate.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/manipulation/flatten.hpp
 /**
  * @file
- * @brief Dimension expansion utilities for mdtensor.
+ * @brief Flatten utilities for mdtensor.
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -5618,259 +6318,63 @@ template <typename... ins_t>
 
 namespace mdtensor {
 
-/**
- * @brief Reshape a tensor into new extents (view-only).
- *
- * @tparam exts_t Extents type satisfying extents_c.
- * @tparam in_t Input type (mdspan, mdarray, scalar, etc.).
- *
- * @param in Input tensor-like object.
- * @param new_exts Target extents (shape). Default constructs exts_t if omitted.
- *
- * @return A reshaped mdspan view sharing the same underlying storage.
- *
- * @note This function does not allocate new memory.
- * @note The total number of elements must match between the input and the
- *       requested extents, as enforced by core::reshape.
- *
- * @see mdtensor::expand_dims for inserting singleton dimensions.
- * @see mdtensor::concatenate for joining tensors along an axis.
- */
-template <extents_c exts_t, typename in_t>
-[[nodiscard]] inline constexpr auto
-reshape(in_t &&in, exts_t &&new_exts = exts_t{}) noexcept {
-    return core::reshape(core::to_mdspan(std::forward<in_t>(in)),
-                         std::forward<exts_t>(new_exts));
+template <core::Copy copy = core::Copy::AUTO>
+[[nodiscard]] constexpr auto reshape(auto &&in, auto &&shape) {
+    return core::reshape<copy>(std::forward<decltype(in)>(in),
+                               std::forward<decltype(shape)>(shape));
 }
 
 } // namespace mdtensor
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/manipulation/reshape.hpp
 
 namespace mdtensor {
-
-/**
- * @brief Insert a new axis of length 1 into the input (out-of-place view).
- *
- * @tparam Axis Axis position to insert the new dimension. Negative values are
- *         supported and normalized (NumPy-like semantics).
- * @tparam in_t Input type (mdspan, mdarray, scalar, etc.).
- *
- * @param in Input tensor-like object.
- *
- * @return A reshaped view with rank increased by 1.
- *
- * @note This function does not allocate new storage; it returns a view
- *       (via reshape or direct mdspan construction for rank-0).
- * @note For rank-0 inputs, the resulting shape is (1).
- * @note For rank>0 inputs, the new shape matches the input with a singleton
- *       inserted at Axis.
- *
- * @see mdtensor::reshape for general reshaping utilities.
- */
-template <int64_t Axis, typename in_t>
-[[nodiscard]] inline constexpr auto expand_dims(in_t &&in) noexcept {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-    using in_mds_t = decltype(in_mds);
-
-    constexpr size_t rank = in_mds_t::rank();
-
-    if constexpr (rank == 0) {
-        auto new_extents = extents<typename in_mds_t::index_type, 1>{1};
-        return mdspan<typename in_mds_t::element_type, decltype(new_extents)>{
-            in_mds.data_handle(), new_extents};
-
-    } else {
-        constexpr size_t axis = static_cast<size_t>(
-            ((Axis % static_cast<int64_t>(rank + 1)) + (rank + 1)) %
-            (rank + 1));
-
-        const auto new_extents = [&in_mds]<size_t... Is>(
-                                     std::index_sequence<Is...>) {
-            return extents<
-                typename in_mds_t::index_type,
-                (Is < axis
-                     ? in_mds_t::static_extent(Is)
-                     : (Is == axis ? 1 : in_mds_t::static_extent(Is - 1)))...>{
-                (Is < axis ? in_mds.extent(Is)
-                           : (Is == axis ? 1 : in_mds.extent(Is - 1)))...};
-        }(std::make_index_sequence<rank + 1>{});
-
-        return reshape(std::forward<in_t>(in), new_extents);
-    }
-}
-
-} // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/manipulation/expand_dims.hpp
-
-namespace mdtensor {
 namespace detail {
 
-template <typename in1_t, typename in2_t, size_t Is, size_t axis>
-constexpr size_t concatenate_static_extent() {
-    constexpr size_t e1 = in1_t::static_extent(Is);
-    constexpr size_t e2 = in2_t::static_extent(Is);
+template <std::size_t... Extents>
+[[nodiscard]] consteval std::size_t flatten_static_extent() noexcept {
+    static_assert(sizeof...(Extents) > 0,
+                  "At least one extent must be provided for flattening.");
 
-    if constexpr (Is == axis) {
-        return (e1 != dyn && e2 != dyn) ? (e1 + e2) : dyn;
+    if constexpr (((Extents == core::dyn) || ...)) {
+        return core::dyn;
 
     } else {
-        static_assert(e1 == e2 || e1 == dyn || e2 == dyn,
-                      "Incompatible extents for concatenate.");
-        return (e1 != dyn && e2 != dyn) ? e1 : dyn;
+        return (Extents * ...);
     }
 }
 
-template <int64_t Axis, extents_c in1_t, extents_c in2_t, extents_c... ins_t>
-    requires(in1_t::rank() == in2_t::rank())
-[[nodiscard]] inline constexpr auto
-concatenate_extents(const in1_t &in1 = in1_t{}, const in2_t &in2 = in2_t{},
-                    const ins_t &...ins) noexcept {
-    constexpr size_t rank = in1_t::rank();
-    constexpr size_t axis = static_cast<size_t>(
-        ((Axis % static_cast<int64_t>(rank)) + (rank)) % rank);
+template <typename index_t, std::convertible_to<index_t>... exts_t>
+[[nodiscard]] constexpr index_t flatten_extent(exts_t &&...exts) noexcept {
+    static_assert(sizeof...(exts) > 0,
+                  "At least one extent must be provided for flattening.");
 
-    using index_t = core::common_index_type_t<typename in1_t::index_type,
-                                              typename in2_t::index_type>;
-
-    const auto exts = [&]<typename E1, typename E2>(const E1 &e1,
-                                                    const E2 &e2) {
-        static_assert(E1::rank() == E2::rank());
-
-        auto dyn_extent = [&]<std::size_t I>() -> index_t {
-            const index_t d1 = static_cast<index_t>(e1.extent(I));
-            const index_t d2 = static_cast<index_t>(e2.extent(I));
-
-            if constexpr (I == axis) {
-                return static_cast<index_t>(d1 + d2);
-
-            } else {
-                assert(d1 == d2);
-                return d1;
-            }
-        };
-
-        auto impl = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-            return extents<index_t,
-                           concatenate_static_extent<E1, E2, Is, axis>()...>{
-                dyn_extent.template operator()<Is>()...};
-        };
-
-        return impl(std::make_index_sequence<E1::rank()>{});
-    }(in1, in2);
-
-    if constexpr (sizeof...(ins_t) != 0) {
-        return concatenate_extents<axis>(exts, ins...);
-
-    } else {
-        return exts;
-    }
+    return (exts * ...);
 }
 
-template <int64_t Axis, extents_c... ins_t>
-[[nodiscard]] inline constexpr auto
-concatenate_extents(std::tuple<ins_t...> &&ins) noexcept {
-    constexpr size_t ins_num =
-        std::tuple_size_v<std::remove_reference_t<decltype(ins)>>;
+template <core::extents_c in_t>
+[[nodiscard]] constexpr auto flatten_extents(in_t &&in) noexcept {
+    using base_t = std::remove_cvref_t<in_t>;
+    using index_t = typename base_t::index_type;
 
-    static_assert(ins_num != 0, "concatenate requires at least one input.");
-
-    if constexpr (ins_num == 1) {
-        return std::get<0>(ins);
-
-    } else {
-        return std::apply(
-            [&](auto &&...elems) {
-                return concatenate_extents<Axis>(
-                    std::forward<decltype(elems)>(elems)...);
-            },
-            ins);
-    }
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return core::extents<
+            typename base_t::index_type,
+            flatten_static_extent<base_t::static_extent(Is)...>()>{
+            flatten_extent<index_t>(in.extent(Is)...)};
+    }(std::make_index_sequence<base_t::rank()>{});
 }
 
 } // namespace detail
 
-/**
- * @brief Concatenate multiple inputs along a specified axis (out-of-place).
- *
- * @tparam Axis Axis to concatenate. Negative values are supported and
- *         normalized by the input rank (NumPy-like semantics).
- * @tparam ins_t Input types (mdspan, mdarray, scalar, etc.).
- *
- * @param ins Input tensors to concatenate.
- *
- * @return Newly allocated mdarray containing the concatenation result.
- *
- * @note Rank-0 inputs (scalars) are expanded to rank-1 along the last axis
- *       using expand_dims<-1>.
- * @note All inputs must have the same rank after scalar expansion.
- * @note For dimensions other than Axis, extents must match.
- * @note The output dtype is the common_type of all input value types.
- */
-template <int64_t Axis, typename... ins_t>
-[[nodiscard]] inline constexpr auto concatenate(ins_t &&...ins) noexcept {
-    constexpr size_t num_ins = sizeof...(ins_t);
-    auto ins_tuple = std::forward_as_tuple(ins...);
+[[nodiscard]] constexpr auto flatten(auto &&in) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    // generate input mdspans
-    const auto ins_mds = [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return std::make_tuple([&]() {
-            auto mds = core::to_const_mdspan(std::get<Is>(ins_tuple));
-
-            if constexpr (mds.rank() == 0) {
-                // if the input is a scalar, expand it to a 1D mdspan.
-                return expand_dims<-1>(mds);
-
-            } else {
-                return mds;
-            }
-        }()...);
-    }(std::make_index_sequence<num_ins>{});
-
-    using ins_mds_t = decltype(ins_mds);
-
-    // generate out extents
-    constexpr size_t rank = std::tuple_element_t<0, ins_mds_t>::rank();
-    constexpr size_t axis = static_cast<size_t>(
-        ((Axis % static_cast<int64_t>(rank)) + (rank)) % rank);
-
-    const auto out_extents =
-        [&ins_mds]<size_t... Is>(std::index_sequence<Is...>) {
-            return detail::concatenate_extents<axis>(
-                std::make_tuple(std::get<Is>(ins_mds).extents()...));
-        }(std::make_index_sequence<num_ins>{});
-
-    // generate out
-    using dtype = decltype([]<size_t... Is>(std::index_sequence<Is...>) {
-        return core::common_data_type_t<
-            core::value_type_t<std::tuple_element_t<Is, ins_mds_t>>...>{};
-    }(std::make_index_sequence<num_ins>{}));
-    auto out = empty<dtype>(out_extents);
-
-    // concatenate
-    [&ins_mds, &out]<size_t... Is>(std::index_sequence<Is...>) {
-        (([&] {
-             const size_t offset =
-                 [&]<size_t... Js>(std::index_sequence<Js...>) {
-                     return (0 + ... + std::get<Js>(ins_mds).extent(axis));
-                 }(std::make_index_sequence<Is>{});
-             const size_t extent = std::get<Is>(ins_mds).extent(axis);
-             constexpr size_t stride = 1;
-
-             copy_to(std::get<Is>(ins_mds),
-                     [&]<size_t... Js>(std::index_sequence<Js...>) {
-                         return core::submdspan_from_left(
-                             core::to_mdspan(out), ((void)Js, full_extent)...,
-                             strided_slice{offset, extent, stride});
-                     }(std::make_index_sequence<axis>{}));
-         })(),
-         ...);
-    }(std::make_index_sequence<num_ins>{});
-
-    return out;
+    return reshape<core::Copy::TRUE>(in_mds,
+                                     detail::flatten_extents(in_mds.extents()));
 }
 
 } // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/manipulation/concatenate.hpp
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/manipulation/flatten.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/manipulation/transpose.hpp
 /**
  * @file
@@ -5882,60 +6386,72 @@ template <int64_t Axis, typename... ins_t>
  */
 
 
-#include <array>
-#include <type_traits>
-#include <utility>
-
 
 namespace mdtensor {
 
-template <typename in_t, std::integral AxesType, AxesType... Axes>
-[[nodiscard]] inline constexpr auto
-transpose(in_t &&in, std::integer_sequence<AxesType, Axes...>) noexcept {
-    const auto in_mds = core::to_mdspan(std::forward<in_t>(in));
+template <std::integral axes_t, axes_t... axes>
+[[nodiscard]] constexpr auto transpose(auto &&in,
+                                       std::integer_sequence<axes_t, axes...>) {
+    const auto in_mds = core::to_mdspan(std::forward<decltype(in)>(in));
     using in_mds_t = decltype(in_mds);
 
-    constexpr size_t rank = in_mds_t::rank();
+    constexpr std::size_t rank = in_mds_t::rank();
 
-    static_assert(sizeof...(Axes) == rank, "Number of axes must match rank.");
-
-    if constexpr (rank == 0 || rank == 1) {
+    if constexpr (rank < 2) {
         return in_mds;
 
+    } else if constexpr (sizeof...(axes) == 0) {
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            return transpose(std::forward<decltype(in)>(in),
+                             std::index_sequence<(rank - 1 - Is)...>{});
+        }(std::make_index_sequence<rank>{});
+
     } else {
-        constexpr auto axes = std::array<size_t, rank>{static_cast<size_t>(
-            ((Axes % static_cast<AxesType>(rank)) + (rank)) % rank)...};
+        static_assert(sizeof...(axes) == rank,
+                      "Number of axes must match rank.");
 
-        const auto new_extents = [&]<size_t... Is>(std::index_sequence<Is...>) {
-            return extents<typename in_mds_t::index_type,
-                           in_mds_t::static_extent(axes[Is])...>{
-                in_mds.extent(axes[Is])...};
-        }(std::make_index_sequence<rank>{});
+        constexpr auto axes_arr = std::array{static_cast<std::size_t>(
+            core::bounding_index<axes_t>(axes, rank - 1))...};
 
-        const auto new_strides = [&]<size_t... Is>(std::index_sequence<Is...>) {
-            return std::array<typename in_mds_t::index_type, rank>{
-                in_mds.stride(axes[Is])...};
-        }(std::make_index_sequence<rank>{});
+        static_assert(
+            [&]() {
+                for (std::size_t i = 0; i < axes_arr.size(); i++) {
+                    for (std::size_t j = i + 1; j < axes_arr.size(); j++) {
+                        if (axes_arr[i] == axes_arr[j]) {
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            }(),
+            "Axes must be unique.");
 
-        return mdspan<typename in_mds_t::element_type,
-                      std::remove_cvref_t<decltype(new_extents)>, layout_stride,
-                      typename in_mds_t::accessor_type>{
+        const auto new_extents =
+            [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                return core::extents<typename in_mds_t::index_type,
+                                     in_mds_t::static_extent(axes_arr[Is])...>{
+                    in_mds.extent(axes_arr[Is])...};
+            }(std::make_index_sequence<axes_arr.size()>{});
+
+        const auto new_strides =
+            [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                return std::array<typename in_mds_t::index_type, rank>{
+                    in_mds.stride(axes_arr[Is])...};
+            }(std::make_index_sequence<axes_arr.size()>{});
+
+        return core::mdspan<typename in_mds_t::element_type,
+                            std::remove_cvref_t<decltype(new_extents)>,
+                            core::stdex::layout_stride,
+                            typename in_mds_t::accessor_type>{
             in_mds.data_handle(),
-            layout_stride::mapping{new_extents, new_strides}};
+            core::stdex::layout_stride::mapping{new_extents, new_strides}};
     }
 }
 
-template <typename in_t>
-[[nodiscard]] inline constexpr auto transpose(in_t &&in) noexcept {
-    const auto in_mds = core::to_mdspan(std::forward<in_t>(in));
-    using in_mds_t = decltype(in_mds);
-
-    constexpr size_t rank = in_mds_t::rank();
-
-    return [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return transpose(std::forward<in_t>(in),
-                         std::integer_sequence<int64_t, rank - 1 - Is...>{});
-    }(std::make_index_sequence<rank>{});
+template <std::int64_t... axes>
+[[nodiscard]] constexpr auto transpose(auto &&in) {
+    return transpose(std::forward<decltype(in)>(in),
+                     std::integer_sequence<std::int64_t, axes...>{});
 }
 
 } // namespace mdtensor
@@ -5965,10 +6481,17 @@ template <typename in_t>
 
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in1_t, typename in2_t, typename out_t>
-inline constexpr void atan2_impl(in1_t &&in1, in2_t &&in2, out_t &&out) {
+constexpr void atan2_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
     using value_t = core::common_data_type_t<decltype(in1()), decltype(in2()),
                                              decltype(out())>;
 
@@ -5976,60 +6499,42 @@ inline constexpr void atan2_impl(in1_t &&in1, in2_t &&in2, out_t &&out) {
         std::atan2(static_cast<value_t>(in1()), static_cast<value_t>(in2()));
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compute atan2 element-wise (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc. (y-coordinate).
- * @param in2 Second input mdspan, mdarray, scalar, etc. (x-coordinate).
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note Equivalent to out = std::atan2(in1, in2) in terms of array
- *       broadcasting.
- *
- * @see mdtensor::atan2 for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
-          typename out_t>
-inline constexpr void atan2_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::atan2_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto atan2(auto &&in1, auto &&in2,
+                                   out_t &&out = out_t{std::nullopt},
+                                   where_t &&where = where_t{std::nullopt}) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-/**
- * @brief Compute atan2 element-wise (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- *         inputs.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc. (y-coordinate).
- * @param in2 Second input mdspan, mdarray, scalar, etc. (x-coordinate).
- *
- * @return mdarray or scalar.
- *
- * @note Equivalent to out = std::atan2(in1, in2) in terms of array
- *       broadcasting.
- *
- * @see mdtensor::atan2_to for the in-place version that writes into an output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
-[[nodiscard]] inline constexpr auto atan2(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<dtype, mpmode>(
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            // NOTE: ensure that the output type is at least float precision
+            using value_t = core::output_value_t<
+                dtype, typename decltype(in1_mds)::value_type,
+                typename decltype(in2_mds)::value_type, float>;
+
+            return core::make_output<value_t>(core::extents<std::uint8_t>{},
+                                              in1_mds, in2_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::atan2_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::atan2_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)));
+        std::integer_sequence<bool, true, true, false, true>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        out_md, std::forward<decltype(where)>(where));
+
+    return out_md;
 }
 
 } // namespace mdtensor
@@ -6047,96 +6552,54 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
 
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in_t, typename min_t, typename max_t, typename out_t>
-inline constexpr void clip_impl(in_t &&in, min_t &&min, max_t &&max,
-                                out_t &&out) {
+constexpr void clip_ufunc(auto &&in, auto &&min, auto &&max, auto &&out) {
     // NOTE: std::clamp is not used to match the behavior with original np.clip
+    // when min > max, np.clip returns max, and std::clamp returns min.
+    // mdtensor.clip is designed to match the behavior of np.clip.
+
+    using value_t = std::remove_cvref_t<decltype(in())>;
+
     out() = in();
 
-    if constexpr (!std::is_same_v<std::remove_cvref_t<decltype(min())>,
-                                  std::nullopt_t>) {
-        using value_t =
-            core::common_data_type_t<std::remove_cvref_t<decltype(out())>,
-                                     std::remove_cvref_t<decltype(min())>>;
-
-        out() =
-            std::max(static_cast<value_t>(out()), static_cast<value_t>(min()));
+    if constexpr (!core::is_nullopt_t_c<decltype(min())>) {
+        out() = std::max(out(), static_cast<value_t>(min()));
     }
 
-    if constexpr (!std::is_same_v<std::remove_cvref_t<decltype(max())>,
-                                  std::nullopt_t>) {
-        using value_t =
-            core::common_data_type_t<std::remove_cvref_t<decltype(out())>,
-                                     std::remove_cvref_t<decltype(max())>>;
-
-        out() =
-            std::min(static_cast<value_t>(out()), static_cast<value_t>(max()));
+    if constexpr (!core::is_nullopt_t_c<decltype(max())>) {
+        out() = std::min(out(), static_cast<value_t>(max()));
     }
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Clip input values to the given range element-wise (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- * @param min Minimum bound (mdspan, mdarray, scalar, etc.) or a disabled bound.
- * @param max Maximum bound (mdspan, mdarray, scalar, etc.) or a disabled bound.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note Equivalent to out = clip(in, min, max) in terms of array broadcasting.
- * @note Either bound may be disabled by passing a "no-bound" value (e.g.,
- *       nullopt wrapper), in which case only the other bound is applied.
- *
- * @see mdtensor::clip for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename min_t,
-          typename max_t, typename out_t>
-inline constexpr void clip_to(in_t &&in, min_t &&min, max_t &&max,
-                              out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::clip_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in_t>(in)),
-        core::to_const_mdspan(std::forward<min_t>(min)),
-        core::to_const_mdspan(std::forward<max_t>(max)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename min_t = std::nullopt_t, typename max_t = std::nullopt_t,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto clip(auto &&in, min_t &&min = min_t{std::nullopt},
+                                  max_t &&max = max_t{std::nullopt},
+                                  out_t &&out = out_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-/**
- * @brief Clip input values to the given range element-wise (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- *         inputs.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- * @param min Minimum bound (mdspan, mdarray, scalar, etc.) or a disabled bound.
- * @param max Maximum bound (mdspan, mdarray, scalar, etc.) or a disabled bound.
- *
- * @return mdarray or scalar.
- *
- * @note Equivalent to out = clip(in, min, max) in terms of array broadcasting.
- * @note Either bound may be disabled by passing a "no-bound" value (e.g.,
- *       nullopt wrapper), in which case only the other bound is applied.
- *
- * @see mdtensor::clip_to for the in-place version that writes into an output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t,
-          typename min_t, typename max_t>
-[[nodiscard]] inline constexpr auto clip(in_t &&in, min_t &&min, max_t &&max) {
-    return core::batch_out<dtype, mpmode>(
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return empty_like<dtype>(in_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::clip_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::clip_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in_t>(in)),
-        core::to_const_mdspan(std::forward<min_t>(min)),
-        core::to_const_mdspan(std::forward<max_t>(max)));
+        std::integer_sequence<bool, true, true, true, false>{},
+        std::forward<decltype(in)>(in), std::forward<decltype(min)>(min),
+        std::forward<decltype(max)>(max), out_md);
+
+    return out_md;
 }
 
 } // namespace mdtensor
@@ -6154,59 +6617,53 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t,
 
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in_t, typename out_t>
-inline constexpr void cos_impl(in_t &&in, out_t &&out) {
-    out() = std::cos(in());
+constexpr void cos_ufunc(auto &&in, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
+    using value_t = core::common_data_type_t<decltype(in()), decltype(out())>;
+
+    out() = std::cos(static_cast<value_t>(in()));
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compute cosine element-wise (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note Equivalent to out = std::cos(in) in terms of array broadcasting.
- *
- * @see mdtensor::cos for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
-inline constexpr void cos_to(in_t &&in, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::cos_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in_t>(in)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto cos(auto &&in, out_t &&out = out_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-/**
- * @brief Compute cosine element-wise (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- *         input.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar.
- *
- * @note Equivalent to out = std::cos(in) in terms of array broadcasting.
- *
- * @see mdtensor::cos_to for the in-place version that writes into an output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto cos(in_t &&in) {
-    return core::batch_out<dtype, mpmode>(
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            // NOTE: ensure that the output type is at least float precision
+            using value_t = core::output_value_t<
+                dtype, typename decltype(in_mds)::value_type, float>;
+
+            return core::make_output<value_t>(core::extents<std::uint8_t>{},
+                                              in_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::cos_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::cos_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in_t>(in)));
+        std::integer_sequence<bool, true, false, true>{},
+        std::forward<decltype(in)>(in), out_md,
+        std::forward<decltype(where)>(where));
+
+    return out_md;
 }
 
 } // namespace mdtensor
@@ -6222,65 +6679,44 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
  */
 
 
-#include <numbers>
-
 
 namespace mdtensor {
 
-/**
- * @brief Convert degrees to radians element-wise (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input angles in degrees (mdspan, mdarray, scalar, etc.).
- * @param out Output angles in radians (mdspan, mdarray, scalar, etc.).
- *
- * @note Equivalent to out = in * (pi / 180) in terms of array broadcasting.
- * @note The scaling constant is computed in a common type of the input value
- *       type and float to ensure floating-point conversion.
- *
- * @see mdtensor::deg2rad for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
-inline constexpr void deg2rad_to(in_t &&in, out_t &&out) {
-    using value_t =
-        core::common_data_type_t<typename decltype(core::to_mdspan(
-                                     std::forward<in_t>(in)))::value_type,
-                                 float>;
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto deg2rad(auto &&in,
+                                     out_t &&out = out_t{std::nullopt},
+                                     where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    constexpr value_t D2R = std::numbers::pi_v<value_t> / value_t(180);
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            // NOTE: ensure that the output type is at least float precision
+            using value_t = core::output_value_t<
+                dtype, typename decltype(in_mds)::value_type, float>;
 
-    multiply_to<mpmode>(std::forward<in_t>(in), D2R, std::forward<out_t>(out));
-}
+            return core::make_output<value_t>(core::extents<std::uint8_t>{},
+                                              in_mds);
 
-/**
- * @brief Convert degrees to radians element-wise (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- *         input.
- *
- * @param in Input angles in degrees (mdspan, mdarray, scalar, etc.).
- *
- * @return mdarray or scalar.
- *
- * @note Equivalent to out = in * (pi / 180) in terms of array broadcasting.
- * @note The scaling constant is computed in a common type of the input value
- *       type and float to ensure floating-point conversion.
- *
- * @see mdtensor::deg2rad_to for the in-place version that writes into an
- *      output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto deg2rad(in_t &&in) {
-    using value_t =
-        core::common_data_type_t<typename decltype(core::to_mdspan(
-                                     std::forward<in_t>(in)))::value_type,
-                                 float>;
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
 
-    constexpr value_t D2R = std::numbers::pi_v<value_t> / value_t(180);
+    using calc_t = core::common_data_type_t<
+        typename decltype(in_mds)::value_type,
+        typename core::to_mdspan_t<decltype(out_md)>::value_type>;
 
-    return multiply<dtype, mpmode>(std::forward<in_t>(in), D2R);
+    static_assert(std::is_floating_point_v<calc_t> &&
+                  "deg2rad conversion requires at least float precision.");
+
+    constexpr calc_t D2R = std::numbers::pi_v<calc_t> / calc_t{180};
+
+    static_cast<void>(
+        multiply<void, backend>(std::forward<decltype(in)>(in), D2R, out_md,
+                                std::forward<decltype(where)>(where)));
+
+    return out_md;
 }
 
 } // namespace mdtensor
@@ -6298,65 +6734,51 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in1_t, typename in2_t, typename out_t>
-inline constexpr void divide_impl(in1_t &&in1, in2_t &&in2, out_t &&out) {
+constexpr void divide_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
     out() = in1() / in2();
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Divide arguments element-wise (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note Equivalent to out = in1 / in2 in terms of array broadcasting.
- *
- * @see mdtensor::divide for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
-          typename out_t>
-inline constexpr void divide_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::divide_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto divide(auto &&in1, auto &&in2,
+                                    out_t &&out = out_t{std::nullopt},
+                                    where_t &&where = where_t{std::nullopt}) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-/**
- * @brief Divide arguments element-wise (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- *         inputs.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar.
- *
- * @note Equivalent to out = in1 / in2 in terms of array broadcasting.
- *
- * @see mdtensor::divide_to for the in-place version that writes into an output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
-[[nodiscard]] inline constexpr auto divide(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<dtype, mpmode>(
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_output<dtype>(core::extents<std::uint8_t>{},
+                                            in1_mds, in2_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::divide_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::divide_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)));
+        std::integer_sequence<bool, true, true, false, true>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        out_md, std::forward<decltype(where)>(where));
+
+    return out_md;
 }
 
 } // namespace mdtensor
@@ -6372,158 +6794,6 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
  */
 
 
-
-namespace mdtensor {
-namespace detail {
-
-template <md_c in_t, md_c out_t>
-    requires(std::remove_cvref_t<out_t>::rank() == 0)
-inline constexpr void max_impl(in_t &&in, out_t &&out) {
-    using in_base_t = std::remove_cvref_t<in_t>;
-    using index_t = typename in_base_t::index_type;
-
-    out() = in(0);
-
-    for (index_t i = 1; i < in.extent(0); i++) {
-        if (in(i) > out()) {
-            out() = in(i);
-        }
-    }
-}
-
-template <md_c in_t, md_c out_t>
-    requires(std::remove_cvref_t<out_t>::rank() > 0)
-inline constexpr void max_impl(in_t &&in, out_t &&out) {
-    using in_base_t = std::remove_cvref_t<in_t>;
-    using index_t = typename in_base_t::index_type;
-
-    for (index_t i = 0; i < in.extent(in_base_t::rank() - 1); i++) {
-        max_impl(core::submdspan_from_right(in, i),
-                 core::submdspan_from_right(out, i));
-    }
-}
-
-} // namespace detail
-
-namespace {
-
-template <md_c in_t, arithmetic_c out_t>
-inline constexpr void max_arithmetic_impl(const in_t &in, out_t &out) {
-    // NOTE: CANNOT USE THIS FUNCTION DIRECTLY. OUT SHOULD BE INITIALIZED
-    using in_base_t = std::remove_cvref_t<in_t>;
-    using index_t = typename in_base_t::index_type;
-
-    if constexpr (in_base_t::rank() == 0) {
-        if (in() > out) {
-            out = in();
-        }
-
-    } else {
-        for (index_t i = 0; i < in.extent(0); i++) {
-            max_arithmetic_impl(core::submdspan_from_left(in, i), out);
-        }
-    }
-}
-
-} // namespace
-
-/**
- * @brief Compute maximum along a specified axis (in-place).
- *
- * @tparam Axis Axis to reduce. Negative values are supported and normalized
- *         by the input rank (NumPy-like semantics).
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note The reduction is performed along the specified axis and written to out.
- * @note Broadcasting is not performed; this is a reduction operation.
- *
- * @see mdtensor::max for the out-of-place axis-reduction version that returns
- *      the result.
- */
-template <int64_t Axis, MPMode mpmode = MPMode::NONE, typename in_t,
-          typename out_t>
-inline constexpr void max_to(in_t &&in, out_t &&out) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-    const auto out_mds = core::to_mdspan(std::forward<out_t>(out));
-
-    constexpr size_t in_rank = decltype(in_mds)::rank();
-    constexpr size_t rin_rank =
-        in_rank -
-        static_cast<size_t>(
-            ((Axis % static_cast<int64_t>(in_rank)) + (in_rank)) % in_rank);
-
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::max_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<rin_rank, rin_rank - 1>{}, in_mds, out_mds);
-}
-
-/**
- * @brief Compute maximum along a specified axis (out-of-place).
- *
- * @tparam Axis Axis to reduce. Negative values are supported and normalized
- *         by the input rank (NumPy-like semantics).
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- *         input.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar (depending on the input rank and reduction).
- *
- * @note The reduction is performed along the specified axis.
- *
- * @see mdtensor::max_to for the in-place version that writes into an output.
- */
-template <int64_t Axis, MPMode mpmode = MPMode::NONE, typename dtype = void,
-          typename in_t>
-[[nodiscard]] inline constexpr auto max(in_t &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-
-    constexpr size_t in_rank = decltype(in_mds)::rank();
-    constexpr size_t rin_rank =
-        in_rank -
-        static_cast<size_t>(
-            ((Axis % static_cast<int64_t>(in_rank)) + (in_rank)) % in_rank);
-
-    return core::batch_out<dtype, mpmode>(
-        [](auto &&...elems) {
-            detail::max_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<rin_rank>{},
-        core::slice_from_right<rin_rank - 1>(in_mds.extents()), in_mds);
-}
-
-/**
- * @brief Compute maximum over all elements (full reduction).
- *
- * @tparam in_t Input type.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- *
- * @return Maximum value as an arithmetic scalar.
- *
- * @note This overload reduces all elements to a single scalar value.
- * @note The accumulator is initialized to the lowest representable value.
- */
-template <typename in_t> [[nodiscard]] inline constexpr auto max(in_t &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-    using in_mds_t = decltype(in_mds);
-
-    typename in_mds_t::value_type out =
-        std::numeric_limits<typename in_mds_t::value_type>::lowest();
-
-    max_arithmetic_impl(in_mds, out);
-
-    return out;
-}
-
-} // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/max.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/maximum.hpp
 /**
  * @file
@@ -6537,72 +6807,162 @@ template <typename in_t> [[nodiscard]] inline constexpr auto max(in_t &&in) {
 
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in1_t, typename in2_t, typename out_t>
-inline constexpr void maximum_impl(in1_t &&in1, in2_t &&in2, out_t &&out) {
+constexpr void maximum_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
     using value_t = std::remove_cvref_t<decltype(out())>;
+
+    // if one of the inputs is NaN, return NaN (numpy-like)
+    if constexpr (requires {
+                      { std::isnan(in1()) } -> std::convertible_to<bool>;
+                  }) {
+        if (std::isnan(in1())) {
+            out() = std::numeric_limits<value_t>::quiet_NaN();
+            return;
+        }
+    }
+
+    if constexpr (requires {
+                      { std::isnan(in2()) } -> std::convertible_to<bool>;
+                  }) {
+        if (std::isnan(in2())) {
+            out() = std::numeric_limits<value_t>::quiet_NaN();
+            return;
+        }
+    }
 
     out() = std::max(static_cast<value_t>(in1()), static_cast<value_t>(in2()));
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compute element-wise maximum of two inputs (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note Equivalent to out = std::max(in1, in2) in terms of array broadcasting.
- *
- * @see mdtensor::maximum for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
-          typename out_t>
-inline constexpr void maximum_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::maximum_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto maximum(auto &&in1, auto &&in2,
+                                     out_t &&out = out_t{std::nullopt},
+                                     where_t &&where = where_t{std::nullopt}) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-/**
- * @brief Compute element-wise maximum of two inputs (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- *         inputs.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar.
- *
- * @note Equivalent to out = std::max(in1, in2) in terms of array broadcasting.
- *
- * @see mdtensor::maximum_to for the in-place version that writes into an
- *      output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
-[[nodiscard]] inline constexpr auto maximum(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<dtype, mpmode>(
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_output<dtype>(core::extents<std::uint8_t>{},
+                                            in1_mds, in2_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::maximum_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::maximum_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)));
+        std::integer_sequence<bool, true, true, false, true>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        out_md, std::forward<decltype(where)>(where));
+
+    return out_md;
 }
 
 } // namespace mdtensor
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/maximum.hpp
+
+namespace mdtensor {
+
+template <typename dtype = void, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO, std::integral axes_t,
+          axes_t... axes, typename out_t = std::nullopt_t,
+          typename initial_t = std::nullopt_t,
+          typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto max(auto &&in,
+                                 std::integer_sequence<axes_t, axes...>,
+                                 out_t &&out = out_t{std::nullopt},
+                                 initial_t &&initial = initial_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_reduce_output<dtype, keepdims>(
+                std::integer_sequence<axes_t, axes...>{},
+                std::index_sequence<0>{}, core::extents<std::uint8_t>{},
+                in_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    // TODO: move to reduce
+    if constexpr (core::is_nullopt_t_c<decltype(initial)>) {
+        using value_t =
+            typename core::to_mdspan_t<decltype(out_md)>::value_type;
+
+        fill<backend>(out_md, std::numeric_limits<value_t>::lowest());
+
+    } else {
+        fill<backend>(out_md, std::forward<decltype(initial)>(initial));
+    }
+
+    core::reduce<keepdims>(
+        [](auto &&in, auto &&out, auto &&where) {
+            static_cast<void>(
+                maximum<void, backend>(std::forward<decltype(in)>(in),
+                                       std::forward<decltype(out)>(out),
+                                       std::forward<decltype(out)>(out),
+                                       std::forward<decltype(where)>(where)));
+        },
+        std::integer_sequence<axes_t, axes...>{},
+        std::index_sequence<0, 0, 0>{},
+        std::integer_sequence<bool, true, false, true>{},
+        std::forward<decltype(in)>(in), out_md,
+        std::forward<decltype(where)>(where));
+
+    return out_md;
+}
+
+template <std::int64_t axis, typename dtype = void, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename initial_t = std::nullopt_t,
+          typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto max(auto &&in, out_t &&out = out_t{std::nullopt},
+                                 initial_t &&initial = initial_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    return max<dtype, keepdims, backend>(
+        std::forward<decltype(in)>(in),
+        std::integer_sequence<std::int64_t, axis>{},
+        std::forward<decltype(out)>(out),
+        std::forward<decltype(initial)>(initial),
+        std::forward<decltype(where)>(where));
+}
+
+template <typename dtype = void, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename initial_t = std::nullopt_t,
+          typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto max(auto &&in, out_t &&out = out_t{std::nullopt},
+                                 initial_t &&initial = initial_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    return max<dtype, keepdims, backend>(
+        std::forward<decltype(in)>(in), std::index_sequence<>{},
+        std::forward<decltype(out)>(out),
+        std::forward<decltype(initial)>(initial),
+        std::forward<decltype(where)>(where));
+}
+
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/max.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/min.hpp
 /**
  * @file
@@ -6614,158 +6974,6 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
  */
 
 
-
-namespace mdtensor {
-namespace detail {
-
-template <md_c in_t, md_c out_t>
-    requires(std::remove_cvref_t<out_t>::rank() == 0)
-inline constexpr void min_impl(in_t &&in, out_t &&out) {
-    using in_base_t = std::remove_cvref_t<in_t>;
-    using index_t = typename in_base_t::index_type;
-
-    out() = in(0);
-
-    for (index_t i = 1; i < in.extent(0); i++) {
-        if (in(i) < out()) {
-            out() = in(i);
-        }
-    }
-}
-
-template <md_c in_t, md_c out_t>
-    requires(std::remove_cvref_t<out_t>::rank() > 0)
-inline constexpr void min_impl(in_t &&in, out_t &&out) {
-    using in_base_t = std::remove_cvref_t<in_t>;
-    using index_t = typename in_base_t::index_type;
-
-    for (index_t i = 0; i < in.extent(in_base_t::rank() - 1); i++) {
-        min_impl(core::submdspan_from_right(in, i),
-                 core::submdspan_from_right(out, i));
-    }
-}
-
-} // namespace detail
-
-namespace {
-
-template <md_c in_t, arithmetic_c out_t>
-inline constexpr void min_arithmetic_impl(const in_t &in, out_t &out) {
-    // NOTE: CANNOT USE THIS FUNCTION DIRECTLY. OUT SHOULD BE INITIALIZED
-    using in_base_t = std::remove_cvref_t<in_t>;
-    using index_t = typename in_base_t::index_type;
-
-    if constexpr (in_base_t::rank() == 0) {
-        if (in() < out) {
-            out = in();
-        }
-
-    } else {
-        for (index_t i = 0; i < in.extent(0); i++) {
-            min_arithmetic_impl(core::submdspan_from_left(in, i), out);
-        }
-    }
-}
-
-} // namespace
-
-/**
- * @brief Compute minimum along a specified axis (in-place).
- *
- * @tparam Axis Axis to reduce. Negative values are supported and normalized
- *         by the input rank (NumPy-like semantics).
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note The reduction is performed along the specified axis and written to out.
- * @note Broadcasting is not performed; this is a reduction operation.
- *
- * @see mdtensor::min for the out-of-place axis-reduction version that returns
- *      the result.
- */
-template <int64_t Axis, MPMode mpmode = MPMode::NONE, typename in_t,
-          typename out_t>
-inline constexpr void min_to(in_t &&in, out_t &&out) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-    const auto out_mds = core::to_mdspan(std::forward<out_t>(out));
-
-    constexpr size_t in_rank = decltype(in_mds)::rank();
-    constexpr size_t rin_rank =
-        in_rank -
-        static_cast<size_t>(
-            ((Axis % static_cast<int64_t>(in_rank)) + (in_rank)) % in_rank);
-
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::min_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<rin_rank, rin_rank - 1>{}, in_mds, out_mds);
-}
-
-/**
- * @brief Compute minimum along a specified axis (out-of-place).
- *
- * @tparam Axis Axis to reduce. Negative values are supported and normalized
- *         by the input rank (NumPy-like semantics).
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- *         input.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar (depending on the input rank and reduction).
- *
- * @note The reduction is performed along the specified axis.
- *
- * @see mdtensor::min_to for the in-place version that writes into an output.
- */
-template <int64_t Axis, MPMode mpmode = MPMode::NONE, typename dtype = void,
-          typename in_t>
-[[nodiscard]] inline constexpr auto min(in_t &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-
-    constexpr size_t in_rank = decltype(in_mds)::rank();
-    constexpr size_t rin_rank =
-        in_rank -
-        static_cast<size_t>(
-            ((Axis % static_cast<int64_t>(in_rank)) + (in_rank)) % in_rank);
-
-    return core::batch_out<dtype, mpmode>(
-        [](auto &&...elems) {
-            detail::min_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<rin_rank>{},
-        core::slice_from_right<rin_rank - 1>(in_mds.extents()), in_mds);
-}
-
-/**
- * @brief Compute minimum over all elements (full reduction).
- *
- * @tparam in_t Input type.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- *
- * @return Minimum value as an arithmetic scalar.
- *
- * @note This overload reduces all elements to a single scalar value.
- * @note The accumulator is initialized to the highest representable value.
- */
-template <typename in_t> [[nodiscard]] inline constexpr auto min(in_t &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
-    using in_mds_t = decltype(in_mds);
-
-    typename in_mds_t::value_type out =
-        std::numeric_limits<typename in_mds_t::value_type>::max();
-
-    min_arithmetic_impl(in_mds, out);
-
-    return out;
-}
-
-} // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/min.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/minimum.hpp
 /**
  * @file
@@ -6779,72 +6987,320 @@ template <typename in_t> [[nodiscard]] inline constexpr auto min(in_t &&in) {
 
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in1_t, typename in2_t, typename out_t>
-inline constexpr void minimum_impl(in1_t &&in1, in2_t &&in2, out_t &&out) {
+constexpr void minimum_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
     using value_t = std::remove_cvref_t<decltype(out())>;
+
+    // if one of the inputs is NaN, return NaN (numpy-like)
+    if constexpr (requires {
+                      { std::isnan(in1()) } -> std::convertible_to<bool>;
+                  }) {
+        if (std::isnan(in1())) {
+            out() = std::numeric_limits<value_t>::quiet_NaN();
+            return;
+        }
+    }
+
+    if constexpr (requires {
+                      { std::isnan(in2()) } -> std::convertible_to<bool>;
+                  }) {
+        if (std::isnan(in2())) {
+            out() = std::numeric_limits<value_t>::quiet_NaN();
+            return;
+        }
+    }
 
     out() = std::min(static_cast<value_t>(in1()), static_cast<value_t>(in2()));
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compute element-wise minimum of two inputs (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note Equivalent to out = std::min(in1, in2) in terms of array broadcasting.
- *
- * @see mdtensor::minimum for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
-          typename out_t>
-inline constexpr void minimum_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::minimum_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto minimum(auto &&in1, auto &&in2,
+                                     out_t &&out = out_t{std::nullopt},
+                                     where_t &&where = where_t{std::nullopt}) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-/**
- * @brief Compute element-wise minimum of two inputs (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- *         inputs.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar.
- *
- * @note Equivalent to out = std::min(in1, in2) in terms of array broadcasting.
- *
- * @see mdtensor::minimum_to for the in-place version that writes into an
- *      output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
-[[nodiscard]] inline constexpr auto minimum(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<dtype, mpmode>(
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_output<dtype>(core::extents<std::uint8_t>{},
+                                            in1_mds, in2_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::minimum_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::minimum_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)));
+        std::integer_sequence<bool, true, true, false, true>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        out_md, std::forward<decltype(where)>(where));
+
+    return out_md;
 }
 
 } // namespace mdtensor
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/minimum.hpp
+
+namespace mdtensor {
+
+template <typename dtype = void, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO, std::integral axes_t,
+          axes_t... axes, typename out_t = std::nullopt_t,
+          typename initial_t = std::nullopt_t,
+          typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto min(auto &&in,
+                                 std::integer_sequence<axes_t, axes...>,
+                                 out_t &&out = out_t{std::nullopt},
+                                 initial_t &&initial = initial_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_reduce_output<dtype, keepdims>(
+                std::integer_sequence<axes_t, axes...>{},
+                std::index_sequence<0>{}, core::extents<std::uint8_t>{},
+                in_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    // TODO: move to reduce
+    if constexpr (core::is_nullopt_t_c<decltype(initial)>) {
+        using value_t =
+            typename core::to_mdspan_t<decltype(out_md)>::value_type;
+
+        fill<backend>(out_md, std::numeric_limits<value_t>::max());
+
+    } else {
+        fill<backend>(out_md, std::forward<decltype(initial)>(initial));
+    }
+
+    core::reduce<keepdims>(
+        [](auto &&in, auto &&out, auto &&where) {
+            static_cast<void>(
+                minimum<void, backend>(std::forward<decltype(in)>(in),
+                                       std::forward<decltype(out)>(out),
+                                       std::forward<decltype(out)>(out),
+                                       std::forward<decltype(where)>(where)));
+        },
+        std::integer_sequence<axes_t, axes...>{},
+        std::index_sequence<0, 0, 0>{},
+        std::integer_sequence<bool, true, false, true>{},
+        std::forward<decltype(in)>(in), out_md,
+        std::forward<decltype(where)>(where));
+
+    return out_md;
+}
+
+template <std::int64_t axis, typename dtype = void, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename initial_t = std::nullopt_t,
+          typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto min(auto &&in, out_t &&out = out_t{std::nullopt},
+                                 initial_t &&initial = initial_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    return min<dtype, keepdims, backend>(
+        std::forward<decltype(in)>(in),
+        std::integer_sequence<std::int64_t, axis>{},
+        std::forward<decltype(out)>(out),
+        std::forward<decltype(initial)>(initial),
+        std::forward<decltype(where)>(where));
+}
+
+template <typename dtype = void, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename initial_t = std::nullopt_t,
+          typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto min(auto &&in, out_t &&out = out_t{std::nullopt},
+                                 initial_t &&initial = initial_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    return min<dtype, keepdims, backend>(
+        std::forward<decltype(in)>(in), std::index_sequence<>{},
+        std::forward<decltype(out)>(out),
+        std::forward<decltype(initial)>(initial),
+        std::forward<decltype(where)>(where));
+}
+
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/min.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/nanmax.hpp
+/**
+ * @file
+ * @brief Maximum reduction without NaN utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor {
+
+template <typename dtype = void, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO, std::integral axes_t,
+          axes_t... axes, typename out_t = std::nullopt_t,
+          typename initial_t = std::nullopt_t,
+          typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+nanmax(auto &&in, std::integer_sequence<axes_t, axes...>,
+       out_t &&out = out_t{std::nullopt},
+       initial_t &&initial = initial_t{std::nullopt},
+       where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+    const auto where_mds =
+        core::to_const_mdspan(std::forward<decltype(where)>(where));
+
+    const auto is_not_nan = logical_not(isnan(in_mds, std::nullopt, where_mds));
+
+    const auto mask = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(where)>) {
+            return is_not_nan;
+
+        } else {
+            return logical_and(is_not_nan, where_mds);
+        }
+    }();
+
+    return max<dtype, keepdims, backend>(
+        std::forward<decltype(in)>(in),
+        std::integer_sequence<axes_t, axes...>{},
+        std::forward<decltype(out)>(out),
+        std::forward<decltype(initial)>(initial), mask);
+}
+
+template <std::int64_t axis, typename dtype = void, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename initial_t = std::nullopt_t,
+          typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+nanmax(auto &&in, out_t &&out = out_t{std::nullopt},
+       initial_t &&initial = initial_t{std::nullopt},
+       where_t &&where = where_t{std::nullopt}) {
+    return nanmax<dtype, keepdims, backend>(
+        std::forward<decltype(in)>(in),
+        std::integer_sequence<std::int64_t, axis>{},
+        std::forward<decltype(out)>(out),
+        std::forward<decltype(initial)>(initial),
+        std::forward<decltype(where)>(where));
+}
+
+template <typename dtype = void, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename initial_t = std::nullopt_t,
+          typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+nanmax(auto &&in, out_t &&out = out_t{std::nullopt},
+       initial_t &&initial = initial_t{std::nullopt},
+       where_t &&where = where_t{std::nullopt}) {
+    return nanmax<dtype, keepdims, backend>(
+        std::forward<decltype(in)>(in), std::index_sequence<>{},
+        std::forward<decltype(out)>(out),
+        std::forward<decltype(initial)>(initial),
+        std::forward<decltype(where)>(where));
+}
+
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/nanmax.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/nanmin.hpp
+/**
+ * @file
+ * @brief Minimum reduction without NaN utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor {
+
+template <typename dtype = void, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO, std::integral axes_t,
+          axes_t... axes, typename out_t = std::nullopt_t,
+          typename initial_t = std::nullopt_t,
+          typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+nanmin(auto &&in, std::integer_sequence<axes_t, axes...>,
+       out_t &&out = out_t{std::nullopt},
+       initial_t &&initial = initial_t{std::nullopt},
+       where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+    const auto where_mds =
+        core::to_const_mdspan(std::forward<decltype(where)>(where));
+
+    const auto is_not_nan = logical_not(isnan(in_mds, std::nullopt, where_mds));
+
+    const auto mask = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(where)>) {
+            return is_not_nan;
+
+        } else {
+            return logical_and(is_not_nan, where_mds);
+        }
+    }();
+
+    return min<dtype, keepdims, backend>(
+        std::forward<decltype(in)>(in),
+        std::integer_sequence<axes_t, axes...>{},
+        std::forward<decltype(out)>(out),
+        std::forward<decltype(initial)>(initial), mask);
+}
+
+template <std::int64_t axis, typename dtype = void, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename initial_t = std::nullopt_t,
+          typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+nanmin(auto &&in, out_t &&out = out_t{std::nullopt},
+       initial_t &&initial = initial_t{std::nullopt},
+       where_t &&where = where_t{std::nullopt}) {
+    return nanmin<dtype, keepdims, backend>(
+        std::forward<decltype(in)>(in),
+        std::integer_sequence<std::int64_t, axis>{},
+        std::forward<decltype(out)>(out),
+        std::forward<decltype(initial)>(initial),
+        std::forward<decltype(where)>(where));
+}
+
+template <typename dtype = void, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename initial_t = std::nullopt_t,
+          typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+nanmin(auto &&in, out_t &&out = out_t{std::nullopt},
+       initial_t &&initial = initial_t{std::nullopt},
+       where_t &&where = where_t{std::nullopt}) {
+    return nanmin<dtype, keepdims, backend>(
+        std::forward<decltype(in)>(in), std::index_sequence<>{},
+        std::forward<decltype(out)>(out),
+        std::forward<decltype(initial)>(initial),
+        std::forward<decltype(where)>(where));
+}
+
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/nanmin.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/negative.hpp
 /**
  * @file
@@ -6858,60 +7314,47 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
 
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in_t, typename out_t>
-inline constexpr void negative_impl(in_t &&in, out_t &&out) {
+constexpr void negative_ufunc(auto &&in, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
     out() = -in();
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compute unary negation element-wise (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note Equivalent to out = -in in terms of array broadcasting.
- *
- * @see mdtensor::negative for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
-inline constexpr void negative_to(in_t &&in, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::negative_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in_t>(in)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto negative(auto &&in,
+                                      out_t &&out = out_t{std::nullopt},
+                                      where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-/**
- * @brief Compute unary negation element-wise (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- *         input.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar.
- *
- * @note Equivalent to out = -in in terms of array broadcasting.
- *
- * @see mdtensor::negative_to for the in-place version that writes into an
- *      output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto negative(in_t &&in) {
-    return core::batch_out<dtype, mpmode>(
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return empty_like<dtype>(in_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::negative_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::negative_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in_t>(in)));
+        std::integer_sequence<bool, true, false, true>{},
+        std::forward<decltype(in)>(in), out_md,
+        std::forward<decltype(where)>(where));
+
+    return out_md;
 }
 
 } // namespace mdtensor
@@ -6927,65 +7370,44 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
  */
 
 
-#include <numbers>
-
 
 namespace mdtensor {
 
-/**
- * @brief Convert radians to degrees element-wise (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input angles in radians (mdspan, mdarray, scalar, etc.).
- * @param out Output angles in degrees (mdspan, mdarray, scalar, etc.).
- *
- * @note Equivalent to out = in * (180 / pi) in terms of array broadcasting.
- * @note The scaling constant is computed in a common type of the input value
- *       type and float to ensure floating-point conversion.
- *
- * @see mdtensor::rad2deg for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
-inline constexpr void rad2deg_to(in_t &&in, out_t &&out) {
-    using value_t =
-        core::common_data_type_t<typename decltype(core::to_mdspan(
-                                     std::forward<in_t>(in)))::value_type,
-                                 float>;
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto rad2deg(auto &&in,
+                                     out_t &&out = out_t{std::nullopt},
+                                     where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    constexpr value_t R2D = std::numbers::inv_pi_v<value_t> * value_t(180);
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            // NOTE: ensure that the output type is at least float precision
+            using value_t = core::output_value_t<
+                dtype, typename decltype(in_mds)::value_type, float>;
 
-    multiply_to<mpmode>(std::forward<in_t>(in), R2D, std::forward<out_t>(out));
-}
+            return core::make_output<value_t>(core::extents<std::uint8_t>{},
+                                              in_mds);
 
-/**
- * @brief Convert radians to degrees element-wise (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- *         input.
- *
- * @param in Input angles in radians (mdspan, mdarray, scalar, etc.).
- *
- * @return mdarray or scalar.
- *
- * @note Equivalent to out = in * (180 / pi) in terms of array broadcasting.
- * @note The scaling constant is computed in a common type of the input value
- *       type and float to ensure floating-point conversion.
- *
- * @see mdtensor::rad2deg_to for the in-place version that writes into an
- *      output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto rad2deg(in_t &&in) {
-    using value_t =
-        core::common_data_type_t<typename decltype(core::to_mdspan(
-                                     std::forward<in_t>(in)))::value_type,
-                                 float>;
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
 
-    constexpr value_t R2D = std::numbers::inv_pi_v<value_t> * value_t(180);
+    using calc_t = core::common_data_type_t<
+        typename decltype(in_mds)::value_type,
+        typename core::to_mdspan_t<decltype(out_md)>::value_type>;
 
-    return multiply<dtype, mpmode>(std::forward<in_t>(in), R2D);
+    static_assert(std::is_floating_point_v<calc_t> &&
+                  "rad2deg conversion requires at least float precision.");
+
+    constexpr calc_t R2D = std::numbers::inv_pi_v<calc_t> * calc_t{180};
+
+    static_cast<void>(
+        multiply<void, backend>(std::forward<decltype(in)>(in), R2D, out_md,
+                                std::forward<decltype(where)>(where)));
+
+    return out_md;
 }
 
 } // namespace mdtensor
@@ -7003,56 +7425,47 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
 
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in_t, typename out_t>
-inline constexpr void sign_impl(in_t &&in, out_t &&out) {
+constexpr void sign_ufunc(auto &&in, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
     out() = (in() > 0) - (in() < 0);
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compute sign element-wise (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @see mdtensor::sign for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
-inline constexpr void sign_to(in_t &&in, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::sign_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in_t>(in)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
+template <typename dtype = std::int8_t,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto sign(auto &&in, out_t &&out = out_t{std::nullopt},
+                                  where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-/**
- * @brief Compute sign element-wise (out-of-place).
- *
- * @tparam dtype (optional) Data type of the result. Default is int8_t.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar.
- *
- * @note By default, the result type is int8_t to represent {-1, 0, 1}.
- *
- * @see mdtensor::sign_to for the in-place version that writes into an output.
- */
-template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto sign(in_t &&in) {
-    return core::batch_out<dtype, mpmode>(
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return empty_like<dtype>(in_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::sign_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::sign_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in_t>(in)));
+        std::integer_sequence<bool, true, false, true>{},
+        std::forward<decltype(in)>(in), out_md,
+        std::forward<decltype(where)>(where));
+
+    return out_md;
 }
 
 } // namespace mdtensor
@@ -7070,140 +7483,57 @@ template <typename dtype = int8_t, MPMode mpmode = MPMode::NONE, typename in_t>
 
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in_t, typename out_t>
-inline constexpr void sin_impl(in_t &&in, out_t &&out) {
-    out() = std::sin(in());
+constexpr void sin_ufunc(auto &&in, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
+    using value_t = core::common_data_type_t<decltype(in()), decltype(out())>;
+
+    out() = std::sin(static_cast<value_t>(in()));
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compute sine element-wise (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note Equivalent to out = std::sin(in) in terms of array broadcasting.
- *
- * @see mdtensor::sin for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
-inline constexpr void sin_to(in_t &&in, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::sin_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in_t>(in)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto sin(auto &&in, out_t &&out = out_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-/**
- * @brief Compute sine element-wise (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- *         input.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar.
- *
- * @note Equivalent to out = std::sin(in) in terms of array broadcasting.
- *
- * @see mdtensor::sin_to for the in-place version that writes into an output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto sin(in_t &&in) {
-    return core::batch_out<dtype, mpmode>(
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            // NOTE: ensure that the output type is at least float precision
+            using value_t = core::output_value_t<
+                dtype, typename decltype(in_mds)::value_type, float>;
+
+            return core::make_output<value_t>(core::extents<std::uint8_t>{},
+                                              in_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::sin_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::sin_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in_t>(in)));
+        std::integer_sequence<bool, true, false, true>{},
+        std::forward<decltype(in)>(in), out_md,
+        std::forward<decltype(where)>(where));
+
+    return out_md;
 }
 
 } // namespace mdtensor
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/sin.hpp
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/subtract.hpp
-/**
- * @file
- * @brief Element-wise subtraction utilities for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
-
-namespace mdtensor {
-namespace detail {
-
-template <typename in1_t, typename in2_t, typename out_t>
-inline constexpr void subtract_impl(in1_t &&in1, in2_t &&in2, out_t &&out) {
-    out() = in1() - in2();
-}
-
-} // namespace detail
-
-/**
- * @brief Subtract arguments element-wise (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note Equivalent to out = in1 - in2 in terms of array broadcasting.
- *
- * @see mdtensor::subtract for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in1_t, typename in2_t,
-          typename out_t>
-inline constexpr void subtract_to(in1_t &&in1, in2_t &&in2, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::subtract_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
-
-/**
- * @brief Subtract arguments element-wise (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- *         inputs.
- *
- * @param in1 First input mdspan, mdarray, scalar, etc.
- * @param in2 Second input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar.
- *
- * @note Equivalent to out = in1 - in2 in terms of array broadcasting.
- *
- * @see mdtensor::subtract_to for the in-place version that writes into an
- *      output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
-          typename in2_t>
-[[nodiscard]] inline constexpr auto subtract(in1_t &&in1, in2_t &&in2) {
-    return core::batch_out<dtype, mpmode>(
-        [](auto &&...elems) {
-            detail::subtract_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in1_t>(in1)),
-        core::to_const_mdspan(std::forward<in2_t>(in2)));
-}
-
-} // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/subtract.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/tan.hpp
 /**
  * @file
@@ -7217,59 +7547,53 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in1_t,
 
 
 namespace mdtensor {
-namespace detail {
+namespace ufunc {
 
-template <typename in_t, typename out_t>
-inline constexpr void tan_impl(in_t &&in, out_t &&out) {
-    out() = std::tan(in());
+constexpr void tan_ufunc(auto &&in, auto &&out, auto &&where) {
+    if constexpr (requires {
+                      { where() == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where() == false) {
+            return;
+        }
+    }
+
+    using value_t = core::common_data_type_t<decltype(in()), decltype(out())>;
+
+    out() = std::tan(static_cast<value_t>(in()));
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Compute tangent element-wise (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- * @param out Output mdspan, mdarray, scalar, etc.
- *
- * @note Equivalent to out = std::tan(in) in terms of array broadcasting.
- *
- * @see mdtensor::tan for the out-of-place version that returns the result.
- */
-template <MPMode mpmode = MPMode::NONE, typename in_t, typename out_t>
-inline constexpr void tan_to(in_t &&in, out_t &&out) {
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::tan_impl(std::forward<decltype(elems)>(elems)...);
-        },
-        core::to_const_mdspan(std::forward<in_t>(in)),
-        core::to_mdspan(std::forward<out_t>(out)));
-}
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto tan(auto &&in, out_t &&out = out_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-/**
- * @brief Compute tangent element-wise (out-of-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam dtype (optional) Data type of the result. If void, deduced from
- *         input.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- *
- * @return mdarray or scalar.
- *
- * @note Equivalent to out = std::tan(in) in terms of array broadcasting.
- *
- * @see mdtensor::tan_to for the in-place version that writes into an output.
- */
-template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
-[[nodiscard]] inline constexpr auto tan(in_t &&in) {
-    return core::batch_out<dtype, mpmode>(
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            // NOTE: ensure that the output type is at least float precision
+            using value_t = core::output_value_t<
+                dtype, typename decltype(in_mds)::value_type, float>;
+
+            return core::make_output<value_t>(core::extents<std::uint8_t>{},
+                                              in_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            detail::tan_impl(std::forward<decltype(elems)>(elems)...);
+            ufunc::tan_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        extents<uint8_t>{}, core::to_const_mdspan(std::forward<in_t>(in)));
+        std::integer_sequence<bool, true, false, true>{},
+        std::forward<decltype(in)>(in), out_md,
+        std::forward<decltype(where)>(where));
+
+    return out_md;
 }
 
 } // namespace mdtensor
@@ -7286,6 +7610,234 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
  */
 
 
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/random/generator/generator.hpp
+/**
+ * @file
+ * @brief Random generator header aggregator for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/random/generator/splitmix64.hpp
+/**
+ * @file
+ * @brief SplitMix64 random number generator for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+#include <cstdint>
+
+namespace mdtensor::random::generator {
+
+class SplitMix64 {
+  public:
+    using result_type = std::uint64_t;
+
+  public:
+    constexpr explicit SplitMix64(result_type seed) noexcept : state_(seed) {}
+
+  public:
+    [[nodiscard]] constexpr result_type operator()() noexcept {
+        // https://rosettacode.org/wiki/Pseudo-random_numbers/Splitmix64
+
+        result_type z = (state_ += 0x9e3779b97f4a7c15ull);
+        z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ull;
+        z = (z ^ (z >> 27)) * 0x94d049bb133111ebull;
+
+        return z ^ (z >> 31);
+    }
+
+  private:
+    result_type state_;
+};
+
+} // namespace mdtensor::random::generator
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/random/generator/splitmix64.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/random/generator/wrapper.hpp
+/**
+ * @file
+ * @brief Random number generator engine wrapper for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+#include <cstdint>
+#include <limits>
+#include <random>
+
+namespace mdtensor::random::generator {
+
+template <typename EngineType = std::mt19937_64> class EngineWrapper {
+  public:
+    using engine_t = std::remove_cvref_t<EngineType>;
+    using base_t = typename engine_t::result_type;
+
+  public:
+    constexpr explicit EngineWrapper() : engine_(engine_t{}) {}
+    constexpr explicit EngineWrapper(const base_t seed)
+        : engine_(engine_t{seed}) {}
+
+  public:
+    [[nodiscard]] constexpr auto operator()() { return engine_(); }
+
+    template <std::integral value_t> [[nodiscard]] constexpr value_t get() {
+        using int_t = std::remove_cvref_t<value_t>;
+
+        if constexpr (std::same_as<int_t, bool>) {
+            return ((*this)() >> (std::numeric_limits<base_t>::digits - 1)) !=
+                   0;
+
+        } else {
+            using uint_t = std::make_unsigned_t<int_t>;
+
+            constexpr std::size_t base_bits =
+                std::numeric_limits<base_t>::digits;
+            constexpr std::size_t uint_bits =
+                std::numeric_limits<uint_t>::digits;
+
+            if constexpr (base_bits >= uint_bits) {
+                const base_t raw = (*this)();
+                const uint_t bits =
+                    static_cast<uint_t>(raw >> (base_bits - uint_bits));
+
+                return from_ordered_unsigned<int_t>(bits);
+
+            } else {
+                uint_t bits = 0;
+                std::size_t shift = 0;
+
+                while (shift < uint_bits) {
+                    bits |= static_cast<uint_t>((*this)()) << shift;
+                    shift += base_bits;
+                }
+
+                return from_ordered_unsigned<int_t>(bits);
+            }
+        }
+    }
+
+    template <std::unsigned_integral value_t>
+    [[nodiscard]] constexpr value_t get_bounded(const value_t bound) {
+        using uint_t = std::remove_cvref_t<value_t>;
+
+        if (bound == 0) {
+            assert(false && "get_bounded: bound must be greater than 0");
+            return 0;
+
+        } else if (std::same_as<uint_t, bool>) {
+            return get<bool>();
+
+        } else {
+            const uint_t thold = static_cast<uint_t>(uint_t{0} - bound) % bound;
+
+            while (true) {
+                const uint_t value = get<uint_t>();
+
+                if (value >= thold) {
+                    return value % bound;
+                }
+            }
+        }
+    }
+
+    template <std::integral value_t>
+    [[nodiscard]] constexpr value_t get_bounded(const value_t low,
+                                                const value_t high) {
+        using int_t = std::remove_cvref_t<value_t>;
+
+        if (low >= high) {
+            assert(false && "get_bounded: low must be less than high");
+
+            // NOTE: select mdtensor::clip like behavior
+            return high;
+
+        } else if (std::same_as<int_t, bool>) {
+            return get<bool>() ? high : low;
+
+        } else {
+            using uint_t = std::make_unsigned_t<int_t>;
+
+            const uint_t u_low = to_ordered_unsigned<int_t>(low);
+            const uint_t u_high = to_ordered_unsigned<int_t>(high);
+
+            const uint_t bound = u_high - u_low;
+
+            return from_ordered_unsigned<int_t>(u_low +
+                                                get_bounded<uint_t>(bound));
+        }
+    }
+
+  private:
+    template <std::integral value_t>
+    [[nodiscard]] static constexpr std::make_unsigned_t<value_t>
+    to_ordered_unsigned(const value_t value) {
+        using int_t = std::remove_cvref_t<value_t>;
+
+        if constexpr (std::is_unsigned_v<int_t>) {
+            return value;
+
+        } else {
+            using sint_t = int_t;
+            using uint_t = std::make_unsigned_t<sint_t>;
+
+            constexpr uint_t begin =
+                static_cast<uint_t>(std::numeric_limits<sint_t>::max()) +
+                uint_t{1};
+
+            if (value < sint_t{0}) {
+                return static_cast<uint_t>(
+                    value - std::numeric_limits<sint_t>::lowest());
+            }
+
+            return static_cast<uint_t>(begin + static_cast<uint_t>(value));
+        }
+    }
+
+    template <std::integral value_t>
+    [[nodiscard]] static constexpr auto
+    from_ordered_unsigned(const std::make_unsigned_t<value_t> value) {
+        using int_t = std::remove_cvref_t<value_t>;
+
+        if constexpr (std::is_unsigned_v<int_t>) {
+            return value;
+
+        } else {
+            using sint_t = int_t;
+            using uint_t = std::make_unsigned_t<sint_t>;
+
+            constexpr uint_t begin =
+                static_cast<uint_t>(std::numeric_limits<sint_t>::max()) +
+                uint_t{1};
+
+            if (value < begin) {
+                return static_cast<sint_t>(
+                    std::numeric_limits<sint_t>::lowest() +
+                    static_cast<sint_t>(value));
+
+            } else {
+                return static_cast<sint_t>(value - begin);
+            }
+        }
+    }
+
+  private:
+    engine_t engine_;
+};
+
+} // namespace mdtensor::random::generator
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/random/generator/wrapper.hpp
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/random/generator/generator.hpp
+
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/random/rand.hpp
 /**
  * @file
@@ -7297,152 +7849,235 @@ template <typename dtype = void, MPMode mpmode = MPMode::NONE, typename in_t>
  */
 
 
-#include <cstdint>
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/random/randint.hpp
+/**
+ * @file
+ * @brief Random integer generation utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+#include <random>
+
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/random/seed.hpp
+/**
+ * @file
+ * @brief Random seed utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
 #include <random>
 
 
-namespace mdtensor {
-namespace random {
-namespace detail {
+namespace mdtensor::random {
 
-// Code adapted from:
-// https://mklimenko.github.io/english/2018/06/04/constexpr-random/
+struct seed_t {
+  public:
+    using value_t = std::uint64_t;
 
-constexpr std::uint32_t lce_a = 16807;
-constexpr std::uint32_t lce_c = 0;
-constexpr std::uint32_t lce_m = 2147483647;
-
-[[nodiscard]] inline constexpr std::uint32_t time_from_string(const char *str,
-                                                              int offset) {
-    return static_cast<std::uint32_t>(str[offset] - '0') * 10 +
-           static_cast<std::uint32_t>(str[offset + 1] - '0');
-}
-
-[[nodiscard]] inline constexpr std::uint32_t get_seed_constexpr() {
-    const char *t = __TIME__;
-    return time_from_string(t, 0) * 3600 + time_from_string(t, 3) * 60 +
-           time_from_string(t, 6);
-}
-
-struct LCEngine {
-    std::uint32_t state;
-
-    constexpr LCEngine(std::uint32_t seed) : state(seed) {}
-
-    [[nodiscard]] constexpr std::uint32_t next() {
-        state = (lce_a * state + lce_c) % lce_m;
-        return state;
-    }
-
-    [[nodiscard]] constexpr double next_normalized() {
-        return static_cast<double>(next()) / lce_m;
-    }
+  public:
+    value_t value;
 };
 
-template <typename T, std::size_t sz>
-[[nodiscard]] inline constexpr auto uniform_distribution(T min, T max) {
-    std::array<T, sz> dst{};
-    LCEngine rng{get_seed_constexpr()};
-    for (auto &el : dst)
-        el = static_cast<T>(rng.next_normalized() * (max - min) + min);
-    return dst;
+[[nodiscard]] inline seed_t make_random_seed() {
+    auto engine = generator::EngineWrapper<std::random_device>{};
+
+    return seed_t{engine.template get<typename seed_t::value_t>()};
 }
 
-template <md_c in_t>
-    requires(
-        std::remove_cvref_t<in_t>::rank() == 0 &&
-        std::floating_point<typename std::remove_cvref_t<in_t>::value_type>)
-inline void rand_impl(in_t &&in) noexcept {
-    using dist_t = std::uniform_real_distribution<
-        typename std::remove_cvref_t<in_t>::value_type>;
+} // namespace mdtensor::random
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/random/seed.hpp
 
-    static auto rd = std::random_device{};
-    thread_local static auto gen = std::mt19937(rd());
-    static auto dist = dist_t{0, 1};
+namespace mdtensor::random {
 
-    in() = dist(gen);
+using default_random_engine_t = std::mt19937_64;
+
+namespace ufunc {
+
+constexpr void randint_ufunc(auto &&out, auto &&low, auto &&high,
+                             auto &&engine) {
+    using value_t = std::remove_cvref_t<decltype(out())>;
+
+    static_assert(std::is_integral_v<value_t>,
+                  "randint_ufunc requires integral value type.");
+
+    constexpr bool has_low =
+        !core::is_nullopt_t_c<std::remove_cvref_t<decltype(low())>>;
+    constexpr bool has_high =
+        !core::is_nullopt_t_c<std::remove_cvref_t<decltype(high())>>;
+
+    if constexpr (has_low && has_high) {
+        // NOTE: This implementation matches the behavior of
+        // numpy.random.randint(low, high)
+
+        out() = engine.template get_bounded<value_t>(
+            static_cast<value_t>(low()), static_cast<value_t>(high()));
+
+    } else if constexpr (has_low && !has_high) {
+        // NOTE: This implementation matches the behavior of
+        // numpy.random.randint(low, high=None)
+
+        out() = engine.template get_bounded<value_t>(
+            value_t{0}, static_cast<value_t>(low()));
+
+    } else if constexpr (!has_low && has_high) {
+        // NOTE: This implementation is not exist in numpy.random.randint,
+        // but maybe useful for some use cases.
+
+        out() = engine.template get_bounded<value_t>(
+            std::numeric_limits<value_t>::lowest(),
+            static_cast<value_t>(high()));
+
+    } else {
+        // NOTE: This implementation is not exist in numpy.random.randint,
+        // but maybe useful for some use cases.
+
+        out() = engine.template get<value_t>();
+    }
 }
 
-} // namespace detail
+} // namespace ufunc
 
-/**
- * @brief Fill an output tensor with uniform random values in [0, 1).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Output mdspan, mdarray, scalar, etc.
- *
- * @note For constant evaluation with fully static extents, a constexpr
- *       LCEngine-based generator is used and the data is copied into the
- *       output.
- * @note For runtime execution, the core batch engine fills elements using a
- *       thread-local std::mt19937 distribution on [0, 1).
- *
- * @see mdtensor::random::rand for the out-of-place version that allocates an
- *      output and fills it.
- */
-template <MPMode mpmode = MPMode::NONE, typename in_t>
-inline constexpr void rand_to(in_t &&in) noexcept {
-    const auto in_mds = core::to_mdspan(std::forward<in_t>(in));
-    using in_mds_t = decltype(in_mds);
+template <typename dtype = int, typename EngineType = default_random_engine_t,
+          typename shape_t = core::extents<std::uint8_t>,
+          typename low_t = std::nullopt_t, typename high_t = std::nullopt_t,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+randint(shape_t &&shape = shape_t{}, low_t &&low = low_t{std::nullopt},
+        high_t &&high = high_t{std::nullopt}, out_t &&out = out_t{std::nullopt},
+        const seed_t seed = make_random_seed()) {
+    const auto low_mds =
+        core::to_const_mdspan(std::forward<decltype(low)>(low));
+    const auto high_mds =
+        core::to_const_mdspan(std::forward<decltype(high)>(high));
 
-    if constexpr (in_mds_t::rank_dynamic() == 0) {
-        if (std::is_constant_evaluated()) {
-            using T = core::value_type_t<in_mds_t>;
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_output<dtype>(
+                core::to_extents(std::forward<decltype(shape)>(shape)), low_mds,
+                high_mds);
 
-            if constexpr (in_mds_t::rank() == 0) {
-                constexpr auto data =
-                    detail::uniform_distribution<T, 1>(0, 1)[0];
-                in_mds() = data;
-
-            } else {
-                constexpr auto data_size =
-                    []<size_t... Is>(std::index_sequence<Is...>) {
-                        return (in_mds_t::static_extent(Is) * ...);
-                    }(std::make_index_sequence<in_mds_t::rank()>{});
-
-                constexpr auto data =
-                    mdarray<T, typename in_mds_t::extents_type>{
-                        detail::uniform_distribution<T, data_size>(0, 1)};
-
-                copy_to(data, in_mds);
-            }
-
-            return;
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
         }
+    }();
+
+    static_assert(core::integral_c<
+                      typename core::to_mdspan_t<decltype(out_md)>::value_type>,
+                  "Output must have a integral value type.");
+
+    auto engine = generator::EngineWrapper<EngineType>{seed.value};
+
+    core::batch_with_broadcast<core::Backend::NATIVE>(
+        [&](auto &&...elems) {
+            ufunc::randint_ufunc(std::forward<decltype(elems)>(elems)...,
+                                 engine);
+        },
+        std::integer_sequence<bool, false, true, true>{}, out_md, low_mds,
+        high_mds);
+
+    return out_md;
+}
+
+} // namespace mdtensor::random
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/random/randint.hpp
+
+namespace mdtensor::random {
+namespace ufunc {
+
+template <std::floating_point value_t>
+[[nodiscard]] constexpr value_t pow2_neg(std::size_t bits) noexcept {
+    value_t result = value_t{1};
+
+    for (std::size_t i = 0; i < bits; i++) {
+        result *= value_t{0.5};
     }
 
-    core::batch<mpmode>(
-        [](auto &&...elems) {
-            detail::rand_impl(std::forward<decltype(elems)>(elems)...);
+    return result;
+}
+
+constexpr void rand_ufunc(auto &&out, auto &&engine) {
+    using value_t = std::remove_cvref_t<decltype(out())>;
+
+    static_assert(std::is_floating_point_v<value_t>,
+                  "rand_ufunc requires floating-point value type.");
+
+    using base_t = typename std::remove_cvref_t<decltype(engine)>::base_t;
+
+    static_assert(std::unsigned_integral<base_t>,
+                  "rand_ufunc requires an unsigned integral engine result.");
+
+    constexpr std::size_t base_bits = std::numeric_limits<base_t>::digits;
+    constexpr std::size_t value_bits = std::numeric_limits<value_t>::digits;
+
+    if constexpr (value_bits <= base_bits) {
+        const base_t bits = engine() >> (base_bits - value_bits);
+        out() = static_cast<value_t>(bits) * pow2_neg<value_t>(value_bits);
+
+    } else {
+        value_t result = value_t{0};
+        value_t scale = value_t{1};
+
+        std::size_t remaining = value_bits;
+
+        while (remaining > 0) {
+            const std::size_t take =
+                remaining < base_bits ? remaining : base_bits;
+
+            const base_t bits = engine() >> (base_bits - take);
+
+            scale *= pow2_neg<value_t>(take);
+            result += static_cast<value_t>(bits) * scale;
+
+            remaining -= take;
+        }
+
+        out() = result;
+    }
+}
+
+} // namespace ufunc
+
+template <typename dtype = double,
+          typename EngineType = default_random_engine_t,
+          typename shape_t = core::extents<std::uint8_t>,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto rand(shape_t &&shape = shape_t{},
+                                  out_t &&out = out_t{std::nullopt},
+                                  const seed_t seed = make_random_seed()) {
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return empty<dtype>(std::forward<decltype(shape)>(shape));
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    static_assert(core::floating_point_c<
+                      typename core::to_mdspan_t<decltype(out_md)>::value_type>,
+                  "Output must have a floating point value type.");
+
+    auto engine = generator::EngineWrapper<EngineType>{seed.value};
+
+    core::batch<core::Backend::NATIVE,
+                core::to_mdspan_t<decltype(out_md)>::rank()>(
+        [&](auto &&...elems) {
+            ufunc::rand_ufunc(std::forward<decltype(elems)>(elems)..., engine);
         },
-        in_mds);
+        out_md);
+
+    return out_md;
 }
 
-/**
- * @brief Create an array of uniform random values in [0, 1).
- *
- * @tparam dtype (optional) Floating-point element type. Default is float.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam exts_t (optional) Extents type. Default is extents<uint8_t>.
- *
- * @param exts Output extents.
- *
- * @return Newly allocated mdarray filled with uniform random values in [0, 1).
- *
- * @see mdtensor::random::rand_to for the in-place version that fills an
- *      existing output.
- */
-template <std::floating_point dtype = float, MPMode mpmode = MPMode::NONE,
-          extents_c exts_t = extents<uint8_t>>
-[[nodiscard]] inline constexpr auto rand(exts_t &&exts = exts_t{}) noexcept {
-    auto out = empty<dtype>(std::forward<exts_t>(exts));
-    rand_to<mpmode>(out);
-    return out;
-}
-
-} // namespace random
-} // namespace mdtensor
+} // namespace mdtensor::random
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/random/rand.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/random/uniform.hpp
 /**
@@ -7456,88 +8091,71 @@ template <std::floating_point dtype = float, MPMode mpmode = MPMode::NONE,
 
 
 
-namespace mdtensor {
-namespace random {
+namespace mdtensor::random {
+namespace ufunc {
 
-/**
- * @brief Fill an output tensor with uniform random values in [low, high)
- *        (in-place).
- *
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- *
- * @param in Output mdspan, mdarray, scalar, etc.
- * @param low Lower bound of the uniform distribution (inclusive).
- * @param high Upper bound of the uniform distribution (exclusive).
- *
- * @note The underlying generator produces values in [0, 1), which are then
- *       scaled and shifted to the target range.
- * @note If high == low, the output becomes constant equal to low.
- * @note Behavior for high < low follows the affine transform and is not
- *       explicitly validated.
- *
- * @see mdtensor::random::uniform for the out-of-place version that allocates an
- *      output and fills it.
- */
-template <MPMode mpmode = MPMode::NONE, typename in_t>
-inline constexpr void uniform_to(in_t &&in, const double &low = 0,
-                                 const double &high = 1) noexcept {
-    const auto in_mds = core::to_mdspan(std::forward<in_t>(in));
+constexpr void uniform_ufunc(auto &&out, auto &&low, auto &&high,
+                             auto &&engine) {
+    using value_t = std::remove_cvref_t<decltype(out())>;
 
-    using T = typename decltype(in_mds)::value_type;
+    rand_ufunc(std::forward<decltype(out)>(out),
+               std::forward<decltype(engine)>(engine));
 
-    random::rand_to(in_mds);
-
-    if constexpr (mpmode == MPMode::SIMD) {
-        multiply_to<mpmode>(in_mds, static_cast<const T>(high - low), in_mds);
-        add_to<mpmode>(in_mds, static_cast<const T>(low), in_mds);
-        return;
-
-    } else {
-        core::batch<mpmode>(
-            [&](auto &&in) {
-                in() = static_cast<const T>(high - low) * in() +
-                       static_cast<const T>(low);
-            },
-            in_mds);
-    }
+    out() =
+        (static_cast<value_t>(high()) - static_cast<value_t>(low())) * out() +
+        static_cast<value_t>(low());
 }
 
-/**
- * @brief Create an array of uniform random values in [low, high)
- *        (out-of-place).
- *
- * @tparam dtype (optional) Floating-point element type. Default is float.
- * @tparam mpmode (optional) Parallel execution mode. Default is MPMode::NONE.
- * @tparam exts_t (optional) Extents type. Default is extents<uint8_t>.
- *
- * @param exts Output extents.
- * @param low Lower bound of the uniform distribution (inclusive).
- * @param high Upper bound of the uniform distribution (exclusive).
- *
- * @return Newly allocated mdarray filled with uniform random values in [low,
- *         high).
- *
- * @see mdtensor::random::uniform_to for the in-place version that fills an
- *      existing output.
- */
-template <std::floating_point dtype = float, MPMode mpmode = MPMode::NONE,
-          extents_c exts_t = extents<uint8_t>>
-[[nodiscard]] inline constexpr auto uniform(exts_t &&exts = exts_t{},
-                                            const double &low = 0,
-                                            const double &high = 1) noexcept {
-    auto out = empty<dtype>(std::forward<exts_t>(exts));
-    uniform_to<mpmode>(out, low, high);
-    return out;
+} // namespace ufunc
+
+template <
+    typename dtype = double, typename EngineType = default_random_engine_t,
+    typename shape_t = core::extents<std::uint8_t>, typename low_t = dtype,
+    typename high_t = dtype, typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+uniform(shape_t &&shape = shape_t{}, low_t &&low = low_t{0},
+        high_t &&high = high_t{1}, out_t &&out = out_t{std::nullopt},
+        const seed_t seed = make_random_seed()) {
+    const auto low_mds =
+        core::to_const_mdspan(std::forward<decltype(low)>(low));
+    const auto high_mds =
+        core::to_const_mdspan(std::forward<decltype(high)>(high));
+
+    auto out_md = [&]() {
+        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            return core::make_output<dtype>(
+                core::to_extents(std::forward<decltype(shape)>(shape)), low_mds,
+                high_mds);
+
+        } else {
+            return core::to_output_mdspan(std::forward<decltype(out)>(out));
+        }
+    }();
+
+    static_assert(core::floating_point_c<
+                      typename core::to_mdspan_t<decltype(out_md)>::value_type>,
+                  "Output must have a floating point value type.");
+
+    auto engine = generator::EngineWrapper<EngineType>{seed.value};
+
+    core::batch_with_broadcast<core::Backend::NATIVE>(
+        [&](auto &&...elems) {
+            ufunc::uniform_ufunc(std::forward<decltype(elems)>(elems)...,
+                                 engine);
+        },
+        std::integer_sequence<bool, false, true, true>{}, out_md, low_mds,
+        high_mds);
+
+    return out_md;
 }
 
-} // namespace random
-} // namespace mdtensor
+} // namespace mdtensor::random
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/random/uniform.hpp
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/random/random.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/util/util.hpp
 /**
  * @file
- * @brief String utilities header aggregator for mdtensor.
+ * @brief Miscellaneous utility functions for mdtensor.
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -7545,10 +8163,10 @@ template <std::floating_point dtype = float, MPMode mpmode = MPMode::NONE,
  */
 
 
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/util/to_string.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/util/broadcast_extents.hpp
 /**
  * @file
- * @brief String conversion utilities for mdtensor.
+ * @brief Broadcast extents utilities for mdtensor.
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -7558,77 +8176,14 @@ template <std::floating_point dtype = float, MPMode mpmode = MPMode::NONE,
 
 
 namespace mdtensor {
-namespace detail {
 
-template <typename in_t>
-[[nodiscard]] inline std::string to_string_impl(in_t &&in) {
-    using index_t = typename std::remove_cvref_t<in_t>::index_type;
-
-    std::string str = "[";
-
-    if constexpr (in_t::rank() == 0) {
-        return std::to_string(in());
-
-    } else {
-        for (index_t i = 0; i < in.extent(0); i++) {
-            str += to_string_impl(core::submdspan_from_left(in, i));
-
-            if (i < in.extent(0) - 1) {
-                str += ", ";
-            }
-        }
-    }
-
-    return str + "]";
-}
-
-} // namespace detail
-
-/**
- * @brief Convert an extents object into a shape string.
- *
- * @tparam in_t Extents type satisfying extents_c.
- *
- * @param in Input extents.
- *
- * @return Shape string in the form "(d0, d1, ...)".
- *
- * @note This overload is useful for printing tensor shapes.
- */
-template <extents_c exts_t>
-[[nodiscard]] inline std::string to_string(exts_t &&exts) {
-    using exts_base_t = std::remove_cvref_t<exts_t>;
-
-    std::string str = "(";
-
-    for (size_t i = 0; i < exts_base_t::rank(); i++) {
-        str += std::to_string(exts.extent(i));
-        if (i < exts_base_t::rank() - 1) {
-            str += ", ";
-        }
-    }
-
-    return str + ")";
-}
-
-/**
- * @brief Convert a tensor-like object into a nested bracket string.
- *
- * @param in Input mdspan, mdarray, scalar, etc.
- *
- * @return Nested bracket string representation.
- *
- * @note The input is converted to a const mdspan view before formatting.
- *
- * @see mdtensor::to_string(const extents_c&) for shape formatting.
- */
-template <typename in_t> [[nodiscard]] inline std::string to_string(in_t &&in) {
-    return detail::to_string_impl(
-        core::to_const_mdspan(std::forward<in_t>(in)));
+template <core::extents_c... ins_t>
+[[nodiscard]] constexpr auto broadcast_extents(ins_t &&...ins) {
+    return core::broadcast_extents(std::forward<ins_t>(ins)...);
 }
 
 } // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/util/to_string.hpp
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/util/broadcast_extents.hpp
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/util/util.hpp
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/mdtensor.hpp
 #endif // MDTENSOR_SINGLE_HEADER_INCLUDE_GUARD_
