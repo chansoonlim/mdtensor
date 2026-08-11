@@ -153,8 +153,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
     const auto uin1_exts = core::slice_extents_from_right<2>(in1_mds.extents());
     const auto uin2_exts = core::slice_extents_from_right<2>(in2_mds.extents());
     const auto uout_exts = core::extents<
-        core::common_data_type_t<typename decltype(uin1_exts)::index_type,
-                                 typename decltype(uin2_exts)::index_type>,
+        core::common_integer_type_t<typename decltype(uin1_exts)::index_type,
+                                    typename decltype(uin2_exts)::index_type>,
         decltype(uin2_exts)::static_extent(1)>{uin2_exts.extent(1)};
 
     auto out = core::make_broadcasted_tensor<dtype>(

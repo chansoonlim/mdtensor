@@ -70,16 +70,9 @@ isclose(auto &&in1, auto &&in2, rtol_t &&rtol = rtol_t{1e-05},
     const auto atol_mds =
         core::to_const_mdspan(std::forward<decltype(atol)>(atol));
 
-    auto out_md = [&]() {
-        if constexpr (core::nullopt_t_c<decltype(out)>) {
-            return core::make_broadcasted_tensor<dtype>(
-                core::extents<std::uint8_t>{}, in1_mds, in2_mds, rtol_mds,
-                atol_mds);
-
-        } else {
-            return core::to_output_mdspan(std::forward<decltype(out)>(out));
-        }
-    }();
+    auto out_md = core::resolve_broadcasted_output<dtype>(
+        std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
+        in1_mds, in2_mds, rtol_mds, atol_mds);
 
     core::batch_with_broadcast<backend>(
         [&](auto &&...elems) {

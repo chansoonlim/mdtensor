@@ -13,9 +13,8 @@
 #include "bcast_to.hpp"
 
 namespace mdtensor::core {
-namespace detail {
 
-template <std::size_t... uranks, mdspan_c... ios_t>
+template <std::size_t... uranks, extents_c... ios_t>
 [[nodiscard]] constexpr auto
 get_broadcast_extents(std::index_sequence<uranks...>, ios_t &&...ios) {
     static_assert(sizeof...(uranks) == sizeof...(ios_t),
@@ -24,10 +23,15 @@ get_broadcast_extents(std::index_sequence<uranks...>, ios_t &&...ios) {
                   "Input rank must be greater than or equal to urank.");
 
     return broadcast_extents(
-        slice_extents_from_left<ios.rank() - uranks>(ios.extents())...);
+        slice_extents_from_left<ios.rank() - uranks>(ios)...);
 }
 
-} // namespace detail
+template <std::size_t... uranks, mdspan_c... ios_t>
+[[nodiscard]] constexpr auto
+get_broadcast_extents(std::index_sequence<uranks...>, ios_t &&...ios) {
+    return get_broadcast_extents(std::index_sequence<uranks...>{},
+                                 ios.extents()...);
+}
 
 template <std::size_t... uranks, bool... bcast>
 [[nodiscard]] constexpr auto broadcast(std::index_sequence<uranks...>,
@@ -44,8 +48,8 @@ template <std::size_t... uranks, bool... bcast>
     constexpr auto ur = std::array{uranks...};
 
     const auto bexts = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        return detail::get_broadcast_extents(std::index_sequence<ur[Is]...>{},
-                                             std::get<Is>(ios_mds)...);
+        return get_broadcast_extents(std::index_sequence<ur[Is]...>{},
+                                     std::get<Is>(ios_mds)...);
     }(std::make_index_sequence<sizeof...(ios)>{});
 
     // calculate broadcasted mdspans

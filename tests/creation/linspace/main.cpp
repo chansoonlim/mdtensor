@@ -74,6 +74,9 @@ TEST(compile_time, 3) {
             md::extents<index_t, ext1, ext2>{}, 2, 3, std::nullopt,
             md::random::seed_t{1});
 
+    std::cout << "start: " << md::to_string(start) << std::endl;
+    std::cout << "stop: " << md::to_string(stop) << std::endl;
+
     constexpr auto out1 = md::linspace<num, 0>(start, stop, true);
     constexpr auto out2 = md::linspace<num, 1>(start, stop, true);
     constexpr auto out3 = md::linspace<num, 2>(start, stop, true);

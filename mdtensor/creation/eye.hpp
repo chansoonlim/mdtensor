@@ -41,14 +41,9 @@ template <typename dtype = double, core::Backend backend = core::Backend::AUTO,
 
         static_assert(exts.rank() >= 2, "eye requires rank >= 2");
 
-        auto out_md = [&]() {
-            if constexpr (core::nullopt_t_c<decltype(out)>) {
-                return empty<dtype>(exts);
-
-            } else {
-                return core::to_output_mdspan(std::forward<decltype(out)>(out));
-            }
-        }();
+        auto out_md =
+            core::resolve_output<dtype>(std::forward<decltype(out)>(out),
+                                        std::forward<decltype(exts)>(exts));
 
         core::batch<backend, exts.rank() - 2>(
             [&](auto &&...elems) {

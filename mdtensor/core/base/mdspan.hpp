@@ -112,4 +112,8 @@ concept mdspan_c = is_mdspan_v<std::remove_cvref_t<T>>;
 template <typename T>
 using to_mdspan_t = decltype(to_mdspan(std::declval<T>()));
 
+template <typename... Ts>
+using common_value_type_t = common_data_type_t<
+    typename std::remove_cvref_t<to_mdspan_t<Ts>>::value_type...>;
+
 } // namespace mdtensor::core

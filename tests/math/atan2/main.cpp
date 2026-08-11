@@ -63,11 +63,12 @@ TEST(run_time, 3) {
 #ifdef REAL_GCC // NOTE: std::cos is not constexpr in clang 16.
 
 TEST(compile_time, 1) {
+    using value_t = double;
     using index_t = std::size_t;
 
     constexpr auto x = md::tensor<int, md::extents<index_t, 4>>{{-1, 1, 1, -1}};
     constexpr auto y = md::tensor<int, md::extents<index_t, 4>>{{-1, -1, 1, 1}};
-    constexpr auto out = md::rad2deg(md::atan2(y, x));
+    constexpr auto out = md::rad2deg(md::atan2<value_t>(y, x));
 
     std::cout << "out: " << md::to_string(out) << std::endl;
 

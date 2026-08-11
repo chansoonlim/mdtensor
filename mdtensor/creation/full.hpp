@@ -27,14 +27,10 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
 
     using value_t = core::output_value_t<dtype, decltype(val_mds)>;
 
-    auto out_md = [&]() {
-        if constexpr (core::nullopt_t_c<decltype(out)>) {
-            return empty<value_t>(std::forward<decltype(shape)>(shape));
-
-        } else {
-            return core::to_output_mdspan(std::forward<decltype(out)>(out));
-        }
-    }();
+    auto out_md =
+        core::resolve_output<core::output_value_t<dtype, decltype(val_mds)>>(
+            std::forward<decltype(out)>(out),
+            core::to_extents(std::forward<decltype(shape)>(shape)));
 
     core::batch_with_broadcast<backend>(
         [](auto &&...elems) {

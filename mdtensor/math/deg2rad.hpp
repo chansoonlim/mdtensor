@@ -20,26 +20,11 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
                                      where_t &&where = where_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = [&]() {
-        if constexpr (core::nullopt_t_c<decltype(out)>) {
-            // NOTE: ensure that the output type is at least float precision
-            using value_t = core::output_value_t<
-                dtype, typename decltype(in_mds)::value_type, float>;
+    auto out_md = core::resolve_output_like<dtype, true>(
+        std::forward<decltype(out)>(out), in_mds);
 
-            return core::make_broadcasted_tensor<value_t>(
-                core::extents<std::uint8_t>{}, in_mds);
-
-        } else {
-            return core::to_output_mdspan(std::forward<decltype(out)>(out));
-        }
-    }();
-
-    using calc_t = core::common_data_type_t<
-        typename decltype(in_mds)::value_type,
-        typename core::to_mdspan_t<decltype(out_md)>::value_type>;
-
-    static_assert(std::is_floating_point_v<calc_t> &&
-                  "deg2rad conversion requires at least float precision.");
+    using calc_t =
+        core::common_value_type_t<decltype(in_mds), decltype(out_md)>;
 
     constexpr calc_t D2R = std::numbers::pi_v<calc_t> / calc_t{180};
 

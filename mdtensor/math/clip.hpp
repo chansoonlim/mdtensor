@@ -41,15 +41,14 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
                                   max_t &&max = max_t{std::nullopt},
                                   out_t &&out = out_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+    const auto min_mds =
+        core::to_const_mdspan(std::forward<decltype(min)>(min));
+    const auto max_mds =
+        core::to_const_mdspan(std::forward<decltype(max)>(max));
 
-    auto out_md = [&]() {
-        if constexpr (core::nullopt_t_c<decltype(out)>) {
-            return empty_like<dtype>(in_mds);
-
-        } else {
-            return core::to_output_mdspan(std::forward<decltype(out)>(out));
-        }
-    }();
+    auto out_md = core::resolve_broadcasted_output<dtype>(
+        std::forward<decltype(out)>(out), core::extents<std::uint8_t>{}, in_mds,
+        min_mds, max_mds);
 
     core::batch_with_broadcast<backend>(
         [](auto &&...elems) {

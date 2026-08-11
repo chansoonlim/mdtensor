@@ -92,21 +92,13 @@ template <std::int64_t axis = 0, typename dtype = void,
         static_cast<std::size_t>(core::bounding_index(axis, bexts.rank()));
     constexpr std::size_t out_urank = bexts.rank() + 1 - baxis;
 
-    auto out_md = [&]() {
-        if constexpr (core::nullopt_t_c<decltype(out)>) {
-            using value_t =
-                core::output_value_t<dtype,
-                                     typename decltype(start_bcast)::value_type,
-                                     typename decltype(stop_bcast)::value_type>;
-
-            return empty<value_t>(core::compose_extents(
+    auto out_md =
+        core::resolve_output<core::output_value_t<dtype, decltype(start_bcast),
+                                                  decltype(stop_bcast)>>(
+            std::forward<decltype(out)>(out),
+            core::compose_extents(
                 core::slice_extents_from_left<baxis>(bexts), exts,
                 core::slice_extents_from_right<out_urank - 1>(bexts)));
-
-        } else {
-            return core::to_output_mdspan(std::forward<decltype(out)>(out));
-        }
-    }();
 
     core::batch_with_broadcast<backend>(
         [&](auto &&...elems) {

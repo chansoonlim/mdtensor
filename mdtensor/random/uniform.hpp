@@ -41,20 +41,12 @@ uniform(shape_t &&shape = shape_t{}, low_t &&low = low_t{0},
     const auto high_mds =
         core::to_const_mdspan(std::forward<decltype(high)>(high));
 
-    auto out_md = [&]() {
-        if constexpr (core::nullopt_t_c<decltype(out)>) {
-            return core::make_broadcasted_tensor<dtype>(
-                core::to_extents(std::forward<decltype(shape)>(shape)), low_mds,
-                high_mds);
-
-        } else {
-            return core::to_output_mdspan(std::forward<decltype(out)>(out));
-        }
-    }();
-
-    static_assert(core::floating_point_c<
-                      typename core::to_mdspan_t<decltype(out_md)>::value_type>,
-                  "Output must have a floating point value type.");
+    auto out_md = core::resolve_output<dtype, true>(
+        std::forward<decltype(out)>(out),
+        core::get_broadcast_extents(
+            std::index_sequence<0, 0, 0>{},
+            core::to_extents(std::forward<decltype(shape)>(shape)),
+            low_mds.extents(), high_mds.extents()));
 
     auto engine = generator::EngineWrapper<EngineType>{seed.value};
 

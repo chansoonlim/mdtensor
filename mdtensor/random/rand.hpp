@@ -75,18 +75,9 @@ template <typename dtype = double,
 [[nodiscard]] constexpr auto rand(shape_t &&shape = shape_t{},
                                   out_t &&out = out_t{std::nullopt},
                                   const seed_t seed = make_random_seed()) {
-    auto out_md = [&]() {
-        if constexpr (core::nullopt_t_c<decltype(out)>) {
-            return empty<dtype>(std::forward<decltype(shape)>(shape));
-
-        } else {
-            return core::to_output_mdspan(std::forward<decltype(out)>(out));
-        }
-    }();
-
-    static_assert(core::floating_point_c<
-                      typename core::to_mdspan_t<decltype(out_md)>::value_type>,
-                  "Output must have a floating point value type.");
+    auto out_md = core::resolve_output<dtype, true>(
+        std::forward<decltype(out)>(out),
+        core::to_extents(std::forward<decltype(shape)>(shape)));
 
     auto engine = generator::EngineWrapper<EngineType>{seed.value};
 

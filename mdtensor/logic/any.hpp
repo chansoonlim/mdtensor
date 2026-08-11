@@ -24,17 +24,10 @@ template <typename dtype = bool, bool keepdims = false,
                                  where_t &&where = where_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = [&]() {
-        if constexpr (core::nullopt_t_c<decltype(out)>) {
-            return core::make_reduced_tensor<dtype, keepdims>(
-                std::integer_sequence<axes_t, axes...>{},
-                std::index_sequence<0>{}, core::extents<std::uint8_t>{},
-                in_mds);
-
-        } else {
-            return core::to_output_mdspan(std::forward<decltype(out)>(out));
-        }
-    }();
+    auto out_md = core::resolve_reduced_output<dtype, keepdims>(
+        std::forward<decltype(out)>(out),
+        std::integer_sequence<axes_t, axes...>{}, core::extents<std::uint8_t>{},
+        in_mds);
 
     // TODO: move to reduce
     fill<backend>(out_md, false);

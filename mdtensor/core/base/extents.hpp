@@ -44,93 +44,6 @@ concept extents_c = is_extents_v<std::remove_cvref_t<T>>;
 constexpr auto dynamic_extent = stdex::dynamic_extent;
 constexpr auto dyn = dynamic_extent;
 
-namespace detail {
-
-template <std::size_t Size> struct signed_by_size;
-
-template <> struct signed_by_size<1> {
-    using type = std::int8_t;
-};
-
-template <> struct signed_by_size<2> {
-    using type = std::int16_t;
-};
-
-template <> struct signed_by_size<4> {
-    using type = std::int32_t;
-};
-
-template <> struct signed_by_size<8> {
-    using type = std::int64_t;
-};
-
-template <std::size_t Size>
-using signed_by_size_t = typename signed_by_size<Size>::type;
-
-template <typename T>
-constexpr bool valid_extent_index_v =
-    integral_c<T> && !std::same_as<std::remove_cvref_t<T>, bool>;
-
-template <typename... Ts> struct common_index_type_impl {
-    // no type
-};
-
-template <typename T>
-    requires valid_extent_index_v<T>
-struct common_index_type_impl<T> {
-    using type = std::remove_cvref_t<T>;
-};
-
-template <typename T1, typename T2>
-    requires(valid_extent_index_v<T1> && valid_extent_index_v<T2> &&
-             (std::is_signed_v<std::remove_cvref_t<T1>> ==
-              std::is_signed_v<std::remove_cvref_t<T2>>))
-struct common_index_type_impl<T1, T2> {
-    using type =
-        std::conditional_t<(sizeof(std::remove_cvref_t<T1>) >=
-                            sizeof(std::remove_cvref_t<T2>)),
-                           std::remove_cvref_t<T1>, std::remove_cvref_t<T2>>;
-};
-
-template <typename S, typename U>
-    requires(valid_extent_index_v<S> && valid_extent_index_v<U> &&
-             std::is_signed_v<std::remove_cvref_t<S>> &&
-             std::is_unsigned_v<std::remove_cvref_t<U>> &&
-             (sizeof(std::remove_cvref_t<U>) < 8))
-struct common_index_type_impl<S, U> {
-  private:
-    static constexpr std::size_t size =
-        (sizeof(std::remove_cvref_t<S>) > sizeof(std::remove_cvref_t<U>))
-            ? sizeof(std::remove_cvref_t<S>)
-            : sizeof(std::remove_cvref_t<U>) * 2;
-
-  public:
-    using type = signed_by_size_t<size>;
-};
-
-template <typename U, typename S>
-    requires(valid_extent_index_v<U> && valid_extent_index_v<S> &&
-             std::is_unsigned_v<std::remove_cvref_t<U>> &&
-             std::is_signed_v<std::remove_cvref_t<S>> &&
-             (sizeof(std::remove_cvref_t<U>) < 8))
-struct common_index_type_impl<U, S>
-    : common_index_type_impl<std::remove_cvref_t<S>, std::remove_cvref_t<U>> {};
-
-template <typename T1, typename T2, typename... Ts>
-    requires(sizeof...(Ts) > 0 &&
-             requires { typename common_index_type_impl<T1, T2>::type; })
-struct common_index_type_impl<T1, T2, Ts...> {
-  public:
-    using type = typename common_index_type_impl<
-        typename common_index_type_impl<T1, T2>::type, Ts...>::type;
-};
-
-} // namespace detail
-
-template <typename... Ts>
-using common_index_type_t =
-    typename detail::common_index_type_impl<Ts...>::type;
-
 [[nodiscard]] constexpr auto to_extents(auto &&shape) {
     using base_t = std::remove_cvref_t<decltype(shape)>;
 
@@ -217,8 +130,8 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
         return false;
     }
 
-    using index_t = common_index_type_t<typename base1_t::index_type,
-                                        typename base2_t::index_type>;
+    using index_t = common_integer_type_t<typename base1_t::index_type,
+                                          typename base2_t::index_type>;
 
     for (std::size_t i = 0; i < base1_t::rank(); i++) {
         if (static_cast<index_t>(in1.extent(i)) !=
@@ -264,8 +177,8 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
                                              ins_t &&...ins) noexcept {
     using base1_t = std::remove_cvref_t<in1_t>;
     using base2_t = std::remove_cvref_t<in2_t>;
-    using index_t = common_index_type_t<typename base1_t::index_type,
-                                        typename base2_t::index_type>;
+    using index_t = common_integer_type_t<typename base1_t::index_type,
+                                          typename base2_t::index_type>;
 
     const auto cexts =
         [&]<std::size_t... Is, std::size_t... Js>(std::index_sequence<Is...>,

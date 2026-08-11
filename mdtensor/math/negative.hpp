@@ -35,14 +35,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
                                       where_t &&where = where_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = [&]() {
-        if constexpr (core::nullopt_t_c<decltype(out)>) {
-            return empty_like<dtype>(in_mds);
-
-        } else {
-            return core::to_output_mdspan(std::forward<decltype(out)>(out));
-        }
-    }();
+    auto out_md = core::resolve_output_like<dtype>(
+        std::forward<decltype(out)>(out), in_mds);
 
     core::batch_with_broadcast<backend>(
         [](auto &&...elems) {

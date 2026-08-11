@@ -7,6 +7,8 @@
  * See README and LICENSE files for full attribution details.
  */
 
+#define BENCHMARK_SKIP_INTEGER_TYPES
+
 #include "benchmarks/common/benchmarking.hpp"
 
 #include "mdtensor/mdtensor.hpp"
