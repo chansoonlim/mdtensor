@@ -20,19 +20,19 @@ struct Target {
 
         const auto in = [&]() {
             if constexpr (std::is_floating_point_v<dtype>) {
-                return md::random::rand<dtype>(len);
+                return md::random::rand<dtype>(md::dims<2>{len, len});
 
             } else {
-                return md::random::randint<dtype>(len);
+                return md::random::randint<dtype>(md::dims<2>{len, len});
             }
         }();
 
-        auto out = md::empty<dtype>(md::dims<1>{1});
+        auto out = md::empty<dtype>(md::dims<1>{len});
 
         benchmark::ClobberMemory();
 
         for (auto _ : state) {
-            static_cast<void>(md::all<bool, false, backend>(in, out));
+            static_cast<void>(md::all<0, bool, false, backend>(in, out));
             benchmark::ClobberMemory();
         }
 
@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
     settings.benchmark_name = "all";
     settings.defaults.dtype = "b";
     settings.defaults.backend = "auto";
-    settings.defaults.range_end = 10'000'000;
+    settings.defaults.range_end = 10'000;
 
     return benchmarking::run<Target>(argc, argv, std::move(settings));
 }

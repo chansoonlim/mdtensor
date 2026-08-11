@@ -30,8 +30,8 @@ enum class Backend {
 namespace detail {
 
 template <std::size_t brank, bool has_escape, mdspan_c io_t, mdspan_c... ios_t>
-constexpr decltype(auto) batch_impl_native(auto &&ufunc, io_t &&io,
-                                           ios_t &&...ios) {
+[[nodiscard]] constexpr decltype(auto)
+batch_impl_native(auto &&ufunc, io_t &&io, ios_t &&...ios) {
     if constexpr (brank == 0) {
         if constexpr (has_escape) {
             return ufunc(unwrap_scalar(std::forward<io_t>(io)),
@@ -98,7 +98,7 @@ constexpr void batch_impl_openmp(auto &&ufunc, io_t &&io, ios_t &&...ios) {
 } // namespace detail
 
 template <Backend backend, std::size_t brank, bool has_escape = false>
-constexpr decltype(auto) batch(auto &&ufunc, auto &&...ios) {
+[[nodiscard]] constexpr decltype(auto) batch(auto &&ufunc, auto &&...ios) {
 #ifdef MDTENSOR_USE_OPENMP
     // TODO: assert when backend is not specified in each funciton call
     // assert(backend != Backend::AUTO);
@@ -137,7 +137,7 @@ constexpr decltype(auto) batch(auto &&ufunc, auto &&...ios) {
 
 template <Backend backend, bool has_escape = false, std::size_t... uranks,
           bool... bcast>
-constexpr decltype(auto)
+[[nodiscard]] constexpr decltype(auto)
 batch_with_broadcast(auto &&ufunc, std::index_sequence<uranks...>,
                      std::integer_sequence<bool, bcast...>, auto &&...ios) {
     // broadcast which bcast = true
@@ -154,7 +154,7 @@ batch_with_broadcast(auto &&ufunc, std::index_sequence<uranks...>,
 }
 
 template <Backend backend, bool has_escape = false, bool... bcast>
-constexpr decltype(auto)
+[[nodiscard]] constexpr decltype(auto)
 batch_with_broadcast(auto &&ufunc, std::integer_sequence<bool, bcast...>,
                      auto &&...ios) {
     return [&]<std::size_t... Is>(std::index_sequence<Is...>) {

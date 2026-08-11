@@ -13,6 +13,28 @@
 #include "logical_or.hpp"
 
 namespace mdtensor {
+namespace rfunc {
+
+template <core::Backend backend>
+constexpr void any_rfunc(auto &&in, auto &&out, auto &&where) {
+    const auto out_mds = core::to_mdspan(std::forward<decltype(out)>(out));
+
+    const auto mask = [&]() {
+        if constexpr (core::nullopt_t_value_type_c<decltype(where)>) {
+            return logical_not<bool, backend>(out_mds);
+
+        } else {
+            return logical_and<bool, backend>(
+                logical_not<bool, backend>(out_mds),
+                std::forward<decltype(where)>(where));
+        }
+    }();
+
+    static_cast<void>(logical_or<void, backend>(std::forward<decltype(in)>(in),
+                                                out_mds, out_mds, mask));
+}
+
+} // namespace rfunc
 
 template <typename dtype = bool, bool keepdims = false,
           core::Backend backend = core::Backend::AUTO, std::integral axes_t,
@@ -32,13 +54,10 @@ template <typename dtype = bool, bool keepdims = false,
     // TODO: move to reduce
     fill<backend>(out_md, false);
 
+    // TODO: use escape for each ufunc to remove mask calculation overhead
     core::reduce<keepdims>(
-        [](auto &&in, auto &&out, auto &&where) {
-            static_cast<void>(logical_or<void, backend>(
-                std::forward<decltype(in)>(in),
-                std::forward<decltype(out)>(out),
-                std::forward<decltype(out)>(out),
-                std::forward<decltype(where)>(where)));
+        [&](auto &&...elems) {
+            rfunc::any_rfunc<backend>(std::forward<decltype(elems)>(elems)...);
         },
         std::integer_sequence<axes_t, axes...>{},
         std::index_sequence<0, 0, 0>{},

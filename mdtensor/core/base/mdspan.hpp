@@ -124,6 +124,12 @@ template <mdspan_c io_t>
 template <typename T>
 using to_mdspan_t = decltype(to_mdspan(std::declval<T>()));
 
+template <typename T>
+using value_type_t = typename std::remove_cvref_t<to_mdspan_t<T>>::value_type;
+
+template <typename T>
+concept nullopt_t_value_type_c = nullopt_t_c<value_type_t<T>>;
+
 template <typename... Ts>
 using common_value_type_t = common_data_type_t<
     typename std::remove_cvref_t<to_mdspan_t<Ts>>::value_type...>;

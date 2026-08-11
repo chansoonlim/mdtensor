@@ -28,16 +28,23 @@ template <bool is_input, std::size_t axis, bool keepdims, mdspan_c io_t,
     }
 }
 
-template <bool keepdims, extents_c bext_t, bool... is_input, mdspan_c... ios_t>
-constexpr void batch_reduced(auto &&func, bext_t &&, std::index_sequence<>,
-                             std::integer_sequence<bool, is_input...>,
-                             ios_t &&...ios) {
-    func(unwrap_scalar(std::forward<ios_t>(ios))...);
+template <bool keepdims, bool has_escape, extents_c bext_t, bool... is_input,
+          mdspan_c... ios_t>
+[[nodiscard]] constexpr decltype(auto)
+batch_reduced(auto &&func, bext_t &&, std::index_sequence<>,
+              std::integer_sequence<bool, is_input...>, ios_t &&...ios) {
+    if constexpr (has_escape) {
+        return func(unwrap_scalar(std::forward<ios_t>(ios))...);
+
+    } else {
+        func(unwrap_scalar(std::forward<ios_t>(ios))...);
+        return;
+    }
 }
 
-template <bool keepdims, extents_c bext_t, std::size_t axis,
+template <bool keepdims, bool has_escape, extents_c bext_t, std::size_t axis,
           std::size_t... axes, bool... is_input, mdspan_c... ios_t>
-constexpr void
+[[nodiscard]] constexpr decltype(auto)
 batch_reduced(auto &&func, bext_t &&bext, std::index_sequence<axis, axes...>,
               std::integer_sequence<bool, is_input...>, ios_t &&...ios) {
     static_assert(sizeof...(is_input) == sizeof...(ios_t));
@@ -45,13 +52,31 @@ batch_reduced(auto &&func, bext_t &&bext, std::index_sequence<axis, axes...>,
 
     using index_t = typename std::remove_cvref_t<bext_t>::index_type;
 
-    for (index_t i = 0; i < bext.extent(axis); i++) {
-        batch_reduced<keepdims>(std::forward<decltype(func)>(func),
-                                std::forward<decltype(bext)>(bext),
-                                std::index_sequence<axes...>{},
-                                std::integer_sequence<bool, is_input...>{},
-                                reduce_input<is_input, axis, keepdims>(
-                                    std::forward<ios_t>(ios), i)...);
+    if constexpr (has_escape) {
+        for (index_t i = 0; i < bext.extent(axis); i++) {
+            if (!batch_reduced<keepdims, has_escape>(
+                    std::forward<decltype(func)>(func),
+                    std::forward<decltype(bext)>(bext),
+                    std::index_sequence<axes...>{},
+                    std::integer_sequence<bool, is_input...>{},
+                    reduce_input<is_input, axis, keepdims>(
+                        std::forward<ios_t>(ios), i)...)) {
+                return false;
+            }
+        }
+        return true;
+
+    } else {
+        for (index_t i = 0; i < bext.extent(axis); i++) {
+            batch_reduced<keepdims, has_escape>(
+                std::forward<decltype(func)>(func),
+                std::forward<decltype(bext)>(bext),
+                std::index_sequence<axes...>{},
+                std::integer_sequence<bool, is_input...>{},
+                reduce_input<is_input, axis, keepdims>(std::forward<ios_t>(ios),
+                                                       i)...);
+        }
+        return;
     }
 }
 
@@ -133,11 +158,12 @@ broadcast_only_input(std::index_sequence<uranks...>,
 
 } // namespace detail
 
-template <bool keepdims = false, std::integral axes_t, axes_t... axes,
-          std::size_t... uranks, bool... is_input>
-constexpr void reduce(auto &&func, std::integer_sequence<axes_t, axes...>,
-                      std::index_sequence<uranks...>,
-                      std::integer_sequence<bool, is_input...>, auto &&...ios) {
+template <bool keepdims = false, bool has_escape = false, std::integral axes_t,
+          axes_t... axes, std::size_t... uranks, bool... is_input>
+[[nodiscard]] constexpr decltype(auto)
+reduce(auto &&func, std::integer_sequence<axes_t, axes...>,
+       std::index_sequence<uranks...>, std::integer_sequence<bool, is_input...>,
+       auto &&...ios) {
     // broadcast inputs only
     const auto [ios_bcast, ins_bexts] =
         detail::broadcast_only_input(std::index_sequence<uranks...>{},
@@ -164,9 +190,9 @@ constexpr void reduce(auto &&func, std::integer_sequence<axes_t, axes...>,
     }();
 
     // batch
-    [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        [&]<std::size_t... Js>(std::index_sequence<Js...>) {
-            detail::batch_reduced<keepdims>(
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return [&]<std::size_t... Js>(std::index_sequence<Js...>) {
+            return detail::batch_reduced<keepdims, has_escape>(
                 std::forward<decltype(func)>(func), ins_bexts,
                 std::index_sequence<axes_sorted[Js]...>{},
                 std::integer_sequence<bool, is_input...>{},

@@ -24,5 +24,4 @@ allclose(auto &&in1, auto &&in2, rtol_t &&rtol = rtol_t{1e-05},
         std::forward<decltype(rtol)>(rtol), std::forward<decltype(atol)>(atol),
         std::nullopt, equal_nan));
 }
-
 } // namespace mdtensor
