@@ -30,17 +30,17 @@ enum class Backend {
 namespace detail {
 
 template <std::size_t brank, mdspan_c io_t, mdspan_c... ios_t>
-constexpr void batch_impl_native(auto &&func, io_t &&io, ios_t &&...ios) {
+constexpr void batch_impl_native(auto &&ufunc, io_t &&io, ios_t &&...ios) {
     if constexpr (brank == 0) {
-        func(unwrap_scalar(std::forward<io_t>(io)),
-             unwrap_scalar(std::forward<ios_t>(ios))...);
+        ufunc(unwrap_scalar(std::forward<io_t>(io)),
+              unwrap_scalar(std::forward<ios_t>(ios))...);
 
     } else {
         using index_t = typename std::remove_cvref_t<io_t>::index_type;
 
         for (index_t i = 0; i < io.extent(0); i++) {
             batch_impl_native<brank - 1>(
-                std::forward<decltype(func)>(func),
+                std::forward<decltype(ufunc)>(ufunc),
                 submdspan_from_left(std::forward<io_t>(io), i),
                 submdspan_from_left(std::forward<ios_t>(ios), i)...);
         }
@@ -50,10 +50,10 @@ constexpr void batch_impl_native(auto &&func, io_t &&io, ios_t &&...ios) {
 #ifdef MDTENSOR_USE_OPENMP
 
 template <std::size_t brank, mdspan_c io_t, mdspan_c... ios_t>
-void batch_impl_openmp(auto &&func, io_t &&io, ios_t &&...ios) {
+void batch_impl_openmp(auto &&ufunc, io_t &&io, ios_t &&...ios) {
     if constexpr (brank == 0) {
-        func(unwrap_scalar(std::forward<io_t>(io)),
-             unwrap_scalar(std::forward<ios_t>(ios))...);
+        ufunc(unwrap_scalar(std::forward<io_t>(io)),
+              unwrap_scalar(std::forward<ios_t>(ios))...);
 
     } else {
         // Parallelize only the outermost batch axis.
@@ -62,7 +62,7 @@ void batch_impl_openmp(auto &&func, io_t &&io, ios_t &&...ios) {
 #pragma omp parallel for
         for (index_t i = 0; i < io.extent(0); i++) {
             batch_impl_native<brank - 1>(
-                std::forward<decltype(func)>(func),
+                std::forward<decltype(ufunc)>(ufunc),
                 submdspan_from_left(std::forward<io_t>(io), i),
                 submdspan_from_left(std::forward<ios_t>(ios), i)...);
         }
@@ -74,7 +74,7 @@ void batch_impl_openmp(auto &&func, io_t &&io, ios_t &&...ios) {
 } // namespace detail
 
 template <Backend backend, std::size_t brank>
-constexpr void batch(auto &&func, auto &&...ios) {
+constexpr void batch(auto &&ufunc, auto &&...ios) {
     // TODO: assert when backend is not specified in each funciton call
     // assert(backend != Backend::AUTO);
     [[maybe_unused]] constexpr auto be = [&]() {
@@ -95,21 +95,21 @@ constexpr void batch(auto &&func, auto &&...ios) {
     ) {
 #ifdef MDTENSOR_USE_OPENMP
         detail::batch_impl_openmp<brank>(
-            std::forward<decltype(func)>(func),
+            std::forward<decltype(ufunc)>(ufunc),
             to_mdspan(std::forward<decltype(ios)>(ios))...);
 #endif
 
     } else {
         detail::batch_impl_native<brank>(
-            std::forward<decltype(func)>(func),
+            std::forward<decltype(ufunc)>(ufunc),
             to_mdspan(std::forward<decltype(ios)>(ios))...);
     }
 }
 
 template <Backend backend, std::size_t... uranks, bool... bcast>
-constexpr void batch_with_broadcast(auto &&func, std::index_sequence<uranks...>,
-                                    std::integer_sequence<bool, bcast...>,
-                                    auto &&...ios) {
+constexpr void
+batch_with_broadcast(auto &&ufunc, std::index_sequence<uranks...>,
+                     std::integer_sequence<bool, bcast...>, auto &&...ios) {
     // broadcast which bcast = true
     const auto [ios_bcast, bexts] =
         broadcast(std::index_sequence<uranks...>{},
@@ -118,17 +118,17 @@ constexpr void batch_with_broadcast(auto &&func, std::index_sequence<uranks...>,
 
     // batch
     [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        batch<backend, bexts.rank()>(std::forward<decltype(func)>(func),
+        batch<backend, bexts.rank()>(std::forward<decltype(ufunc)>(ufunc),
                                      std::get<Is>(ios_bcast)...);
     }(std::make_index_sequence<sizeof...(ios)>{});
 }
 
 template <Backend backend, bool... bcast>
-constexpr void batch_with_broadcast(auto &&func,
+constexpr void batch_with_broadcast(auto &&ufunc,
                                     std::integer_sequence<bool, bcast...>,
                                     auto &&...ios) {
     [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        batch_with_broadcast<backend>(std::forward<decltype(func)>(func),
+        batch_with_broadcast<backend>(std::forward<decltype(ufunc)>(ufunc),
                                       std::index_sequence<((void)Is, 0)...>{},
                                       std::integer_sequence<bool, bcast...>{},
                                       std::forward<decltype(ios)>(ios)...);
