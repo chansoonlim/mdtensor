@@ -516,6 +516,37 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
 }
 
 template <extents_c in_t>
+[[nodiscard]] consteval bool is_always_different_extents() noexcept {
+    return false;
+}
+
+template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
+[[nodiscard]] consteval bool is_always_different_extents() noexcept {
+    using base1_t = std::remove_cvref_t<in1_t>;
+    using base2_t = std::remove_cvref_t<in2_t>;
+
+    if constexpr (base1_t::rank() != base2_t::rank()) {
+        return true;
+
+    } else if constexpr ([&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                             return ((base1_t::static_extent(Is) !=
+                                          base2_t::static_extent(Is) &&
+                                      base1_t::static_extent(Is) != dyn &&
+                                      base2_t::static_extent(Is) != dyn) ||
+                                     ...);
+                         }(std::make_index_sequence<base1_t::rank()>{})) {
+        return true;
+    }
+
+    if constexpr (sizeof...(ins_t) != 0) {
+        return is_always_same_extents<in2_t, ins_t...>();
+
+    } else {
+        return false;
+    }
+}
+
+template <extents_c in_t>
 [[nodiscard]] constexpr bool is_same_extents(in_t &&in) noexcept {
     return true;
 }
@@ -528,7 +559,7 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
     using base1_t = std::remove_cvref_t<in1_t>;
     using base2_t = std::remove_cvref_t<in2_t>;
 
-    if constexpr (base1_t::rank() != base2_t::rank()) {
+    if constexpr (is_always_different_extents<base1_t, base2_t>()) {
         return false;
     }
 
@@ -789,8 +820,26 @@ concept mdspan_c = is_mdspan_v<std::remove_cvref_t<T>>;
     }
 }
 
+template <mdspan_c io_t>
+[[nodiscard]] constexpr decltype(auto) unwrap_scalar(io_t &&io) {
+    using base_t = std::remove_cvref_t<io_t>;
+
+    if constexpr (base_t::rank() == 0) {
+        return std::forward<io_t>(io)();
+
+    } else {
+        return std::forward<io_t>(io);
+    }
+}
+
 template <typename T>
 using to_mdspan_t = decltype(to_mdspan(std::declval<T>()));
+
+template <typename T>
+using value_type_t = typename std::remove_cvref_t<to_mdspan_t<T>>::value_type;
+
+template <typename T>
+concept nullopt_t_value_type_c = nullopt_t_c<value_type_t<T>>;
 
 template <typename... Ts>
 using common_value_type_t = common_data_type_t<
@@ -1773,19 +1822,42 @@ enum class Backend {
 
 namespace detail {
 
-template <std::size_t brank, mdspan_c io_t, mdspan_c... ios_t>
-constexpr void batch_impl_native(auto &&func, io_t &&io, ios_t &&...ios) {
+template <std::size_t brank, bool has_escape, mdspan_c io_t, mdspan_c... ios_t>
+[[nodiscard]] constexpr decltype(auto)
+batch_impl_native(auto &&ufunc, io_t &&io, ios_t &&...ios) {
     if constexpr (brank == 0) {
-        func(std::forward<io_t>(io), std::forward<ios_t>(ios)...);
+        if constexpr (has_escape) {
+            return ufunc(unwrap_scalar(std::forward<io_t>(io)),
+                         unwrap_scalar(std::forward<ios_t>(ios))...);
+
+        } else {
+            ufunc(unwrap_scalar(std::forward<io_t>(io)),
+                  unwrap_scalar(std::forward<ios_t>(ios))...);
+            return;
+        }
 
     } else {
         using index_t = typename std::remove_cvref_t<io_t>::index_type;
 
-        for (index_t i = 0; i < io.extent(0); i++) {
-            batch_impl_native<brank - 1>(
-                std::forward<decltype(func)>(func),
-                submdspan_from_left(std::forward<io_t>(io), i),
-                submdspan_from_left(std::forward<ios_t>(ios), i)...);
+        if constexpr (has_escape) {
+            for (index_t i = 0; i < io.extent(0); i++) {
+                if (!batch_impl_native<brank - 1, has_escape>(
+                        std::forward<decltype(ufunc)>(ufunc),
+                        submdspan_from_left(std::forward<io_t>(io), i),
+                        submdspan_from_left(std::forward<ios_t>(ios), i)...)) {
+                    return false;
+                }
+            }
+            return true;
+
+        } else {
+            for (index_t i = 0; i < io.extent(0); i++) {
+                batch_impl_native<brank - 1, has_escape>(
+                    std::forward<decltype(ufunc)>(ufunc),
+                    submdspan_from_left(std::forward<io_t>(io), i),
+                    submdspan_from_left(std::forward<ios_t>(ios), i)...);
+            }
+            return;
         }
     }
 }
@@ -1793,18 +1865,21 @@ constexpr void batch_impl_native(auto &&func, io_t &&io, ios_t &&...ios) {
 #ifdef MDTENSOR_USE_OPENMP
 
 template <std::size_t brank, mdspan_c io_t, mdspan_c... ios_t>
-void batch_impl_openmp(auto &&func, io_t &&io, ios_t &&...ios) {
+constexpr void batch_impl_openmp(auto &&ufunc, io_t &&io, ios_t &&...ios) {
+    // NOTE: OpenMP does not support return value from parallel region.
+    // NOTE: Parallelize only the outermost batch axis.
+
     if constexpr (brank == 0) {
-        func(std::forward<io_t>(io), std::forward<ios_t>(ios)...);
+        ufunc(unwrap_scalar(std::forward<io_t>(io)),
+              unwrap_scalar(std::forward<ios_t>(ios))...);
 
     } else {
-        // Parallelize only the outermost batch axis.
         using index_t = typename std::remove_cvref_t<io_t>::index_type;
 
 #pragma omp parallel for
         for (index_t i = 0; i < io.extent(0); i++) {
-            batch_impl_native<brank - 1>(
-                std::forward<decltype(func)>(func),
+            batch_impl_native<brank - 1, false>(
+                std::forward<decltype(ufunc)>(ufunc),
                 submdspan_from_left(std::forward<io_t>(io), i),
                 submdspan_from_left(std::forward<ios_t>(ios), i)...);
         }
@@ -1815,11 +1890,12 @@ void batch_impl_openmp(auto &&func, io_t &&io, ios_t &&...ios) {
 
 } // namespace detail
 
-template <Backend backend, std::size_t brank>
-constexpr void batch(auto &&func, auto &&...ios) {
+template <Backend backend, std::size_t brank, bool has_escape = false>
+[[nodiscard]] constexpr decltype(auto) batch(auto &&ufunc, auto &&...ios) {
+#ifdef MDTENSOR_USE_OPENMP
     // TODO: assert when backend is not specified in each funciton call
     // assert(backend != Backend::AUTO);
-    [[maybe_unused]] constexpr auto be = [&]() {
+    constexpr auto backend_real = [&]() {
         if constexpr (backend == Backend::AUTO) {
             return Backend::NATIVE; // temporary approach.
 
@@ -1827,31 +1903,36 @@ constexpr void batch(auto &&func, auto &&...ios) {
             return backend;
         }
     }();
+#endif
 
     if constexpr (
 #ifdef MDTENSOR_USE_OPENMP
-        be == Backend::OPENMP
+        backend_real == Backend::OPENMP
 #else
         false
 #endif
     ) {
 #ifdef MDTENSOR_USE_OPENMP
+        static_assert(!has_escape,
+                      "OpenMP backend does not support return value.");
         detail::batch_impl_openmp<brank>(
-            std::forward<decltype(func)>(func),
+            std::forward<decltype(ufunc)>(ufunc),
             to_mdspan(std::forward<decltype(ios)>(ios))...);
+        return;
 #endif
 
     } else {
-        detail::batch_impl_native<brank>(
-            std::forward<decltype(func)>(func),
+        return detail::batch_impl_native<brank, has_escape>(
+            std::forward<decltype(ufunc)>(ufunc),
             to_mdspan(std::forward<decltype(ios)>(ios))...);
     }
 }
 
-template <Backend backend, std::size_t... uranks, bool... bcast>
-constexpr void batch_with_broadcast(auto &&func, std::index_sequence<uranks...>,
-                                    std::integer_sequence<bool, bcast...>,
-                                    auto &&...ios) {
+template <Backend backend, bool has_escape = false, std::size_t... uranks,
+          bool... bcast>
+[[nodiscard]] constexpr decltype(auto)
+batch_with_broadcast(auto &&ufunc, std::index_sequence<uranks...>,
+                     std::integer_sequence<bool, bcast...>, auto &&...ios) {
     // broadcast which bcast = true
     const auto [ios_bcast, bexts] =
         broadcast(std::index_sequence<uranks...>{},
@@ -1859,21 +1940,22 @@ constexpr void batch_with_broadcast(auto &&func, std::index_sequence<uranks...>,
                   std::forward<decltype(ios)>(ios)...);
 
     // batch
-    [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        batch<backend, bexts.rank()>(std::forward<decltype(func)>(func),
-                                     std::get<Is>(ios_bcast)...);
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return batch<backend, bexts.rank(), has_escape>(
+            std::forward<decltype(ufunc)>(ufunc), std::get<Is>(ios_bcast)...);
     }(std::make_index_sequence<sizeof...(ios)>{});
 }
 
-template <Backend backend, bool... bcast>
-constexpr void batch_with_broadcast(auto &&func,
-                                    std::integer_sequence<bool, bcast...>,
-                                    auto &&...ios) {
-    [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        batch_with_broadcast<backend>(std::forward<decltype(func)>(func),
-                                      std::index_sequence<((void)Is, 0)...>{},
-                                      std::integer_sequence<bool, bcast...>{},
-                                      std::forward<decltype(ios)>(ios)...);
+template <Backend backend, bool has_escape = false, bool... bcast>
+[[nodiscard]] constexpr decltype(auto)
+batch_with_broadcast(auto &&ufunc, std::integer_sequence<bool, bcast...>,
+                     auto &&...ios) {
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return batch_with_broadcast<backend, has_escape>(
+            std::forward<decltype(ufunc)>(ufunc),
+            std::index_sequence<((void)Is, 0)...>{},
+            std::integer_sequence<bool, bcast...>{},
+            std::forward<decltype(ios)>(ios)...);
     }(std::make_index_sequence<sizeof...(ios)>{});
 }
 
@@ -1908,16 +1990,23 @@ template <bool is_input, std::size_t axis, bool keepdims, mdspan_c io_t,
     }
 }
 
-template <bool keepdims, extents_c bext_t, bool... is_input, mdspan_c... ios_t>
-constexpr void batch_reduced(auto &&func, bext_t &&, std::index_sequence<>,
-                             std::integer_sequence<bool, is_input...>,
-                             ios_t &&...ios) {
-    func(std::forward<ios_t>(ios)...);
+template <bool keepdims, bool has_escape, extents_c bext_t, bool... is_input,
+          mdspan_c... ios_t>
+[[nodiscard]] constexpr decltype(auto)
+batch_reduced(auto &&func, bext_t &&, std::index_sequence<>,
+              std::integer_sequence<bool, is_input...>, ios_t &&...ios) {
+    if constexpr (has_escape) {
+        return func(unwrap_scalar(std::forward<ios_t>(ios))...);
+
+    } else {
+        func(unwrap_scalar(std::forward<ios_t>(ios))...);
+        return;
+    }
 }
 
-template <bool keepdims, extents_c bext_t, std::size_t axis,
+template <bool keepdims, bool has_escape, extents_c bext_t, std::size_t axis,
           std::size_t... axes, bool... is_input, mdspan_c... ios_t>
-constexpr void
+[[nodiscard]] constexpr decltype(auto)
 batch_reduced(auto &&func, bext_t &&bext, std::index_sequence<axis, axes...>,
               std::integer_sequence<bool, is_input...>, ios_t &&...ios) {
     static_assert(sizeof...(is_input) == sizeof...(ios_t));
@@ -1925,13 +2014,31 @@ batch_reduced(auto &&func, bext_t &&bext, std::index_sequence<axis, axes...>,
 
     using index_t = typename std::remove_cvref_t<bext_t>::index_type;
 
-    for (index_t i = 0; i < bext.extent(axis); i++) {
-        batch_reduced<keepdims>(std::forward<decltype(func)>(func),
-                                std::forward<decltype(bext)>(bext),
-                                std::index_sequence<axes...>{},
-                                std::integer_sequence<bool, is_input...>{},
-                                reduce_input<is_input, axis, keepdims>(
-                                    std::forward<ios_t>(ios), i)...);
+    if constexpr (has_escape) {
+        for (index_t i = 0; i < bext.extent(axis); i++) {
+            if (!batch_reduced<keepdims, has_escape>(
+                    std::forward<decltype(func)>(func),
+                    std::forward<decltype(bext)>(bext),
+                    std::index_sequence<axes...>{},
+                    std::integer_sequence<bool, is_input...>{},
+                    reduce_input<is_input, axis, keepdims>(
+                        std::forward<ios_t>(ios), i)...)) {
+                return false;
+            }
+        }
+        return true;
+
+    } else {
+        for (index_t i = 0; i < bext.extent(axis); i++) {
+            batch_reduced<keepdims, has_escape>(
+                std::forward<decltype(func)>(func),
+                std::forward<decltype(bext)>(bext),
+                std::index_sequence<axes...>{},
+                std::integer_sequence<bool, is_input...>{},
+                reduce_input<is_input, axis, keepdims>(std::forward<ios_t>(ios),
+                                                       i)...);
+        }
+        return;
     }
 }
 
@@ -2013,11 +2120,12 @@ broadcast_only_input(std::index_sequence<uranks...>,
 
 } // namespace detail
 
-template <bool keepdims = false, std::integral axes_t, axes_t... axes,
-          std::size_t... uranks, bool... is_input>
-constexpr void reduce(auto &&func, std::integer_sequence<axes_t, axes...>,
-                      std::index_sequence<uranks...>,
-                      std::integer_sequence<bool, is_input...>, auto &&...ios) {
+template <bool keepdims = false, bool has_escape = false, std::integral axes_t,
+          axes_t... axes, std::size_t... uranks, bool... is_input>
+[[nodiscard]] constexpr decltype(auto)
+reduce(auto &&func, std::integer_sequence<axes_t, axes...>,
+       std::index_sequence<uranks...>, std::integer_sequence<bool, is_input...>,
+       auto &&...ios) {
     // broadcast inputs only
     const auto [ios_bcast, ins_bexts] =
         detail::broadcast_only_input(std::index_sequence<uranks...>{},
@@ -2044,9 +2152,9 @@ constexpr void reduce(auto &&func, std::integer_sequence<axes_t, axes...>,
     }();
 
     // batch
-    [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        [&]<std::size_t... Js>(std::index_sequence<Js...>) {
-            detail::batch_reduced<keepdims>(
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return [&]<std::size_t... Js>(std::index_sequence<Js...>) {
+            return detail::batch_reduced<keepdims, has_escape>(
                 std::forward<decltype(func)>(func), ins_bexts,
                 std::index_sequence<axes_sorted[Js]...>{},
                 std::integer_sequence<bool, is_input...>{},
@@ -2141,7 +2249,7 @@ template <extents_c exts_t>
     auto out = make_tensor<value_t>(std::forward<exts_t>(exts));
 
     batch<Backend::NATIVE, in_mds.rank()>(
-        [&](auto &&in, auto &&out) { out() = in(); }, in_mds,
+        [&](auto &&in, auto &&out) { out = in; }, in_mds,
         make_reshape_view(out, in_mds.extents()));
 
     return out;
@@ -2699,7 +2807,7 @@ template <typename dtype = void>
 namespace mdtensor {
 namespace ufunc {
 
-constexpr void copy_ufunc(auto &&in, auto &&out) { out() = in(); }
+constexpr void copy_ufunc(auto &&in, auto &&out) { out = in; }
 
 } // namespace ufunc
 
@@ -2817,7 +2925,7 @@ template <std::size_t N, typename dtype = double,
 namespace mdtensor {
 namespace ufunc {
 
-constexpr void full_ufunc(auto &&out, auto &&val) { out() = val(); }
+constexpr void full_ufunc(auto &&out, auto &&val) { out = val; }
 
 } // namespace ufunc
 
@@ -2896,14 +3004,14 @@ namespace ufunc {
 
 constexpr void add_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    out() = in1() + in2();
+    out = in1 + in2;
 }
 
 } // namespace ufunc
@@ -2952,14 +3060,14 @@ namespace ufunc {
 constexpr void multiply_ufunc(auto &&in1, auto &&in2, auto &&out,
                               auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    out() = in1() * in2();
+    out = in1 * in2;
 }
 
 } // namespace ufunc
@@ -3008,14 +3116,14 @@ namespace ufunc {
 constexpr void subtract_ufunc(auto &&in1, auto &&in2, auto &&out,
                               auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    out() = in1() - in2();
+    out = in1 - in2;
 }
 
 } // namespace ufunc
@@ -3296,52 +3404,52 @@ sqrt_newton_raphson(const dtype &x, const dtype &curr, const dtype &prev) {
 }
 
 constexpr void sqrt_ufunc_native(auto &&in, auto &&out) {
-    using calc_t = core::common_data_type_t<decltype(in()), float>;
+    using calc_t = core::common_data_type_t<decltype(in), float>;
 
     if constexpr (requires {
-                      { std::isnan(in()) } -> std::convertible_to<bool>;
+                      { std::isnan(in) } -> std::convertible_to<bool>;
                   }) {
-        if (std::isnan(in())) {
-            out() = in();
+        if (std::isnan(in)) {
+            out = in;
             return;
         }
     }
 
     if constexpr (requires {
-                      { std::isinf(in()) } -> std::convertible_to<bool>;
+                      { std::isinf(in) } -> std::convertible_to<bool>;
                   }) {
-        if (std::isinf(in())) {
-            out() = in();
+        if (std::isinf(in)) {
+            out = in;
             return;
         }
     }
 
-    if constexpr (std::is_same_v<std::remove_cvref_t<decltype(in())>, bool>) {
-        out() = static_cast<calc_t>(in());
+    if constexpr (std::is_same_v<std::remove_cvref_t<decltype(in)>, bool>) {
+        out = static_cast<calc_t>(in);
         return;
 
     } else {
-        out() = (in() >= 0 && in() < std::numeric_limits<calc_t>::infinity())
-                    ? sqrt_newton_raphson(static_cast<calc_t>(in()),
-                                          static_cast<calc_t>(in()),
-                                          static_cast<calc_t>(0))
-                    : std::numeric_limits<calc_t>::quiet_NaN();
+        out = (in >= 0 && in < std::numeric_limits<calc_t>::infinity())
+                  ? sqrt_newton_raphson(static_cast<calc_t>(in),
+                                        static_cast<calc_t>(in),
+                                        static_cast<calc_t>(0))
+                  : std::numeric_limits<calc_t>::quiet_NaN();
     }
 }
 
 constexpr void sqrt_ufunc(auto &&in, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
 #ifdef REAL_GCC
     if (!std::is_constant_evaluated()) {
-        if constexpr (requires { out() = std::sqrt(in()); }) {
-            out() = std::sqrt(in());
+        if constexpr (requires { out = std::sqrt(in); }) {
+            out = std::sqrt(in);
             return;
         }
     }
@@ -3390,7 +3498,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
 namespace mdtensor {
 namespace ufunc {
 
-constexpr void fill_ufunc(auto &&out, auto &&val) { out() = val; }
+constexpr void fill_ufunc(auto &&out, auto &&val) { out = val; }
 
 } // namespace ufunc
 
@@ -3521,7 +3629,7 @@ constexpr void cholesky_to(auto &&in, auto &&out, auto &&valid,
     const auto run_batch = [&]<bool upper_v>() {
         core::batch_with_broadcast<backend>(
             [](auto &&in, auto &&out, auto &&valid) {
-                valid() = ufunc::cholesky_ufunc<upper_v>(
+                valid = ufunc::cholesky_ufunc<upper_v>(
                     std::forward<decltype(in)>(in),
                     std::forward<decltype(out)>(out));
             },
@@ -3582,22 +3690,22 @@ namespace ufunc {
 
 constexpr void absolute_ufunc(auto &&in, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    if constexpr (std::is_signed_v<std::remove_cvref_t<decltype(in())>>) {
+    if constexpr (std::is_signed_v<std::remove_cvref_t<decltype(in)>>) {
 #ifdef REAL_GCC // NOTE: std::abs is not constexpr in clang 16.
-        out() = std::abs(in());
+        out = std::abs(in);
 #else
-        out() = in() < 0 ? -in() : in();
+        out = in < 0 ? -in : in;
 #endif
 
     } else {
-        out() = in();
+        out = in;
     }
 }
 
@@ -3728,8 +3836,8 @@ template <core::Backend backend = core::Backend::AUTO>
 constexpr void inv_to(auto &&in, auto &&out, auto &&valid) {
     core::batch_with_broadcast<backend>(
         [](auto &&in, auto &&out, auto &&valid) {
-            valid() = ufunc::inv_ufunc(std::forward<decltype(in)>(in),
-                                       std::forward<decltype(out)>(out));
+            valid = ufunc::inv_ufunc(std::forward<decltype(in)>(in),
+                                     std::forward<decltype(out)>(out));
         },
         std::index_sequence<2, 2, 0>{},
         std::integer_sequence<bool, true, false, false>{},
@@ -4956,9 +5064,9 @@ constexpr void solve_to(auto &&a, auto &&b, auto &&x, auto &&valid) {
 
     core::batch_with_broadcast<backend>(
         [](auto &&a, auto &&b, auto &&x, auto &&valid) {
-            valid() = ufunc::solve_ufunc(std::forward<decltype(a)>(a),
-                                         std::forward<decltype(b)>(b),
-                                         std::forward<decltype(x)>(x));
+            valid = ufunc::solve_ufunc(std::forward<decltype(a)>(a),
+                                       std::forward<decltype(b)>(b),
+                                       std::forward<decltype(x)>(x));
         },
         std::index_sequence<2, rhs_rank, rhs_rank, 0>{},
         std::integer_sequence<bool, true, true, false, false>{},
@@ -5061,14 +5169,14 @@ namespace ufunc {
 constexpr void logical_and_ufunc(auto &&in1, auto &&in2, auto &&out,
                                  auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    out() = (static_cast<bool>(in1()) && static_cast<bool>(in2()));
+    out = (static_cast<bool>(in1) && static_cast<bool>(in2));
 }
 
 } // namespace ufunc
@@ -5101,6 +5209,27 @@ logical_and(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/logical_and.hpp
 
 namespace mdtensor {
+namespace rfunc {
+
+template <core::Backend backend>
+constexpr void all_rfunc(auto &&in, auto &&out, auto &&where) {
+    const auto out_mds = core::to_mdspan(std::forward<decltype(out)>(out));
+
+    const auto mask = [&]() {
+        if constexpr (core::nullopt_t_value_type_c<decltype(where)>) {
+            return out_mds;
+
+        } else {
+            return logical_and<bool, backend>(
+                out_mds, std::forward<decltype(where)>(where));
+        }
+    }();
+
+    static_cast<void>(logical_and<void, backend>(std::forward<decltype(in)>(in),
+                                                 out_mds, out_mds, mask));
+}
+
+} // namespace rfunc
 
 template <typename dtype = bool, bool keepdims = false,
           core::Backend backend = core::Backend::AUTO, std::integral axes_t,
@@ -5120,13 +5249,10 @@ template <typename dtype = bool, bool keepdims = false,
     // TODO: move to reduce
     fill<backend>(out_md, true);
 
+    // TODO: use escape for each ufunc to remove mask calculation overhead
     core::reduce<keepdims>(
-        [](auto &&in, auto &&out, auto &&where) {
-            static_cast<void>(logical_and<void, backend>(
-                std::forward<decltype(in)>(in),
-                std::forward<decltype(out)>(out),
-                std::forward<decltype(out)>(out),
-                std::forward<decltype(where)>(where)));
+        [&](auto &&...elems) {
+            rfunc::all_rfunc<backend>(std::forward<decltype(elems)>(elems)...);
         },
         std::integer_sequence<axes_t, axes...>{},
         std::index_sequence<0, 0, 0>{},
@@ -5188,12 +5314,12 @@ namespace ufunc {
 constexpr void isclose_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&rtol,
                              auto &&atol, const bool equal_nan) {
     if constexpr (requires {
-                      { std::isnan(in1()) } -> std::convertible_to<bool>;
-                      { std::isnan(in2()) } -> std::convertible_to<bool>;
+                      { std::isnan(in1) } -> std::convertible_to<bool>;
+                      { std::isnan(in2) } -> std::convertible_to<bool>;
                   }) {
         if (equal_nan) {
-            if (std::isnan(in1()) && std::isnan(in2())) {
-                out() = true;
+            if (std::isnan(in1) && std::isnan(in2)) {
+                out = true;
                 return;
             }
         }
@@ -5201,26 +5327,26 @@ constexpr void isclose_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&rtol,
 
     // if both inputs are inf and same sign, return true (numpy-like)
     if constexpr (requires {
-                      { std::isinf(in1()) } -> std::convertible_to<bool>;
-                      { std::isinf(in2()) } -> std::convertible_to<bool>;
-                      { std::signbit(in1()) } -> std::convertible_to<bool>;
-                      { std::signbit(in2()) } -> std::convertible_to<bool>;
+                      { std::isinf(in1) } -> std::convertible_to<bool>;
+                      { std::isinf(in2) } -> std::convertible_to<bool>;
+                      { std::signbit(in1) } -> std::convertible_to<bool>;
+                      { std::signbit(in2) } -> std::convertible_to<bool>;
                   }) {
-        if (std::isinf(in1()) && std::isinf(in2()) &&
-            std::signbit(in1()) == std::signbit(in2())) {
-            out() = true;
+        if (std::isinf(in1) && std::isinf(in2) &&
+            std::signbit(in1) == std::signbit(in2)) {
+            out = true;
             return;
         }
     }
 
-    using out_t = std::remove_cvref_t<decltype(out())>;
-    using calc_t = core::common_data_type_t<decltype(in1()), decltype(in2()),
-                                            decltype(rtol()), decltype(atol())>;
+    using out_t = std::remove_cvref_t<decltype(out)>;
+    using calc_t = core::common_data_type_t<decltype(in1), decltype(in2),
+                                            decltype(rtol), decltype(atol)>;
 
-    out() = static_cast<out_t>(
-        absolute(static_cast<calc_t>(in1()) - static_cast<calc_t>(in2())) <=
-        (static_cast<calc_t>(atol()) +
-         static_cast<calc_t>(rtol()) * absolute(static_cast<calc_t>(in2()))));
+    out = static_cast<out_t>(
+        absolute(static_cast<calc_t>(in1) - static_cast<calc_t>(in2)) <=
+        (static_cast<calc_t>(atol) +
+         static_cast<calc_t>(rtol) * absolute(static_cast<calc_t>(in2))));
 }
 
 } // namespace ufunc
@@ -5271,7 +5397,6 @@ allclose(auto &&in1, auto &&in2, rtol_t &&rtol = rtol_t{1e-05},
         std::forward<decltype(rtol)>(rtol), std::forward<decltype(atol)>(atol),
         std::nullopt, equal_nan));
 }
-
 } // namespace mdtensor
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/allclose.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/any.hpp
@@ -5303,14 +5428,14 @@ namespace ufunc {
 constexpr void logical_or_ufunc(auto &&in1, auto &&in2, auto &&out,
                                 auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    out() = (static_cast<bool>(in1()) || static_cast<bool>(in2()));
+    out = (static_cast<bool>(in1) || static_cast<bool>(in2));
 }
 
 } // namespace ufunc
@@ -5343,6 +5468,28 @@ logical_or(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/logical_or.hpp
 
 namespace mdtensor {
+namespace rfunc {
+
+template <core::Backend backend>
+constexpr void any_rfunc(auto &&in, auto &&out, auto &&where) {
+    const auto out_mds = core::to_mdspan(std::forward<decltype(out)>(out));
+
+    const auto mask = [&]() {
+        if constexpr (core::nullopt_t_value_type_c<decltype(where)>) {
+            return logical_not<bool, backend>(out_mds);
+
+        } else {
+            return logical_and<bool, backend>(
+                logical_not<bool, backend>(out_mds),
+                std::forward<decltype(where)>(where));
+        }
+    }();
+
+    static_cast<void>(logical_or<void, backend>(std::forward<decltype(in)>(in),
+                                                out_mds, out_mds, mask));
+}
+
+} // namespace rfunc
 
 template <typename dtype = bool, bool keepdims = false,
           core::Backend backend = core::Backend::AUTO, std::integral axes_t,
@@ -5362,13 +5509,10 @@ template <typename dtype = bool, bool keepdims = false,
     // TODO: move to reduce
     fill<backend>(out_md, false);
 
+    // TODO: use escape for each ufunc to remove mask calculation overhead
     core::reduce<keepdims>(
-        [](auto &&in, auto &&out, auto &&where) {
-            static_cast<void>(logical_or<void, backend>(
-                std::forward<decltype(in)>(in),
-                std::forward<decltype(out)>(out),
-                std::forward<decltype(out)>(out),
-                std::forward<decltype(where)>(where)));
+        [&](auto &&...elems) {
+            rfunc::any_rfunc<backend>(std::forward<decltype(elems)>(elems)...);
         },
         std::integer_sequence<axes_t, axes...>{},
         std::index_sequence<0, 0, 0>{},
@@ -5419,49 +5563,20 @@ namespace ufunc {
 template <bool equal_nan>
 constexpr bool array_equal_ufunc(auto &&in1, auto &&in2) {
     if constexpr (equal_nan && requires {
-                      { std::isnan(in1()) } -> std::convertible_to<bool>;
-                      { std::isnan(in2()) } -> std::convertible_to<bool>;
+                      { std::isnan(in1) } -> std::convertible_to<bool>;
+                      { std::isnan(in2) } -> std::convertible_to<bool>;
                   }) {
-        if (std::isnan(in1()) && std::isnan(in2())) {
+        if (std::isnan(in1) && std::isnan(in2)) {
             return true;
         }
     }
 
-    using value_t = core::common_value_type_t<decltype(in1), decltype(in2)>;
+    using calc_t = core::common_data_type_t<decltype(in1), decltype(in2)>;
 
-    return static_cast<value_t>(in1()) == static_cast<value_t>(in2());
+    return static_cast<calc_t>(in1) == static_cast<calc_t>(in2);
 }
 
 } // namespace ufunc
-
-namespace {
-
-template <bool equal_nan>
-[[nodiscard]] constexpr bool array_equal_impl_(auto &&in1, auto &&in2) {
-    const auto in1_mds =
-        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
-    const auto in2_mds =
-        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
-
-    if constexpr (in1_mds.rank() == 0) {
-        return ufunc::array_equal_ufunc<equal_nan>(in1_mds, in2_mds);
-
-    } else {
-        using index_t = typename decltype(in1_mds)::index_type;
-
-        for (index_t i = 0; i < in1_mds.extent(0); ++i) {
-            if (!array_equal_impl_<equal_nan>(
-                    core::submdspan_from_left(in1_mds, i),
-                    core::submdspan_from_left(in2_mds, i))) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-}
-
-} // namespace
 
 [[nodiscard]] constexpr bool array_equal(auto &&in1, auto &&in2,
                                          const bool equal_nan = false) {
@@ -5470,7 +5585,9 @@ template <bool equal_nan>
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    if constexpr (in1_mds.rank() != in2_mds.rank()) {
+    if constexpr (core::is_always_different_extents<
+                      decltype(in1_mds.extents()),
+                      decltype(in2_mds.extents())>()) {
         return false;
 
     } else {
@@ -5478,11 +5595,20 @@ template <bool equal_nan>
             return false;
         }
 
+        const auto run_batch = [&]<bool equal_nan_v>() {
+            return core::batch<core::Backend::NATIVE, in1_mds.rank(), true>(
+                [](auto &&...elems) {
+                    return ufunc::array_equal_ufunc<equal_nan_v>(
+                        std::forward<decltype(elems)>(elems)...);
+                },
+                in1_mds, in2_mds);
+        };
+
         if (equal_nan) {
-            return array_equal_impl_<true>(in1_mds, in2_mds);
+            return run_batch.template operator()<true>();
 
         } else {
-            return array_equal_impl_<false>(in1_mds, in2_mds);
+            return run_batch.template operator()<false>();
         }
     }
 }
@@ -5536,14 +5662,14 @@ namespace ufunc {
 
 constexpr void equal_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    out() = (in1() == in2());
+    out = (in1 == in2);
 }
 
 } // namespace ufunc
@@ -5591,14 +5717,14 @@ namespace ufunc {
 
 constexpr void greater_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    out() = (in1() > in2());
+    out = (in1 > in2);
 }
 
 } // namespace ufunc
@@ -5647,14 +5773,14 @@ namespace ufunc {
 constexpr void greater_equal_ufunc(auto &&in1, auto &&in2, auto &&out,
                                    auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    out() = (in1() >= in2());
+    out = (in1 >= in2);
 }
 
 } // namespace ufunc
@@ -5702,23 +5828,23 @@ namespace ufunc {
 
 constexpr void isinf_ufunc(auto &&in, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
     if constexpr (requires {
-                      { std::isinf(in()) } -> std::convertible_to<bool>;
+                      { std::isinf(in) } -> std::convertible_to<bool>;
                   }) {
-        if (std::isinf(in())) {
-            out() = true;
+        if (std::isinf(in)) {
+            out = true;
             return;
         }
     }
 
-    out() = false;
+    out = false;
 }
 
 } // namespace ufunc
@@ -5761,23 +5887,23 @@ namespace ufunc {
 
 constexpr void isnan_ufunc(auto &&in, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
     if constexpr (requires {
-                      { std::isnan(in()) } -> std::convertible_to<bool>;
+                      { std::isnan(in) } -> std::convertible_to<bool>;
                   }) {
-        if (std::isnan(in())) {
-            out() = true;
+        if (std::isnan(in)) {
+            out = true;
             return;
         }
     }
 
-    out() = false;
+    out = false;
 }
 
 } // namespace ufunc
@@ -5820,14 +5946,14 @@ namespace ufunc {
 
 constexpr void less_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    out() = (in1() < in2());
+    out = (in1 < in2);
 }
 
 } // namespace ufunc
@@ -5876,14 +6002,14 @@ namespace ufunc {
 constexpr void less_equal_ufunc(auto &&in1, auto &&in2, auto &&out,
                                 auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    out() = (in1() <= in2());
+    out = (in1 <= in2);
 }
 
 } // namespace ufunc
@@ -5931,14 +6057,14 @@ namespace ufunc {
 
 constexpr void logical_not_ufunc(auto &&in, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    out() = (!static_cast<bool>(in()));
+    out = (!static_cast<bool>(in));
 }
 
 } // namespace ufunc
@@ -5983,14 +6109,14 @@ namespace ufunc {
 constexpr void logical_xor_ufunc(auto &&in1, auto &&in2, auto &&out,
                                  auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    out() = (static_cast<bool>(in1()) != static_cast<bool>(in2()));
+    out = (static_cast<bool>(in1) != static_cast<bool>(in2));
 }
 
 } // namespace ufunc
@@ -6039,14 +6165,14 @@ namespace ufunc {
 constexpr void not_equal_ufunc(auto &&in1, auto &&in2, auto &&out,
                                auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    out() = (in1() != in2());
+    out = (in1 != in2);
 }
 
 } // namespace ufunc
@@ -6482,18 +6608,17 @@ namespace ufunc {
 
 constexpr void atan2_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    using value_t = core::common_data_type_t<decltype(in1()), decltype(in2()),
-                                             decltype(out())>;
+    using value_t =
+        core::common_data_type_t<decltype(in1), decltype(in2), decltype(out)>;
 
-    out() =
-        std::atan2(static_cast<value_t>(in1()), static_cast<value_t>(in2()));
+    out = std::atan2(static_cast<value_t>(in1), static_cast<value_t>(in2));
 }
 
 } // namespace ufunc
@@ -6544,16 +6669,16 @@ constexpr void clip_ufunc(auto &&in, auto &&min, auto &&max, auto &&out) {
     // when min > max, np.clip returns max, and std::clamp returns min.
     // mdtensor.clip is designed to match the behavior of np.clip.
 
-    using value_t = std::remove_cvref_t<decltype(in())>;
+    using value_t = std::remove_cvref_t<decltype(in)>;
 
-    out() = in();
+    out = in;
 
-    if constexpr (!core::nullopt_t_c<decltype(min())>) {
-        out() = std::max(out(), static_cast<value_t>(min()));
+    if constexpr (!core::nullopt_t_c<decltype(min)>) {
+        out = std::max(out, static_cast<value_t>(min));
     }
 
-    if constexpr (!core::nullopt_t_c<decltype(max())>) {
-        out() = std::min(out(), static_cast<value_t>(max()));
+    if constexpr (!core::nullopt_t_c<decltype(max)>) {
+        out = std::min(out, static_cast<value_t>(max));
     }
 }
 
@@ -6605,16 +6730,16 @@ namespace ufunc {
 
 constexpr void cos_ufunc(auto &&in, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    using value_t = core::common_data_type_t<decltype(in()), decltype(out())>;
+    using value_t = core::common_data_type_t<decltype(in), decltype(out)>;
 
-    out() = std::cos(static_cast<value_t>(in()));
+    out = std::cos(static_cast<value_t>(in));
 }
 
 } // namespace ufunc
@@ -6694,14 +6819,14 @@ namespace ufunc {
 
 constexpr void divide_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    out() = in1() / in2();
+    out = in1 / in2;
 }
 
 } // namespace ufunc
@@ -6760,35 +6885,35 @@ namespace ufunc {
 
 constexpr void maximum_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    using value_t = std::remove_cvref_t<decltype(out())>;
+    using value_t = std::remove_cvref_t<decltype(out)>;
 
     // if one of the inputs is NaN, return NaN (numpy-like)
     if constexpr (requires {
-                      { std::isnan(in1()) } -> std::convertible_to<bool>;
+                      { std::isnan(in1) } -> std::convertible_to<bool>;
                   }) {
-        if (std::isnan(in1())) {
-            out() = std::numeric_limits<value_t>::quiet_NaN();
+        if (std::isnan(in1)) {
+            out = std::numeric_limits<value_t>::quiet_NaN();
             return;
         }
     }
 
     if constexpr (requires {
-                      { std::isnan(in2()) } -> std::convertible_to<bool>;
+                      { std::isnan(in2) } -> std::convertible_to<bool>;
                   }) {
-        if (std::isnan(in2())) {
-            out() = std::numeric_limits<value_t>::quiet_NaN();
+        if (std::isnan(in2)) {
+            out = std::numeric_limits<value_t>::quiet_NaN();
             return;
         }
     }
 
-    out() = std::max(static_cast<value_t>(in1()), static_cast<value_t>(in2()));
+    out = std::max(static_cast<value_t>(in1), static_cast<value_t>(in2));
 }
 
 } // namespace ufunc
@@ -6925,35 +7050,35 @@ namespace ufunc {
 
 constexpr void minimum_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    using value_t = std::remove_cvref_t<decltype(out())>;
+    using value_t = std::remove_cvref_t<decltype(out)>;
 
     // if one of the inputs is NaN, return NaN (numpy-like)
     if constexpr (requires {
-                      { std::isnan(in1()) } -> std::convertible_to<bool>;
+                      { std::isnan(in1) } -> std::convertible_to<bool>;
                   }) {
-        if (std::isnan(in1())) {
-            out() = std::numeric_limits<value_t>::quiet_NaN();
+        if (std::isnan(in1)) {
+            out = std::numeric_limits<value_t>::quiet_NaN();
             return;
         }
     }
 
     if constexpr (requires {
-                      { std::isnan(in2()) } -> std::convertible_to<bool>;
+                      { std::isnan(in2) } -> std::convertible_to<bool>;
                   }) {
-        if (std::isnan(in2())) {
-            out() = std::numeric_limits<value_t>::quiet_NaN();
+        if (std::isnan(in2)) {
+            out = std::numeric_limits<value_t>::quiet_NaN();
             return;
         }
     }
 
-    out() = std::min(static_cast<value_t>(in1()), static_cast<value_t>(in2()));
+    out = std::min(static_cast<value_t>(in1), static_cast<value_t>(in2));
 }
 
 } // namespace ufunc
@@ -7235,14 +7360,14 @@ namespace ufunc {
 
 constexpr void negative_ufunc(auto &&in, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    out() = -in();
+    out = -in;
 }
 
 } // namespace ufunc
@@ -7326,14 +7451,14 @@ namespace ufunc {
 
 constexpr void sign_ufunc(auto &&in, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    out() = (in() > 0) - (in() < 0);
+    out = (in > 0) - (in < 0);
 }
 
 } // namespace ufunc
@@ -7377,16 +7502,16 @@ namespace ufunc {
 
 constexpr void sin_ufunc(auto &&in, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    using value_t = core::common_data_type_t<decltype(in()), decltype(out())>;
+    using value_t = core::common_data_type_t<decltype(in), decltype(out)>;
 
-    out() = std::sin(static_cast<value_t>(in()));
+    out = std::sin(static_cast<value_t>(in));
 }
 
 } // namespace ufunc
@@ -7429,16 +7554,16 @@ namespace ufunc {
 
 constexpr void tan_ufunc(auto &&in, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    using value_t = core::common_data_type_t<decltype(in()), decltype(out())>;
+    using value_t = core::common_data_type_t<decltype(in), decltype(out)>;
 
-    out() = std::tan(static_cast<value_t>(in()));
+    out = std::tan(static_cast<value_t>(in));
 }
 
 } // namespace ufunc
@@ -7769,43 +7894,42 @@ namespace ufunc {
 
 constexpr void randint_ufunc(auto &&out, auto &&low, auto &&high,
                              auto &&engine) {
-    using value_t = std::remove_cvref_t<decltype(out())>;
+    using value_t = std::remove_cvref_t<decltype(out)>;
 
     static_assert(std::is_integral_v<value_t>,
                   "randint_ufunc requires integral value type.");
 
     constexpr bool has_low =
-        !core::nullopt_t_c<std::remove_cvref_t<decltype(low())>>;
+        !core::nullopt_t_c<std::remove_cvref_t<decltype(low)>>;
     constexpr bool has_high =
-        !core::nullopt_t_c<std::remove_cvref_t<decltype(high())>>;
+        !core::nullopt_t_c<std::remove_cvref_t<decltype(high)>>;
 
     if constexpr (has_low && has_high) {
         // NOTE: This implementation matches the behavior of
         // numpy.random.randint(low, high)
 
-        out() = engine.template get_bounded<value_t>(
-            static_cast<value_t>(low()), static_cast<value_t>(high()));
+        out = engine.template get_bounded<value_t>(static_cast<value_t>(low),
+                                                   static_cast<value_t>(high));
 
     } else if constexpr (has_low && !has_high) {
         // NOTE: This implementation matches the behavior of
         // numpy.random.randint(low, high=None)
 
-        out() = engine.template get_bounded<value_t>(
-            value_t{0}, static_cast<value_t>(low()));
+        out = engine.template get_bounded<value_t>(value_t{0},
+                                                   static_cast<value_t>(low));
 
     } else if constexpr (!has_low && has_high) {
         // NOTE: This implementation is not exist in numpy.random.randint,
         // but maybe useful for some use cases.
 
-        out() = engine.template get_bounded<value_t>(
-            std::numeric_limits<value_t>::lowest(),
-            static_cast<value_t>(high()));
+        out = engine.template get_bounded<value_t>(
+            std::numeric_limits<value_t>::lowest(), static_cast<value_t>(high));
 
     } else {
         // NOTE: This implementation is not exist in numpy.random.randint,
         // but maybe useful for some use cases.
 
-        out() = engine.template get<value_t>();
+        out = engine.template get<value_t>();
     }
 }
 
@@ -7862,7 +7986,7 @@ template <std::floating_point value_t>
 }
 
 constexpr void rand_ufunc(auto &&out, auto &&engine) {
-    using value_t = std::remove_cvref_t<decltype(out())>;
+    using value_t = std::remove_cvref_t<decltype(out)>;
 
     static_assert(std::is_floating_point_v<value_t>,
                   "rand_ufunc requires floating-point value type.");
@@ -7877,7 +8001,7 @@ constexpr void rand_ufunc(auto &&out, auto &&engine) {
 
     if constexpr (value_bits <= base_bits) {
         const base_t bits = engine() >> (base_bits - value_bits);
-        out() = static_cast<value_t>(bits) * pow2_neg<value_t>(value_bits);
+        out = static_cast<value_t>(bits) * pow2_neg<value_t>(value_bits);
 
     } else {
         value_t result = value_t{0};
@@ -7897,7 +8021,7 @@ constexpr void rand_ufunc(auto &&out, auto &&engine) {
             remaining -= take;
         }
 
-        out() = result;
+        out = result;
     }
 }
 
@@ -7945,14 +8069,13 @@ namespace ufunc {
 
 constexpr void uniform_ufunc(auto &&out, auto &&low, auto &&high,
                              auto &&engine) {
-    using value_t = std::remove_cvref_t<decltype(out())>;
+    using value_t = std::remove_cvref_t<decltype(out)>;
 
     rand_ufunc(std::forward<decltype(out)>(out),
                std::forward<decltype(engine)>(engine));
 
-    out() =
-        (static_cast<value_t>(high()) - static_cast<value_t>(low())) * out() +
-        static_cast<value_t>(low());
+    out = (static_cast<value_t>(high) - static_cast<value_t>(low)) * out +
+          static_cast<value_t>(low);
 }
 
 } // namespace ufunc
