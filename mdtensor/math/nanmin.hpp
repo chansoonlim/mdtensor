@@ -41,8 +41,7 @@ nanmin(auto &&in, std::integer_sequence<axes_t, axes...>,
     }();
 
     return min<dtype, keepdims, backend>(
-        std::forward<decltype(in)>(in),
-        std::integer_sequence<axes_t, axes...>{},
+        in_mds, std::integer_sequence<axes_t, axes...>{},
         std::forward<decltype(out)>(out),
         std::forward<decltype(initial)>(initial), mask);
 }

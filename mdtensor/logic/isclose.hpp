@@ -81,25 +81,13 @@ isclose(auto &&in1, auto &&in2, rtol_t &&rtol = rtol_t{1e-05},
         }
     }();
 
-    // choose backend
-    constexpr auto be = [&]() {
-        if constexpr (backend != core::Backend::AUTO) {
-            return backend;
-
-        } else {
-            return core::Backend::NATIVE;
-        }
-    }();
-
-    core::batch_with_broadcast<be>(
+    core::batch_with_broadcast<backend>(
         [&](auto &&...elems) {
             ufunc::isclose_ufunc(std::forward<decltype(elems)>(elems)...,
                                  equal_nan);
         },
-        std::integer_sequence<bool, true, true, false, true, true>{},
-        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
-        out_md, std::forward<decltype(rtol)>(rtol),
-        std::forward<decltype(atol)>(atol));
+        std::integer_sequence<bool, true, true, false, true, true>{}, in1_mds,
+        in2_mds, out_md, rtol_mds, atol_mds);
 
     return out_md;
 }

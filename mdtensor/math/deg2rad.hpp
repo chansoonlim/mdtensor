@@ -43,9 +43,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
 
     constexpr calc_t D2R = std::numbers::pi_v<calc_t> / calc_t{180};
 
-    static_cast<void>(
-        multiply<void, backend>(std::forward<decltype(in)>(in), D2R, out_md,
-                                std::forward<decltype(where)>(where)));
+    static_cast<void>(multiply<void, backend>(
+        in_mds, D2R, out_md, std::forward<decltype(where)>(where)));
 
     return out_md;
 }

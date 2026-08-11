@@ -55,9 +55,9 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         [](auto &&...elems) {
             ufunc::clip_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, true, true, false>{},
-        std::forward<decltype(in)>(in), std::forward<decltype(min)>(min),
-        std::forward<decltype(max)>(max), out_md);
+        std::integer_sequence<bool, true, true, true, false>{}, in_mds,
+        std::forward<decltype(min)>(min), std::forward<decltype(max)>(max),
+        out_md);
 
     return out_md;
 }

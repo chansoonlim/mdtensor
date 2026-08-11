@@ -48,8 +48,7 @@ logical_not(auto &&in, out_t &&out = out_t{std::nullopt},
         [](auto &&...elems) {
             ufunc::logical_not_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, false, true>{},
-        std::forward<decltype(in)>(in), out_md,
+        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
 
     return out_md;

@@ -52,9 +52,8 @@ template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
         [](auto &&...elems) {
             ufunc::less_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, true, false, true>{},
-        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
-        out_md, std::forward<decltype(where)>(where));
+        std::integer_sequence<bool, true, true, false, true>{}, in1_mds,
+        in2_mds, out_md, std::forward<decltype(where)>(where));
 
     return out_md;
 }

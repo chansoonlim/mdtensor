@@ -59,8 +59,7 @@ template <typename dtype = void, bool keepdims = false,
         },
         std::integer_sequence<axes_t, axes...>{},
         std::index_sequence<0, 0, 0>{},
-        std::integer_sequence<bool, true, false, true>{},
-        std::forward<decltype(in)>(in), out_md,
+        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
 
     return out_md;
