@@ -32,35 +32,6 @@ constexpr bool array_equal_ufunc(auto &&in1, auto &&in2) {
 
 } // namespace ufunc
 
-namespace {
-
-template <bool equal_nan>
-[[nodiscard]] constexpr bool array_equal_impl_(auto &&in1, auto &&in2) {
-    const auto in1_mds =
-        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
-    const auto in2_mds =
-        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
-
-    if constexpr (in1_mds.rank() == 0) {
-        return ufunc::array_equal_ufunc<equal_nan>(in1_mds(), in2_mds());
-
-    } else {
-        using index_t = typename decltype(in1_mds)::index_type;
-
-        for (index_t i = 0; i < in1_mds.extent(0); ++i) {
-            if (!array_equal_impl_<equal_nan>(
-                    core::submdspan_from_left(in1_mds, i),
-                    core::submdspan_from_left(in2_mds, i))) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-}
-
-} // namespace
-
 [[nodiscard]] constexpr bool array_equal(auto &&in1, auto &&in2,
                                          const bool equal_nan = false) {
     const auto in1_mds =
@@ -68,7 +39,9 @@ template <bool equal_nan>
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    if constexpr (in1_mds.rank() != in2_mds.rank()) {
+    if constexpr (core::is_always_different_extents<
+                      decltype(in1_mds.extents()),
+                      decltype(in2_mds.extents())>()) {
         return false;
 
     } else {
@@ -76,11 +49,20 @@ template <bool equal_nan>
             return false;
         }
 
+        const auto run_batch = [&]<bool equal_nan_v>() {
+            return core::batch<core::Backend::NATIVE, in1_mds.rank(), true>(
+                [](auto &&...elems) {
+                    return ufunc::array_equal_ufunc<equal_nan_v>(
+                        std::forward<decltype(elems)>(elems)...);
+                },
+                in1_mds, in2_mds);
+        };
+
         if (equal_nan) {
-            return array_equal_impl_<true>(in1_mds, in2_mds);
+            return run_batch.template operator()<true>();
 
         } else {
-            return array_equal_impl_<false>(in1_mds, in2_mds);
+            return run_batch.template operator()<false>();
         }
     }
 }

@@ -114,6 +114,37 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
 }
 
 template <extents_c in_t>
+[[nodiscard]] consteval bool is_always_different_extents() noexcept {
+    return false;
+}
+
+template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
+[[nodiscard]] consteval bool is_always_different_extents() noexcept {
+    using base1_t = std::remove_cvref_t<in1_t>;
+    using base2_t = std::remove_cvref_t<in2_t>;
+
+    if constexpr (base1_t::rank() != base2_t::rank()) {
+        return true;
+
+    } else if constexpr ([&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                             return ((base1_t::static_extent(Is) !=
+                                          base2_t::static_extent(Is) &&
+                                      base1_t::static_extent(Is) != dyn &&
+                                      base2_t::static_extent(Is) != dyn) ||
+                                     ...);
+                         }(std::make_index_sequence<base1_t::rank()>{})) {
+        return true;
+    }
+
+    if constexpr (sizeof...(ins_t) != 0) {
+        return is_always_same_extents<in2_t, ins_t...>();
+
+    } else {
+        return false;
+    }
+}
+
+template <extents_c in_t>
 [[nodiscard]] constexpr bool is_same_extents(in_t &&in) noexcept {
     return true;
 }
@@ -126,7 +157,7 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
     using base1_t = std::remove_cvref_t<in1_t>;
     using base2_t = std::remove_cvref_t<in2_t>;
 
-    if constexpr (base1_t::rank() != base2_t::rank()) {
+    if constexpr (is_always_different_extents<base1_t, base2_t>()) {
         return false;
     }
 
