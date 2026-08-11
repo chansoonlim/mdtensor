@@ -1510,10 +1510,21 @@ constexpr void batch_with_broadcast(auto &&func,
 
 } // namespace mdtensor::core
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/batch.hpp
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/container.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/manipulation.hpp
 /**
  * @file
- * @brief Container utilities for mdtensor.
+ * @brief Manipulation utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor.hpp
+/**
+ * @file
+ * @brief Tensor utilities for mdtensor.
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -1527,7 +1538,7 @@ namespace mdtensor::core {
 using bool_value_t = std::int8_t;
 
 template <typename value_t, extents_c extent_t>
-using container = std::conditional_t<
+using tensor = std::conditional_t<
     extent_t::rank() == 0, value_t,
     std::conditional_t<
         extent_t::rank_dynamic() == 0,
@@ -1541,41 +1552,30 @@ using container = std::conditional_t<
                           std::vector<value_t>>>>>;
 
 template <typename value_t = double, extents_c exts_t>
-[[nodiscard]] constexpr auto make_container(exts_t &&exts) {
+[[nodiscard]] constexpr auto make_tensor(exts_t &&exts) {
     using base_t = std::remove_cvref_t<decltype(exts)>;
 
     if constexpr (base_t::rank() == 0) {
-        return container<value_t, base_t>{};
+        return tensor<value_t, base_t>{};
 
     } else {
-        return container<value_t, base_t>{std::forward<exts_t>(exts)};
+        return tensor<value_t, base_t>{std::forward<exts_t>(exts)};
     }
 }
 
-[[nodiscard]] constexpr auto make_container_like(auto &&in) {
+[[nodiscard]] constexpr auto make_tensor_like(auto &&in) {
     const auto in_mds = to_const_mdspan(std::forward<decltype(in)>(in));
 
     using value_t = typename decltype(in_mds)::value_type;
 
-    return make_container<value_t>(in_mds.extents());
+    return make_tensor<value_t>(in_mds.extents());
 }
 
 template <typename T>
-using make_container_like_t = decltype(make_container_like(std::declval<T>()));
+using make_tensor_like_t = decltype(make_tensor_like(std::declval<T>()));
 
 } // namespace mdtensor::core
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/container.hpp
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/manipulation.hpp
-/**
- * @file
- * @brief Manipulation utilities for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor.hpp
 
 namespace mdtensor::core {
 namespace detail {
@@ -1649,7 +1649,7 @@ template <extents_c exts_t>
     using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
     using value_t = typename in_mds_t::value_type;
 
-    auto out = make_container<value_t>(std::forward<exts_t>(exts));
+    auto out = make_tensor<value_t>(std::forward<exts_t>(exts));
 
     batch<Backend::NATIVE, in_mds.rank()>(
         [&](auto &&in, auto &&out) { out() = in(); }, in_mds,
@@ -1806,7 +1806,7 @@ template <typename dtype = void, std::size_t... uranks, extents_c uout_exts_t>
     constexpr std::size_t ins_num = sizeof...(uranks);
 
     if constexpr (ins_num == 0) {
-        return make_container<dtype>(std::forward<uout_exts_t>(uout_exts));
+        return make_tensor<dtype>(std::forward<uout_exts_t>(uout_exts));
 
     } else {
         using value_t = output_value_t<dtype, decltype(ins)...>;
@@ -1816,8 +1816,7 @@ template <typename dtype = void, std::size_t... uranks, extents_c uout_exts_t>
             std::index_sequence<uranks...>{},
             to_const_mdspan(std::forward<decltype(ins)>(ins))...);
 
-        // make output container
-        return make_container<value_t>(
+        return make_tensor<value_t>(
             compose_extents(bexts, std::forward<uout_exts_t>(uout_exts)));
     }
 }
@@ -1847,7 +1846,7 @@ template <typename dtype = void, std::size_t... uranks,
     if constexpr (ins_num == 0) {
         return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
             return std::tuple{
-                make_container<dtype>(std::get<Is>(uout_exts_tuple))...};
+                make_tensor<dtype>(std::get<Is>(uout_exts_tuple))...};
         }(std::make_index_sequence<outs_num>{});
 
     } else {
@@ -1858,9 +1857,8 @@ template <typename dtype = void, std::size_t... uranks,
             std::index_sequence<uranks...>{},
             to_const_mdspan(std::forward<decltype(ins)>(ins))...);
 
-        // make output container
         return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-            return std::tuple{make_container<value_t>(
+            return std::tuple{make_tensor<value_t>(
                 compose_extents(bexts, std::get<Is>(uout_exts_tuple)))...};
         }(std::make_index_sequence<outs_num>{});
     }
@@ -2132,7 +2130,7 @@ make_reduce_output(std::integer_sequence<axes_t, axes...>,
     // generate out
     using value_t = output_value_t<dtype, decltype(ins)...>;
 
-    return make_container<value_t>(
+    return make_tensor<value_t>(
         compose_extents(out_bexts, std::forward<uout_exts_t>(uout_exts)));
 }
 
@@ -2176,7 +2174,7 @@ using mdspan = core::mdspan<ElementType, Extents, LayoutPolicy, AccessorPolicy>;
 constexpr auto full_extent = core::full_extent;
 
 template <typename value_t, extents_c extent_t>
-using container = core::container<value_t, extent_t>;
+using tensor = core::tensor<value_t, extent_t>;
 
 using Backend = core::Backend;
 
@@ -2277,7 +2275,7 @@ namespace mdtensor {
 
 template <typename dtype = double>
 [[nodiscard]] constexpr auto empty(auto &&shape) {
-    return core::make_container<dtype>(
+    return core::make_tensor<dtype>(
         core::to_extents(std::forward<decltype(shape)>(shape)));
 }
 
@@ -2421,8 +2419,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         [](auto &&...elems) {
             ufunc::copy_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, false>{},
-        std::forward<decltype(in)>(in), out_md);
+        std::integer_sequence<bool, true, false>{}, in_mds, out_md);
 
     return out_md;
 }
@@ -2650,9 +2647,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         [](auto &&...elems) {
             ufunc::add_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, true, false, true>{},
-        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
-        out_md, std::forward<decltype(where)>(where));
+        std::integer_sequence<bool, true, true, false, true>{}, in1_mds,
+        in2_mds, out_md, std::forward<decltype(where)>(where));
 
     return out_md;
 }
@@ -2713,9 +2709,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         [](auto &&...elems) {
             ufunc::multiply_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, true, false, true>{},
-        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
-        out_md, std::forward<decltype(where)>(where));
+        std::integer_sequence<bool, true, true, false, true>{}, in1_mds,
+        in2_mds, out_md, std::forward<decltype(where)>(where));
 
     return out_md;
 }
@@ -2776,9 +2771,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         [](auto &&...elems) {
             ufunc::subtract_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, true, false, true>{},
-        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
-        out_md, std::forward<decltype(where)>(where));
+        std::integer_sequence<bool, true, true, false, true>{}, in1_mds,
+        in2_mds, out_md, std::forward<decltype(where)>(where));
 
     return out_md;
 }
@@ -3120,8 +3114,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         [](auto &&...elems) {
             ufunc::sqrt_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, false, true>{},
-        std::forward<decltype(in)>(in), out_md,
+        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
 
     return out_md;
@@ -3377,8 +3370,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         [](auto &&...elems) {
             ufunc::absolute_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, false, true>{},
-        std::forward<decltype(in)>(in), out_md,
+        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
 
     return out_md;
@@ -4645,8 +4637,7 @@ template <typename dtype = void, bool keepdims = false,
         },
         std::integer_sequence<axes_t, axes...>{},
         std::index_sequence<0, 0, 0>{},
-        std::integer_sequence<bool, true, false, true>{},
-        std::forward<decltype(in)>(in), out_md,
+        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
 
     return out_md;
@@ -4992,9 +4983,8 @@ logical_and(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
         [](auto &&...elems) {
             ufunc::logical_and_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, true, false, true>{},
-        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
-        out_md, std::forward<decltype(where)>(where));
+        std::integer_sequence<bool, true, true, false, true>{}, in1_mds,
+        in2_mds, out_md, std::forward<decltype(where)>(where));
 
     return out_md;
 }
@@ -5039,8 +5029,7 @@ template <typename dtype = bool, bool keepdims = false,
         },
         std::integer_sequence<axes_t, axes...>{},
         std::index_sequence<0, 0, 0>{},
-        std::integer_sequence<bool, true, false, true>{},
-        std::forward<decltype(in)>(in), out_md,
+        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
 
     return out_md;
@@ -5162,25 +5151,13 @@ isclose(auto &&in1, auto &&in2, rtol_t &&rtol = rtol_t{1e-05},
         }
     }();
 
-    // choose backend
-    constexpr auto be = [&]() {
-        if constexpr (backend != core::Backend::AUTO) {
-            return backend;
-
-        } else {
-            return core::Backend::NATIVE;
-        }
-    }();
-
-    core::batch_with_broadcast<be>(
+    core::batch_with_broadcast<backend>(
         [&](auto &&...elems) {
             ufunc::isclose_ufunc(std::forward<decltype(elems)>(elems)...,
                                  equal_nan);
         },
-        std::integer_sequence<bool, true, true, false, true, true>{},
-        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
-        out_md, std::forward<decltype(rtol)>(rtol),
-        std::forward<decltype(atol)>(atol));
+        std::integer_sequence<bool, true, true, false, true, true>{}, in1_mds,
+        in2_mds, out_md, rtol_mds, atol_mds);
 
     return out_md;
 }
@@ -5268,9 +5245,8 @@ logical_or(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
         [](auto &&...elems) {
             ufunc::logical_or_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, true, false, true>{},
-        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
-        out_md, std::forward<decltype(where)>(where));
+        std::integer_sequence<bool, true, true, false, true>{}, in1_mds,
+        in2_mds, out_md, std::forward<decltype(where)>(where));
 
     return out_md;
 }
@@ -5315,8 +5291,7 @@ template <typename dtype = bool, bool keepdims = false,
         },
         std::integer_sequence<axes_t, axes...>{},
         std::index_sequence<0, 0, 0>{},
-        std::integer_sequence<bool, true, false, true>{},
-        std::forward<decltype(in)>(in), out_md,
+        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
 
     return out_md;
@@ -5516,9 +5491,8 @@ template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
         [](auto &&...elems) {
             ufunc::equal_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, true, false, true>{},
-        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
-        out_md, std::forward<decltype(where)>(where));
+        std::integer_sequence<bool, true, true, false, true>{}, in1_mds,
+        in2_mds, out_md, std::forward<decltype(where)>(where));
 
     return out_md;
 }
@@ -5578,9 +5552,8 @@ template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
         [](auto &&...elems) {
             ufunc::greater_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, true, false, true>{},
-        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
-        out_md, std::forward<decltype(where)>(where));
+        std::integer_sequence<bool, true, true, false, true>{}, in1_mds,
+        in2_mds, out_md, std::forward<decltype(where)>(where));
 
     return out_md;
 }
@@ -5641,9 +5614,8 @@ greater_equal(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
         [](auto &&...elems) {
             ufunc::greater_equal_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, true, false, true>{},
-        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
-        out_md, std::forward<decltype(where)>(where));
+        std::integer_sequence<bool, true, true, false, true>{}, in1_mds,
+        in2_mds, out_md, std::forward<decltype(where)>(where));
 
     return out_md;
 }
@@ -5707,8 +5679,7 @@ template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
         [](auto &&...elems) {
             ufunc::isinf_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, false, true>{},
-        std::forward<decltype(in)>(in), out_md,
+        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
 
     return out_md;
@@ -5773,8 +5744,7 @@ template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
         [](auto &&...elems) {
             ufunc::isnan_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, false, true>{},
-        std::forward<decltype(in)>(in), out_md,
+        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
 
     return out_md;
@@ -5835,9 +5805,8 @@ template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
         [](auto &&...elems) {
             ufunc::less_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, true, false, true>{},
-        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
-        out_md, std::forward<decltype(where)>(where));
+        std::integer_sequence<bool, true, true, false, true>{}, in1_mds,
+        in2_mds, out_md, std::forward<decltype(where)>(where));
 
     return out_md;
 }
@@ -5898,9 +5867,8 @@ less_equal(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
         [](auto &&...elems) {
             ufunc::less_equal_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, true, false, true>{},
-        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
-        out_md, std::forward<decltype(where)>(where));
+        std::integer_sequence<bool, true, true, false, true>{}, in1_mds,
+        in2_mds, out_md, std::forward<decltype(where)>(where));
 
     return out_md;
 }
@@ -5956,8 +5924,7 @@ logical_not(auto &&in, out_t &&out = out_t{std::nullopt},
         [](auto &&...elems) {
             ufunc::logical_not_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, false, true>{},
-        std::forward<decltype(in)>(in), out_md,
+        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
 
     return out_md;
@@ -6019,9 +5986,8 @@ logical_xor(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
         [](auto &&...elems) {
             ufunc::logical_xor_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, true, false, true>{},
-        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
-        out_md, std::forward<decltype(where)>(where));
+        std::integer_sequence<bool, true, true, false, true>{}, in1_mds,
+        in2_mds, out_md, std::forward<decltype(where)>(where));
 
     return out_md;
 }
@@ -6082,9 +6048,8 @@ not_equal(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
         [](auto &&...elems) {
             ufunc::not_equal_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, true, false, true>{},
-        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
-        out_md, std::forward<decltype(where)>(where));
+        std::integer_sequence<bool, true, true, false, true>{}, in1_mds,
+        in2_mds, out_md, std::forward<decltype(where)>(where));
 
     return out_md;
 }
@@ -6541,9 +6506,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         [](auto &&...elems) {
             ufunc::atan2_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, true, false, true>{},
-        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
-        out_md, std::forward<decltype(where)>(where));
+        std::integer_sequence<bool, true, true, false, true>{}, in1_mds,
+        in2_mds, out_md, std::forward<decltype(where)>(where));
 
     return out_md;
 }
@@ -6606,9 +6570,9 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         [](auto &&...elems) {
             ufunc::clip_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, true, true, false>{},
-        std::forward<decltype(in)>(in), std::forward<decltype(min)>(min),
-        std::forward<decltype(max)>(max), out_md);
+        std::integer_sequence<bool, true, true, true, false>{}, in_mds,
+        std::forward<decltype(min)>(min), std::forward<decltype(max)>(max),
+        out_md);
 
     return out_md;
 }
@@ -6670,8 +6634,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         [](auto &&...elems) {
             ufunc::cos_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, false, true>{},
-        std::forward<decltype(in)>(in), out_md,
+        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
 
     return out_md;
@@ -6723,9 +6686,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
 
     constexpr calc_t D2R = std::numbers::pi_v<calc_t> / calc_t{180};
 
-    static_cast<void>(
-        multiply<void, backend>(std::forward<decltype(in)>(in), D2R, out_md,
-                                std::forward<decltype(where)>(where)));
+    static_cast<void>(multiply<void, backend>(
+        in_mds, D2R, out_md, std::forward<decltype(where)>(where)));
 
     return out_md;
 }
@@ -6785,9 +6747,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         [](auto &&...elems) {
             ufunc::divide_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, true, false, true>{},
-        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
-        out_md, std::forward<decltype(where)>(where));
+        std::integer_sequence<bool, true, true, false, true>{}, in1_mds,
+        in2_mds, out_md, std::forward<decltype(where)>(where));
 
     return out_md;
 }
@@ -6879,9 +6840,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         [](auto &&...elems) {
             ufunc::maximum_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, true, false, true>{},
-        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
-        out_md, std::forward<decltype(where)>(where));
+        std::integer_sequence<bool, true, true, false, true>{}, in1_mds,
+        in2_mds, out_md, std::forward<decltype(where)>(where));
 
     return out_md;
 }
@@ -6936,8 +6896,7 @@ template <typename dtype = void, bool keepdims = false,
         },
         std::integer_sequence<axes_t, axes...>{},
         std::index_sequence<0, 0, 0>{},
-        std::integer_sequence<bool, true, false, true>{},
-        std::forward<decltype(in)>(in), out_md,
+        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
 
     return out_md;
@@ -7059,9 +7018,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         [](auto &&...elems) {
             ufunc::minimum_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, true, false, true>{},
-        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
-        out_md, std::forward<decltype(where)>(where));
+        std::integer_sequence<bool, true, true, false, true>{}, in1_mds,
+        in2_mds, out_md, std::forward<decltype(where)>(where));
 
     return out_md;
 }
@@ -7116,8 +7074,7 @@ template <typename dtype = void, bool keepdims = false,
         },
         std::integer_sequence<axes_t, axes...>{},
         std::index_sequence<0, 0, 0>{},
-        std::integer_sequence<bool, true, false, true>{},
-        std::forward<decltype(in)>(in), out_md,
+        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
 
     return out_md;
@@ -7194,8 +7151,7 @@ nanmax(auto &&in, std::integer_sequence<axes_t, axes...>,
     }();
 
     return max<dtype, keepdims, backend>(
-        std::forward<decltype(in)>(in),
-        std::integer_sequence<axes_t, axes...>{},
+        in_mds, std::integer_sequence<axes_t, axes...>{},
         std::forward<decltype(out)>(out),
         std::forward<decltype(initial)>(initial), mask);
 }
@@ -7273,8 +7229,7 @@ nanmin(auto &&in, std::integer_sequence<axes_t, axes...>,
     }();
 
     return min<dtype, keepdims, backend>(
-        std::forward<decltype(in)>(in),
-        std::integer_sequence<axes_t, axes...>{},
+        in_mds, std::integer_sequence<axes_t, axes...>{},
         std::forward<decltype(out)>(out),
         std::forward<decltype(initial)>(initial), mask);
 }
@@ -7361,8 +7316,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         [](auto &&...elems) {
             ufunc::negative_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, false, true>{},
-        std::forward<decltype(in)>(in), out_md,
+        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
 
     return out_md;
@@ -7414,9 +7368,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
 
     constexpr calc_t R2D = std::numbers::inv_pi_v<calc_t> * calc_t{180};
 
-    static_cast<void>(
-        multiply<void, backend>(std::forward<decltype(in)>(in), R2D, out_md,
-                                std::forward<decltype(where)>(where)));
+    static_cast<void>(multiply<void, backend>(
+        in_mds, R2D, out_md, std::forward<decltype(where)>(where)));
 
     return out_md;
 }
@@ -7472,8 +7425,7 @@ template <typename dtype = std::int8_t,
         [](auto &&...elems) {
             ufunc::sign_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, false, true>{},
-        std::forward<decltype(in)>(in), out_md,
+        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
 
     return out_md;
@@ -7536,8 +7488,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         [](auto &&...elems) {
             ufunc::sin_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, false, true>{},
-        std::forward<decltype(in)>(in), out_md,
+        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
 
     return out_md;
@@ -7600,8 +7551,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         [](auto &&...elems) {
             ufunc::tan_ufunc(std::forward<decltype(elems)>(elems)...);
         },
-        std::integer_sequence<bool, true, false, true>{},
-        std::forward<decltype(in)>(in), out_md,
+        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
 
     return out_md;
