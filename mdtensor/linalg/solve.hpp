@@ -109,9 +109,9 @@ constexpr void solve_to(auto &&a, auto &&b, auto &&x, auto &&valid) {
 
     core::batch_with_broadcast<backend>(
         [](auto &&a, auto &&b, auto &&x, auto &&valid) {
-            valid() = ufunc::solve_ufunc(std::forward<decltype(a)>(a),
-                                         std::forward<decltype(b)>(b),
-                                         std::forward<decltype(x)>(x));
+            valid = ufunc::solve_ufunc(std::forward<decltype(a)>(a),
+                                       std::forward<decltype(b)>(b),
+                                       std::forward<decltype(x)>(x));
         },
         std::index_sequence<2, rhs_rank, rhs_rank, 0>{},
         std::integer_sequence<bool, true, true, false, false>{},

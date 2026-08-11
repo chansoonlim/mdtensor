@@ -23,52 +23,52 @@ sqrt_newton_raphson(const dtype &x, const dtype &curr, const dtype &prev) {
 }
 
 constexpr void sqrt_ufunc_native(auto &&in, auto &&out) {
-    using calc_t = core::common_data_type_t<decltype(in()), float>;
+    using calc_t = core::common_data_type_t<decltype(in), float>;
 
     if constexpr (requires {
-                      { std::isnan(in()) } -> std::convertible_to<bool>;
+                      { std::isnan(in) } -> std::convertible_to<bool>;
                   }) {
-        if (std::isnan(in())) {
-            out() = in();
+        if (std::isnan(in)) {
+            out = in;
             return;
         }
     }
 
     if constexpr (requires {
-                      { std::isinf(in()) } -> std::convertible_to<bool>;
+                      { std::isinf(in) } -> std::convertible_to<bool>;
                   }) {
-        if (std::isinf(in())) {
-            out() = in();
+        if (std::isinf(in)) {
+            out = in;
             return;
         }
     }
 
-    if constexpr (std::is_same_v<std::remove_cvref_t<decltype(in())>, bool>) {
-        out() = static_cast<calc_t>(in());
+    if constexpr (std::is_same_v<std::remove_cvref_t<decltype(in)>, bool>) {
+        out = static_cast<calc_t>(in);
         return;
 
     } else {
-        out() = (in() >= 0 && in() < std::numeric_limits<calc_t>::infinity())
-                    ? sqrt_newton_raphson(static_cast<calc_t>(in()),
-                                          static_cast<calc_t>(in()),
-                                          static_cast<calc_t>(0))
-                    : std::numeric_limits<calc_t>::quiet_NaN();
+        out = (in >= 0 && in < std::numeric_limits<calc_t>::infinity())
+                  ? sqrt_newton_raphson(static_cast<calc_t>(in),
+                                        static_cast<calc_t>(in),
+                                        static_cast<calc_t>(0))
+                  : std::numeric_limits<calc_t>::quiet_NaN();
     }
 }
 
 constexpr void sqrt_ufunc(auto &&in, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
 #ifdef REAL_GCC
     if (!std::is_constant_evaluated()) {
-        if constexpr (requires { out() = std::sqrt(in()); }) {
-            out() = std::sqrt(in());
+        if constexpr (requires { out = std::sqrt(in); }) {
+            out = std::sqrt(in);
             return;
         }
     }

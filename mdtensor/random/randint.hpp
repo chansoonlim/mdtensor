@@ -23,43 +23,42 @@ namespace ufunc {
 
 constexpr void randint_ufunc(auto &&out, auto &&low, auto &&high,
                              auto &&engine) {
-    using value_t = std::remove_cvref_t<decltype(out())>;
+    using value_t = std::remove_cvref_t<decltype(out)>;
 
     static_assert(std::is_integral_v<value_t>,
                   "randint_ufunc requires integral value type.");
 
     constexpr bool has_low =
-        !core::nullopt_t_c<std::remove_cvref_t<decltype(low())>>;
+        !core::nullopt_t_c<std::remove_cvref_t<decltype(low)>>;
     constexpr bool has_high =
-        !core::nullopt_t_c<std::remove_cvref_t<decltype(high())>>;
+        !core::nullopt_t_c<std::remove_cvref_t<decltype(high)>>;
 
     if constexpr (has_low && has_high) {
         // NOTE: This implementation matches the behavior of
         // numpy.random.randint(low, high)
 
-        out() = engine.template get_bounded<value_t>(
-            static_cast<value_t>(low()), static_cast<value_t>(high()));
+        out = engine.template get_bounded<value_t>(static_cast<value_t>(low),
+                                                   static_cast<value_t>(high));
 
     } else if constexpr (has_low && !has_high) {
         // NOTE: This implementation matches the behavior of
         // numpy.random.randint(low, high=None)
 
-        out() = engine.template get_bounded<value_t>(
-            value_t{0}, static_cast<value_t>(low()));
+        out = engine.template get_bounded<value_t>(value_t{0},
+                                                   static_cast<value_t>(low));
 
     } else if constexpr (!has_low && has_high) {
         // NOTE: This implementation is not exist in numpy.random.randint,
         // but maybe useful for some use cases.
 
-        out() = engine.template get_bounded<value_t>(
-            std::numeric_limits<value_t>::lowest(),
-            static_cast<value_t>(high()));
+        out = engine.template get_bounded<value_t>(
+            std::numeric_limits<value_t>::lowest(), static_cast<value_t>(high));
 
     } else {
         // NOTE: This implementation is not exist in numpy.random.randint,
         // but maybe useful for some use cases.
 
-        out() = engine.template get<value_t>();
+        out = engine.template get<value_t>();
     }
 }
 

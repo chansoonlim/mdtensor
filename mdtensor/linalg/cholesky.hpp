@@ -124,7 +124,7 @@ constexpr void cholesky_to(auto &&in, auto &&out, auto &&valid,
     const auto run_batch = [&]<bool upper_v>() {
         core::batch_with_broadcast<backend>(
             [](auto &&in, auto &&out, auto &&valid) {
-                valid() = ufunc::cholesky_ufunc<upper_v>(
+                valid = ufunc::cholesky_ufunc<upper_v>(
                     std::forward<decltype(in)>(in),
                     std::forward<decltype(out)>(out));
             },

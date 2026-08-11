@@ -16,35 +16,35 @@ namespace ufunc {
 
 constexpr void maximum_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    using value_t = std::remove_cvref_t<decltype(out())>;
+    using value_t = std::remove_cvref_t<decltype(out)>;
 
     // if one of the inputs is NaN, return NaN (numpy-like)
     if constexpr (requires {
-                      { std::isnan(in1()) } -> std::convertible_to<bool>;
+                      { std::isnan(in1) } -> std::convertible_to<bool>;
                   }) {
-        if (std::isnan(in1())) {
-            out() = std::numeric_limits<value_t>::quiet_NaN();
+        if (std::isnan(in1)) {
+            out = std::numeric_limits<value_t>::quiet_NaN();
             return;
         }
     }
 
     if constexpr (requires {
-                      { std::isnan(in2()) } -> std::convertible_to<bool>;
+                      { std::isnan(in2) } -> std::convertible_to<bool>;
                   }) {
-        if (std::isnan(in2())) {
-            out() = std::numeric_limits<value_t>::quiet_NaN();
+        if (std::isnan(in2)) {
+            out = std::numeric_limits<value_t>::quiet_NaN();
             return;
         }
     }
 
-    out() = std::max(static_cast<value_t>(in1()), static_cast<value_t>(in2()));
+    out = std::max(static_cast<value_t>(in1), static_cast<value_t>(in2));
 }
 
 } // namespace ufunc

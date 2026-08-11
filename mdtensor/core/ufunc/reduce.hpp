@@ -32,7 +32,7 @@ template <bool keepdims, extents_c bext_t, bool... is_input, mdspan_c... ios_t>
 constexpr void batch_reduced(auto &&func, bext_t &&, std::index_sequence<>,
                              std::integer_sequence<bool, is_input...>,
                              ios_t &&...ios) {
-    func(std::forward<ios_t>(ios)...);
+    func(unwrap_scalar(std::forward<ios_t>(ios))...);
 }
 
 template <bool keepdims, extents_c bext_t, std::size_t axis,

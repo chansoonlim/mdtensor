@@ -17,12 +17,12 @@ namespace ufunc {
 constexpr void isclose_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&rtol,
                              auto &&atol, const bool equal_nan) {
     if constexpr (requires {
-                      { std::isnan(in1()) } -> std::convertible_to<bool>;
-                      { std::isnan(in2()) } -> std::convertible_to<bool>;
+                      { std::isnan(in1) } -> std::convertible_to<bool>;
+                      { std::isnan(in2) } -> std::convertible_to<bool>;
                   }) {
         if (equal_nan) {
-            if (std::isnan(in1()) && std::isnan(in2())) {
-                out() = true;
+            if (std::isnan(in1) && std::isnan(in2)) {
+                out = true;
                 return;
             }
         }
@@ -30,26 +30,26 @@ constexpr void isclose_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&rtol,
 
     // if both inputs are inf and same sign, return true (numpy-like)
     if constexpr (requires {
-                      { std::isinf(in1()) } -> std::convertible_to<bool>;
-                      { std::isinf(in2()) } -> std::convertible_to<bool>;
-                      { std::signbit(in1()) } -> std::convertible_to<bool>;
-                      { std::signbit(in2()) } -> std::convertible_to<bool>;
+                      { std::isinf(in1) } -> std::convertible_to<bool>;
+                      { std::isinf(in2) } -> std::convertible_to<bool>;
+                      { std::signbit(in1) } -> std::convertible_to<bool>;
+                      { std::signbit(in2) } -> std::convertible_to<bool>;
                   }) {
-        if (std::isinf(in1()) && std::isinf(in2()) &&
-            std::signbit(in1()) == std::signbit(in2())) {
-            out() = true;
+        if (std::isinf(in1) && std::isinf(in2) &&
+            std::signbit(in1) == std::signbit(in2)) {
+            out = true;
             return;
         }
     }
 
-    using out_t = std::remove_cvref_t<decltype(out())>;
-    using calc_t = core::common_data_type_t<decltype(in1()), decltype(in2()),
-                                            decltype(rtol()), decltype(atol())>;
+    using out_t = std::remove_cvref_t<decltype(out)>;
+    using calc_t = core::common_data_type_t<decltype(in1), decltype(in2),
+                                            decltype(rtol), decltype(atol)>;
 
-    out() = static_cast<out_t>(
-        absolute(static_cast<calc_t>(in1()) - static_cast<calc_t>(in2())) <=
-        (static_cast<calc_t>(atol()) +
-         static_cast<calc_t>(rtol()) * absolute(static_cast<calc_t>(in2()))));
+    out = static_cast<out_t>(
+        absolute(static_cast<calc_t>(in1) - static_cast<calc_t>(in2)) <=
+        (static_cast<calc_t>(atol) +
+         static_cast<calc_t>(rtol) * absolute(static_cast<calc_t>(in2))));
 }
 
 } // namespace ufunc

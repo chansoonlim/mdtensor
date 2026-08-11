@@ -19,16 +19,16 @@ constexpr void clip_ufunc(auto &&in, auto &&min, auto &&max, auto &&out) {
     // when min > max, np.clip returns max, and std::clamp returns min.
     // mdtensor.clip is designed to match the behavior of np.clip.
 
-    using value_t = std::remove_cvref_t<decltype(in())>;
+    using value_t = std::remove_cvref_t<decltype(in)>;
 
-    out() = in();
+    out = in;
 
-    if constexpr (!core::nullopt_t_c<decltype(min())>) {
-        out() = std::max(out(), static_cast<value_t>(min()));
+    if constexpr (!core::nullopt_t_c<decltype(min)>) {
+        out = std::max(out, static_cast<value_t>(min));
     }
 
-    if constexpr (!core::nullopt_t_c<decltype(max())>) {
-        out() = std::min(out(), static_cast<value_t>(max()));
+    if constexpr (!core::nullopt_t_c<decltype(max)>) {
+        out = std::min(out, static_cast<value_t>(max));
     }
 }
 

@@ -109,6 +109,18 @@ concept mdspan_c = is_mdspan_v<std::remove_cvref_t<T>>;
     }
 }
 
+template <mdspan_c io_t>
+[[nodiscard]] constexpr decltype(auto) unwrap_scalar(io_t &&io) {
+    using base_t = std::remove_cvref_t<io_t>;
+
+    if constexpr (base_t::rank() == 0) {
+        return std::forward<io_t>(io)();
+
+    } else {
+        return std::forward<io_t>(io);
+    }
+}
+
 template <typename T>
 using to_mdspan_t = decltype(to_mdspan(std::declval<T>()));
 

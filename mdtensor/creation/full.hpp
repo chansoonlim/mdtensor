@@ -14,7 +14,7 @@
 namespace mdtensor {
 namespace ufunc {
 
-constexpr void full_ufunc(auto &&out, auto &&val) { out() = val(); }
+constexpr void full_ufunc(auto &&out, auto &&val) { out = val; }
 
 } // namespace ufunc
 

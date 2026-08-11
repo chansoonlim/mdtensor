@@ -14,7 +14,7 @@
 namespace mdtensor {
 namespace ufunc {
 
-constexpr void copy_ufunc(auto &&in, auto &&out) { out() = in(); }
+constexpr void copy_ufunc(auto &&in, auto &&out) { out = in; }
 
 } // namespace ufunc
 

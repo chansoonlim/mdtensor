@@ -27,7 +27,7 @@ template <std::floating_point value_t>
 }
 
 constexpr void rand_ufunc(auto &&out, auto &&engine) {
-    using value_t = std::remove_cvref_t<decltype(out())>;
+    using value_t = std::remove_cvref_t<decltype(out)>;
 
     static_assert(std::is_floating_point_v<value_t>,
                   "rand_ufunc requires floating-point value type.");
@@ -42,7 +42,7 @@ constexpr void rand_ufunc(auto &&out, auto &&engine) {
 
     if constexpr (value_bits <= base_bits) {
         const base_t bits = engine() >> (base_bits - value_bits);
-        out() = static_cast<value_t>(bits) * pow2_neg<value_t>(value_bits);
+        out = static_cast<value_t>(bits) * pow2_neg<value_t>(value_bits);
 
     } else {
         value_t result = value_t{0};
@@ -62,7 +62,7 @@ constexpr void rand_ufunc(auto &&out, auto &&engine) {
             remaining -= take;
         }
 
-        out() = result;
+        out = result;
     }
 }
 

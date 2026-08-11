@@ -16,14 +16,14 @@ namespace ufunc {
 
 constexpr void sign_ufunc(auto &&in, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    out() = (in() > 0) - (in() < 0);
+    out = (in > 0) - (in < 0);
 }
 
 } // namespace ufunc

@@ -16,14 +16,14 @@ namespace ufunc {
 
 constexpr void logical_not_ufunc(auto &&in, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    out() = (!static_cast<bool>(in()));
+    out = (!static_cast<bool>(in));
 }
 
 } // namespace ufunc

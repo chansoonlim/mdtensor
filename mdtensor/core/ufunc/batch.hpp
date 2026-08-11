@@ -32,7 +32,8 @@ namespace detail {
 template <std::size_t brank, mdspan_c io_t, mdspan_c... ios_t>
 constexpr void batch_impl_native(auto &&func, io_t &&io, ios_t &&...ios) {
     if constexpr (brank == 0) {
-        func(std::forward<io_t>(io), std::forward<ios_t>(ios)...);
+        func(unwrap_scalar(std::forward<io_t>(io)),
+             unwrap_scalar(std::forward<ios_t>(ios))...);
 
     } else {
         using index_t = typename std::remove_cvref_t<io_t>::index_type;
@@ -51,7 +52,8 @@ constexpr void batch_impl_native(auto &&func, io_t &&io, ios_t &&...ios) {
 template <std::size_t brank, mdspan_c io_t, mdspan_c... ios_t>
 void batch_impl_openmp(auto &&func, io_t &&io, ios_t &&...ios) {
     if constexpr (brank == 0) {
-        func(std::forward<io_t>(io), std::forward<ios_t>(ios)...);
+        func(unwrap_scalar(std::forward<io_t>(io)),
+             unwrap_scalar(std::forward<ios_t>(ios))...);
 
     } else {
         // Parallelize only the outermost batch axis.

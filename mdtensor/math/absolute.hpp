@@ -16,22 +16,22 @@ namespace ufunc {
 
 constexpr void absolute_ufunc(auto &&in, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    if constexpr (std::is_signed_v<std::remove_cvref_t<decltype(in())>>) {
+    if constexpr (std::is_signed_v<std::remove_cvref_t<decltype(in)>>) {
 #ifdef REAL_GCC // NOTE: std::abs is not constexpr in clang 16.
-        out() = std::abs(in());
+        out = std::abs(in);
 #else
-        out() = in() < 0 ? -in() : in();
+        out = in < 0 ? -in : in;
 #endif
 
     } else {
-        out() = in();
+        out = in;
     }
 }
 

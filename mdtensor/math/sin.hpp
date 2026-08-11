@@ -16,16 +16,16 @@ namespace ufunc {
 
 constexpr void sin_ufunc(auto &&in, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    using value_t = core::common_data_type_t<decltype(in()), decltype(out())>;
+    using value_t = core::common_data_type_t<decltype(in), decltype(out)>;
 
-    out() = std::sin(static_cast<value_t>(in()));
+    out = std::sin(static_cast<value_t>(in));
 }
 
 } // namespace ufunc

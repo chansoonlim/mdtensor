@@ -116,8 +116,8 @@ template <core::Backend backend = core::Backend::AUTO>
 constexpr void inv_to(auto &&in, auto &&out, auto &&valid) {
     core::batch_with_broadcast<backend>(
         [](auto &&in, auto &&out, auto &&valid) {
-            valid() = ufunc::inv_ufunc(std::forward<decltype(in)>(in),
-                                       std::forward<decltype(out)>(out));
+            valid = ufunc::inv_ufunc(std::forward<decltype(in)>(in),
+                                     std::forward<decltype(out)>(out));
         },
         std::index_sequence<2, 2, 0>{},
         std::integer_sequence<bool, true, false, false>{},

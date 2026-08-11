@@ -17,14 +17,14 @@ namespace ufunc {
 constexpr void logical_and_ufunc(auto &&in1, auto &&in2, auto &&out,
                                  auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    out() = (static_cast<bool>(in1()) && static_cast<bool>(in2()));
+    out = (static_cast<bool>(in1) && static_cast<bool>(in2));
 }
 
 } // namespace ufunc

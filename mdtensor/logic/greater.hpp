@@ -16,14 +16,14 @@ namespace ufunc {
 
 constexpr void greater_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
     if constexpr (requires {
-                      { where() == false } -> std::convertible_to<bool>;
+                      { where == false } -> std::convertible_to<bool>;
                   }) {
-        if (where() == false) {
+        if (where == false) {
             return;
         }
     }
 
-    out() = (in1() > in2());
+    out = (in1 > in2);
 }
 
 } // namespace ufunc

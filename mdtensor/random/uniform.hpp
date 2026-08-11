@@ -16,14 +16,13 @@ namespace ufunc {
 
 constexpr void uniform_ufunc(auto &&out, auto &&low, auto &&high,
                              auto &&engine) {
-    using value_t = std::remove_cvref_t<decltype(out())>;
+    using value_t = std::remove_cvref_t<decltype(out)>;
 
     rand_ufunc(std::forward<decltype(out)>(out),
                std::forward<decltype(engine)>(engine));
 
-    out() =
-        (static_cast<value_t>(high()) - static_cast<value_t>(low())) * out() +
-        static_cast<value_t>(low());
+    out = (static_cast<value_t>(high) - static_cast<value_t>(low)) * out +
+          static_cast<value_t>(low);
 }
 
 } // namespace ufunc
