@@ -26,10 +26,10 @@ namespace std::experimental {
  */
 
 
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/batch.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/base.hpp
 /**
  * @file
- * @brief Batch utilities for mdtensor.
+ * @brief Base utilities for mdtensor.
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -37,10 +37,10 @@ namespace std::experimental {
  */
 
 
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/broadcast.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/common.hpp
 /**
  * @file
- * @brief Broadcast utilities for mdtensor.
+ * @brief Common utilities for mdtensor.
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -48,40 +48,7 @@ namespace std::experimental {
  */
 
 
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/extents.hpp
-/**
- * @file
- * @brief Extents utilities for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/util.hpp
-/**
- * @file
- * @brief Other utility functions for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/mdspan.hpp
-/**
- * @file
- * @brief Mdspan utilities for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/type.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type.hpp
 /**
  * @file
  * @brief Type utilities for mdtensor.
@@ -131,10 +98,6 @@ namespace core {
 
 namespace stdex = std::experimental;
 
-// ------------------------------------------------------------------
-// - general type aliases -------------------------------------------
-// ------------------------------------------------------------------
-
 template <typename T>
 concept integral_c = std::integral<std::remove_cvref_t<T>>;
 
@@ -145,189 +108,8 @@ template <typename T>
 concept floating_point_c = std::floating_point<std::remove_cvref_t<T>>;
 
 template <typename T>
-concept arithmetic = std::integral<std::remove_cvref_t<T>> ||
-                     std::floating_point<std::remove_cvref_t<T>>;
-
-template <typename T>
-concept arithmetic_c = arithmetic<std::remove_cvref_t<T>>;
-
-// ------------------------------------------------------------------
-// - extents type aliases -------------------------------------------
-// ------------------------------------------------------------------
-
-template <typename IndexType, std::size_t... Extents>
-using extents = stdex::extents<IndexType, Extents...>;
-
-template <typename IndexType, std::size_t Rank>
-using dextents = stdex::dextents<IndexType, Rank>;
-
-#if false
-// dims: will be included in C++23
-// (https://en.cppreference.com/w/cpp/container/mdspan/extents)
-template <std::size_t Rank, class IndexType = std::size_t>
-using dims = stdex::dims<IndexType, Rank>;
-
-#else
-template <std::size_t Rank, class IndexType = std::size_t>
-using dims = stdex::dextents<IndexType, Rank>;
-
-#endif
-
-namespace detail {
-
-template <typename T> struct is_extents_impl : std::false_type {};
-
-template <typename IndexType, std::size_t... Extents>
-struct is_extents_impl<stdex::extents<IndexType, Extents...>> : std::true_type {
-};
-
-} // namespace detail
-
-// NOTE: stdex::detail::__is_extents is not used for godbolt test compatibility
-template <typename T> struct is_extents : detail::is_extents_impl<T> {};
-
-template <typename T> constexpr bool is_extents_v = is_extents<T>::value;
-
-template <typename T>
-concept extents_c = is_extents_v<std::remove_cvref_t<T>>;
-
-namespace detail {
-
-template <typename T> struct is_extents_tuple_impl : std::false_type {};
-
-template <typename... Ts>
-struct is_extents_tuple_impl<std::tuple<Ts...>>
-    : std::conjunction<is_extents<std::remove_cvref_t<Ts>>...> {};
-
-} // namespace detail
-
-template <typename T>
-struct is_extents_tuple : detail::is_extents_tuple_impl<T> {};
-
-template <typename T>
-constexpr bool is_extents_tuple_v = is_extents_tuple<T>::value;
-
-template <typename T>
-concept extents_tuple_c = is_extents_tuple_v<T>;
-
-constexpr auto dynamic_extent = stdex::dynamic_extent;
-constexpr auto dyn = dynamic_extent;
-
-// ------------------------------------------------------------------
-// - mdspan type aliases --------------------------------------------
-// ------------------------------------------------------------------
-
-template <typename ElementType, typename Extents,
-          typename LayoutPolicy = stdex::layout_right,
-          typename AccessorPolicy = stdex::default_accessor<ElementType>>
-using mdspan =
-    stdex::mdspan<ElementType, Extents, LayoutPolicy, AccessorPolicy>;
-
-namespace detail {
-
-template <typename T> struct is_mdspan_impl : std::false_type {};
-
-template <typename ElementType, typename ExtentsType, typename LayoutType,
-          typename AccessorType>
-struct is_mdspan_impl<
-    mdspan<ElementType, ExtentsType, LayoutType, AccessorType>>
-    : std::true_type {};
-
-} // namespace detail
-
-template <typename T> struct is_mdspan : detail::is_mdspan_impl<T> {};
-
-template <typename T> constexpr bool is_mdspan_v = is_mdspan<T>::value;
-
-template <typename T>
-concept mdspan_c = is_mdspan_v<std::remove_cvref_t<T>>;
-
-constexpr auto full_extent = stdex::full_extent;
-
-// ------------------------------------------------------------------
-// - mdarray type aliases ------------------------------------------
-// ------------------------------------------------------------------
-
-template <typename ElementType, typename Extents,
-          typename LayoutPolicy = stdex::layout_right,
-          typename Container = std::vector<ElementType>>
-using mdarray = stdex::mdarray<ElementType, Extents, LayoutPolicy, Container>;
-
-namespace detail {
-
-template <typename T> struct is_mdarray_impl : std::false_type {};
-
-template <typename ElementType, typename ExtentsType, typename LayoutType,
-          typename ContainerType>
-struct is_mdarray_impl<
-    mdarray<ElementType, ExtentsType, LayoutType, ContainerType>>
-    : std::true_type {};
-
-} // namespace detail
-
-template <typename T> struct is_mdarray : detail::is_mdarray_impl<T> {};
-
-template <typename T> constexpr bool is_mdarray_v = is_mdarray<T>::value;
-
-template <typename T>
-concept mdarray_c = is_mdarray_v<std::remove_cvref_t<T>>;
-
-// ------------------------------------------------------------------
-// - backend type aliases ---------------------------------------------
-// ------------------------------------------------------------------
-
-enum class Backend {
-    AUTO,   // Automatically select backend based on input types and sizes
-    NATIVE, // Native mdtensor implementation
-    SIMD,   // SIMD parallelization
-
-#ifdef MDTENSOR_USE_EIGEN
-    EIGEN, // Eigen backend
-#endif
-
-#ifdef MDTENSOR_USE_OPENMP
-    OPENMP, // CPU multi-processing with OpenMP
-#endif
-};
-
-namespace detail {
-
-template <typename T> struct is_backend_impl : std::false_type {};
-
-template <> struct is_backend_impl<Backend> : std::true_type {};
-
-} // namespace detail
-
-template <typename T> struct is_backend : detail::is_backend_impl<T> {};
-
-template <typename T> constexpr bool is_backend_v = is_backend<T>::value;
-
-template <typename T>
-concept backend_c = is_backend_v<std::remove_cvref_t<T>>;
-
-// ------------------------------------------------------------------
-// - copy type aliases ----------------------------------------------
-// ------------------------------------------------------------------
-
-enum class Copy : std::uint8_t {
-    TRUE,  // Copy the input tensor to a new tensor
-    FALSE, // Do not copy the input tensor; return a view of the input tensor
-    AUTO,  // Automatically determine whether to copy or not based on input
-};
-
-// ------------------------------------------------------------------
-// - strided_slice type aliases -------------------------------------
-// ------------------------------------------------------------------
-
-template <std::size_t start, std::size_t end>
-using slice =
-    stdex::strided_slice<std::integral_constant<std::size_t, start>,
-                         std::integral_constant<std::size_t, end - start>,
-                         std::integral_constant<std::size_t, 1>>;
-
-// ------------------------------------------------------------------
-// - is_nullopt_t type aliases --------------------------------------
-// ------------------------------------------------------------------
+concept arithmetic_c = std::integral<std::remove_cvref_t<T>> ||
+                       std::floating_point<std::remove_cvref_t<T>>;
 
 namespace detail {
 
@@ -342,11 +124,121 @@ template <typename T> struct is_nullopt_t : detail::is_nullopt_impl<T> {};
 template <typename T> constexpr bool is_nullopt_t_v = is_nullopt_t<T>::value;
 
 template <typename T>
-concept is_nullopt_t_c = is_nullopt_t_v<std::remove_cvref_t<T>>;
+concept nullopt_t_c = is_nullopt_t_v<std::remove_cvref_t<T>>;
 
-// ------------------------------------------------------------------
-// - common_index_type_t helpers ------------------------------------
-// ------------------------------------------------------------------
+} // namespace core
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type.hpp
+
+namespace mdtensor::core {
+
+template <std::integral index_t>
+[[nodiscard]] constexpr index_t bounding_index(index_t index,
+                                               const std::size_t &bound) {
+    if constexpr (std::is_signed_v<index_t>) {
+        if (index < index_t{0}) {
+            index = static_cast<index_t>(bound + 1 -
+                                         static_cast<std::size_t>(-index));
+        }
+    }
+
+    if (index < index_t{0} || bound < static_cast<std::size_t>(index)) {
+        throw std::out_of_range(
+            "Index is out of bounds: " + std::to_string(index) +
+            " is not in [0, " + std::to_string(bound) + ").");
+    }
+
+    return index;
+}
+
+template <std::integral in_t, in_t... ins, typename compare_t>
+[[nodiscard]] consteval auto
+get_sorted_array(std::integer_sequence<in_t, ins...>,
+                 compare_t compare) noexcept {
+    auto arr = std::array{ins...};
+    std::sort(arr.begin(), arr.end(), compare);
+    return arr;
+}
+
+template <std::size_t rank, std::integral axes_t, axes_t... axes,
+          typename compare_t>
+[[nodiscard]] consteval auto
+get_sorted_axes(std::integer_sequence<axes_t, axes...>,
+                compare_t compare) noexcept {
+    constexpr auto arr =
+        get_sorted_array(std::index_sequence<static_cast<std::size_t>(
+                             bounding_index<axes_t>(axes, rank - 1))...>{},
+                         compare);
+
+    if constexpr (1 < arr.size()) {
+        static_assert(
+            [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                return ((arr[Is] != arr[Is + 1]) && ...);
+            }(std::make_index_sequence<arr.size() - 1>{}),
+            "Duplicate axes are not allowed.");
+    }
+
+    return arr;
+}
+
+template <typename value_t, std::size_t size>
+[[nodiscard]] constexpr bool contains(const std::array<value_t, size> &array,
+                                      const value_t &value) noexcept {
+    for (const auto element : array) {
+        if (element == value) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/common.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/extents.hpp
+/**
+ * @file
+ * @brief Extents utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor::core {
+
+template <typename IndexType, std::size_t... Extents>
+using extents = stdex::extents<IndexType, Extents...>;
+
+template <typename IndexType, std::size_t Rank>
+using dextents = stdex::dextents<IndexType, Rank>;
+
+// NOTE: dims will be included in C++23
+// (https://en.cppreference.com/w/cpp/container/mdspan/extents)
+template <std::size_t Rank, class IndexType = std::size_t>
+using dims = dextents<IndexType, Rank>;
+
+namespace detail {
+
+template <typename T> struct is_extents_impl : std::false_type {};
+
+template <typename IndexType, std::size_t... Extents>
+struct is_extents_impl<extents<IndexType, Extents...>> : std::true_type {};
+
+} // namespace detail
+
+// NOTE: stdex::detail::__is_extents is not used for godbolt test compatibility
+template <typename T> struct is_extents : detail::is_extents_impl<T> {};
+
+template <typename T> constexpr bool is_extents_v = is_extents<T>::value;
+
+template <typename T>
+concept extents_c = is_extents_v<std::remove_cvref_t<T>>;
+
+constexpr auto dynamic_extent = stdex::dynamic_extent;
+constexpr auto dyn = dynamic_extent;
 
 namespace detail {
 
@@ -435,10 +327,838 @@ template <typename... Ts>
 using common_index_type_t =
     typename detail::common_index_type_impl<Ts...>::type;
 
-// ------------------------------------------------------------------
-// - common_data_type_t helpers -------------------------------------
-// ------------------------------------------------------------------
+[[nodiscard]] constexpr auto to_extents(auto &&shape) {
+    using base_t = std::remove_cvref_t<decltype(shape)>;
 
+    if constexpr (extents_c<base_t>) {
+        // If the input is already an extents, just return it as-is
+        return std::forward<decltype(shape)>(shape);
+
+    } else if constexpr (integral_c<base_t>) {
+        if (shape < base_t{0}) {
+            throw std::invalid_argument("shape must be non-negative");
+        }
+
+        using index_t = std::make_unsigned_t<base_t>;
+
+        return dextents<index_t, 1>{static_cast<index_t>(shape)};
+    }
+}
+
+template <extents_c in_t>
+[[nodiscard]] constexpr std::size_t extents_size(in_t &&in) noexcept {
+    if constexpr (in.rank() == 0) {
+        // NOTE: mdspan with rank 0 can capture a single element.
+        return 1;
+
+    } else if constexpr (in.rank_dynamic() == 0) {
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            return (in.static_extent(Is) * ...);
+        }(std::make_index_sequence<in.rank()>{});
+
+    } else {
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            return (static_cast<std::size_t>(in.extent(Is)) * ...);
+        }(std::make_index_sequence<in.rank()>{});
+    }
+}
+
+template <extents_c in_t>
+[[nodiscard]] consteval bool is_always_same_extents() noexcept {
+    return true;
+}
+
+template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
+[[nodiscard]] consteval bool is_always_same_extents() noexcept {
+    using base1_t = std::remove_cvref_t<in1_t>;
+    using base2_t = std::remove_cvref_t<in2_t>;
+
+    if constexpr (base1_t::rank() != base2_t::rank()) {
+        return false;
+
+    } else if constexpr (base1_t::rank_dynamic() != 0 ||
+                         base2_t::rank_dynamic() != 0) {
+        return false;
+
+    } else if constexpr ([&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                             return ((base1_t::static_extent(Is) !=
+                                      base2_t::static_extent(Is)) ||
+                                     ...);
+                         }(std::make_index_sequence<base1_t::rank()>{})) {
+        return false;
+    }
+
+    if constexpr (sizeof...(ins_t) != 0) {
+        return is_always_same_extents<in2_t, ins_t...>();
+
+    } else {
+        return true;
+    }
+}
+
+template <extents_c in_t>
+[[nodiscard]] constexpr bool is_same_extents(in_t &&in) noexcept {
+    return true;
+}
+
+template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
+[[nodiscard]] constexpr bool is_same_extents(in1_t &&in1, in2_t &&in2,
+                                             ins_t &&...ins) noexcept {
+    // NOTE: direct comparison of extents cannot catch rank difference.
+
+    using base1_t = std::remove_cvref_t<in1_t>;
+    using base2_t = std::remove_cvref_t<in2_t>;
+
+    if constexpr (base1_t::rank() != base2_t::rank()) {
+        return false;
+    }
+
+    using index_t = common_index_type_t<typename base1_t::index_type,
+                                        typename base2_t::index_type>;
+
+    for (std::size_t i = 0; i < base1_t::rank(); i++) {
+        if (static_cast<index_t>(in1.extent(i)) !=
+            static_cast<index_t>(in2.extent(i))) {
+            return false;
+        }
+    }
+
+    if constexpr (sizeof...(ins_t) != 0) {
+        return is_same_extents(in2, ins...);
+
+    } else {
+        return true;
+    }
+}
+
+template <std::size_t offset, std::size_t rank, extents_c in_t>
+[[nodiscard]] constexpr auto slice_extents(in_t &&in) noexcept {
+    using index_t = typename std::remove_cvref_t<in_t>::index_type;
+
+    static_assert(in.rank() >= offset + rank,
+                  "Incompatible offset and rank for slicing.");
+
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return extents<index_t, in.static_extent(offset + Is)...>{
+            in.extent(offset + Is)...};
+    }(std::make_index_sequence<rank>{});
+}
+
+template <std::size_t rank, extents_c in_t>
+[[nodiscard]] constexpr auto slice_extents_from_left(in_t &&in) noexcept {
+    return slice_extents<0, rank>(std::forward<in_t>(in));
+}
+
+template <std::size_t rank, extents_c in_t>
+[[nodiscard]] constexpr auto slice_extents_from_right(in_t &&in) noexcept {
+    return slice_extents<std::remove_cvref_t<in_t>::rank() - rank, rank>(
+        std::forward<in_t>(in));
+}
+
+template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
+[[nodiscard]] constexpr auto compose_extents(in1_t &&in1, in2_t &&in2,
+                                             ins_t &&...ins) noexcept {
+    using base1_t = std::remove_cvref_t<in1_t>;
+    using base2_t = std::remove_cvref_t<in2_t>;
+    using index_t = common_index_type_t<typename base1_t::index_type,
+                                        typename base2_t::index_type>;
+
+    const auto cexts =
+        [&]<std::size_t... Is, std::size_t... Js>(std::index_sequence<Is...>,
+                                                  std::index_sequence<Js...>) {
+            return extents<index_t, base1_t::static_extent(Is)...,
+                           base2_t::static_extent(Js)...>{
+                static_cast<index_t>(in1.extent(Is))...,
+                static_cast<index_t>(in2.extent(Js))...};
+        }(std::make_index_sequence<base1_t::rank()>{},
+          std::make_index_sequence<base2_t::rank()>{});
+
+    if constexpr (sizeof...(ins_t) == 0) {
+        return cexts;
+
+    } else {
+        return compose_extents(cexts, std::forward<ins_t>(ins)...);
+    }
+}
+
+namespace {
+
+template <extents_c in_t>
+[[nodiscard]] constexpr auto expand_extents_dims_impl_(in_t &&in,
+                                                       std::index_sequence<>) {
+    return std::forward<in_t>(in);
+}
+
+template <extents_c in_t, std::size_t axis, std::size_t... axes>
+[[nodiscard]] constexpr auto
+expand_extents_dims_impl_(in_t &&in, std::index_sequence<axis, axes...>) {
+    // NOTE: this function requires ordered axes and does not check duplicates.
+
+    using base_t = std::remove_cvref_t<in_t>;
+
+    return expand_extents_dims_impl_(
+        compose_extents(slice_extents_from_left<axis>(std::forward<in_t>(in)),
+                        extents<uint8_t, 1>{},
+                        slice_extents_from_right<base_t::rank() - axis>(
+                            std::forward<in_t>(in))),
+        std::index_sequence<axes...>{});
+}
+
+} // namespace
+
+template <extents_c in_t, std::integral axes_t, axes_t... axes>
+[[nodiscard]] constexpr auto
+expand_extents_dims(in_t &&in, std::integer_sequence<axes_t, axes...>) {
+    constexpr auto axes_sorted = get_sorted_axes<in.rank() + sizeof...(axes)>(
+        std::integer_sequence<axes_t, axes...>{}, std::less<std::size_t>{});
+
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return expand_extents_dims_impl_(
+            std::forward<in_t>(in), std::index_sequence<axes_sorted[Is]...>{});
+    }(std::make_index_sequence<axes_sorted.size()>{});
+}
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/extents.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/mdarray.hpp
+/**
+ * @file
+ * @brief Mdarray utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor::core {
+
+template <typename ElementType, typename Extents,
+          typename LayoutPolicy = stdex::layout_right,
+          typename Container = std::vector<ElementType>>
+using mdarray = stdex::mdarray<ElementType, Extents, LayoutPolicy, Container>;
+
+namespace detail {
+
+template <typename T> struct is_mdarray_impl : std::false_type {};
+
+template <typename ElementType, typename ExtentsType, typename LayoutType,
+          typename ContainerType>
+struct is_mdarray_impl<
+    mdarray<ElementType, ExtentsType, LayoutType, ContainerType>>
+    : std::true_type {};
+
+} // namespace detail
+
+template <typename T> struct is_mdarray : detail::is_mdarray_impl<T> {};
+
+template <typename T> constexpr bool is_mdarray_v = is_mdarray<T>::value;
+
+template <typename T>
+concept mdarray_c = is_mdarray_v<std::remove_cvref_t<T>>;
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/mdarray.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/mdspan.hpp
+/**
+ * @file
+ * @brief Mdspan utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor::core {
+
+template <typename ElementType, typename Extents,
+          typename LayoutPolicy = stdex::layout_right,
+          typename AccessorPolicy = stdex::default_accessor<ElementType>>
+using mdspan =
+    stdex::mdspan<ElementType, Extents, LayoutPolicy, AccessorPolicy>;
+
+namespace detail {
+
+template <typename T> struct is_mdspan_impl : std::false_type {};
+
+template <typename ElementType, typename ExtentsType, typename LayoutType,
+          typename AccessorType>
+struct is_mdspan_impl<
+    mdspan<ElementType, ExtentsType, LayoutType, AccessorType>>
+    : std::true_type {};
+
+} // namespace detail
+
+template <typename T> struct is_mdspan : detail::is_mdspan_impl<T> {};
+
+template <typename T> constexpr bool is_mdspan_v = is_mdspan<T>::value;
+
+template <typename T>
+concept mdspan_c = is_mdspan_v<std::remove_cvref_t<T>>;
+
+[[nodiscard]] constexpr auto to_mdspan(auto &&io) {
+    if constexpr (mdspan_c<decltype(io)>) {
+        // If the input is already an mdspan, just return it as-is
+        return std::forward<decltype(io)>(io);
+
+    } else if constexpr (requires { io.to_mdspan(); }) {
+        // If the input has a to_mdspan() member function, call it
+        return io.to_mdspan();
+
+    } else {
+        // If the input is not an mdspan,
+        // create a new mdspan that points to the input data
+        using element_t = std::remove_reference_t<decltype(io)>;
+        using extents_t = extents<std::uint8_t>;
+
+        return mdspan<element_t, extents_t>{std::addressof(io), extents_t{}};
+    }
+}
+
+[[nodiscard]] constexpr auto to_const_mdspan(auto &&in) {
+    if constexpr (mdspan_c<decltype(in)>) {
+        if constexpr (std::is_const_v<typename std::remove_reference_t<
+                          decltype(in)>::element_type>) {
+            // If the input is already a const mdspan, just return it as-is
+            return std::forward<decltype(in)>(in);
+
+        } else {
+            // If the input is a non-const mdspan,
+            // create a new const mdspan with the same data handle and mapping
+            using in_t = std::remove_cvref_t<decltype(in)>;
+
+            return mdspan<
+                const typename in_t::value_type, typename in_t::extents_type,
+                typename in_t::layout_type,
+                stdex::default_accessor<const typename in_t::value_type>>(
+                in.data_handle(), in.mapping(), {});
+        }
+
+    } else {
+        // If the input is not an mdspan,
+        // create a new const mdspan with the same data handle and mapping
+        auto mds = to_mdspan(std::forward<decltype(in)>(in));
+
+        using mds_t = std::remove_cvref_t<decltype(mds)>;
+
+        return mdspan<
+            const typename mds_t::value_type, typename mds_t::extents_type,
+            typename mds_t::layout_type,
+            stdex::default_accessor<const typename mds_t::value_type>>(
+            mds.data_handle(), mds.mapping(), {});
+    }
+}
+
+[[nodiscard]] constexpr auto to_output_mdspan(auto &&out) {
+    if constexpr (mdspan_c<decltype(out)>) {
+        static_assert(
+            !std::is_const_v<
+                typename std::remove_reference_t<decltype(out)>::element_type>,
+            "Output mdspan must not be const");
+
+        // If the output is already an mdspan, just return it as-is
+        return std::forward<decltype(out)>(out);
+
+    } else {
+        static_assert(std::is_lvalue_reference_v<decltype(out)>,
+                      "Output owners and scalars must be passed as lvalues.");
+
+        return to_mdspan(std::forward<decltype(out)>(out));
+    }
+}
+
+template <typename T>
+using to_mdspan_t = decltype(to_mdspan(std::declval<T>()));
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/mdspan.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/submdspan.hpp
+/**
+ * @file
+ * @brief Submdspan utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor::core {
+
+constexpr auto full_extent = stdex::full_extent;
+
+template <std::size_t start, std::size_t end>
+using slice =
+    stdex::strided_slice<std::integral_constant<std::size_t, start>,
+                         std::integral_constant<std::size_t, end - start>,
+                         std::integral_constant<std::size_t, 1>>;
+
+[[nodiscard]] constexpr auto submdspan(auto &&io, auto &&...slices) {
+    return stdex::submdspan(to_mdspan(std::forward<decltype(io)>(io)),
+                            std::forward<decltype(slices)>(slices)...);
+}
+
+template <std::size_t lspace = 0, std::size_t rspace = 0>
+[[nodiscard]] constexpr auto submdspan_with_space(auto &&io, auto &&...slices) {
+    return [&]<std::size_t... Is, std::size_t... Js>(
+               std::index_sequence<Is...>, std::index_sequence<Js...>) {
+        return submdspan(to_mdspan(std::forward<decltype(io)>(io)),
+                         ((void)Is, full_extent)...,
+                         std::forward<decltype(slices)>(slices)...,
+                         ((void)Js, full_extent)...);
+    }(std::make_index_sequence<lspace>{}, std::make_index_sequence<rspace>{});
+}
+
+template <std::size_t lspace = 0>
+[[nodiscard]] constexpr auto submdspan_from_left(auto &&io, auto &&...slices) {
+    using base_t = std::remove_reference_t<decltype(io)>;
+
+    constexpr std::size_t rspace =
+        to_mdspan_t<base_t>::rank() - (lspace + sizeof...(slices));
+
+    return submdspan_with_space<lspace, rspace>(
+        std::forward<decltype(io)>(io),
+        std::forward<decltype(slices)>(slices)...);
+}
+
+template <std::size_t rspace = 0>
+[[nodiscard]] constexpr auto submdspan_from_right(auto &&io, auto &&...slices) {
+    using base_t = std::remove_reference_t<decltype(io)>;
+
+    constexpr std::size_t lspace =
+        to_mdspan_t<base_t>::rank() - (rspace + sizeof...(slices));
+
+    return submdspan_with_space<lspace, rspace>(
+        std::forward<decltype(io)>(io),
+        std::forward<decltype(slices)>(slices)...);
+}
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/submdspan.hpp
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/base.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/broadcast/broadcast.hpp
+/**
+ * @file
+ * @brief Broadcast utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/broadcast/bcast.hpp
+/**
+ * @file
+ * @brief Broadcast utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/broadcast/bcast_extents.hpp
+/**
+ * @file
+ * @brief Broadcast extents utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor::core {
+namespace detail {
+
+template <std::size_t I, std::size_t brank, extents_c in_t>
+[[nodiscard]] consteval std::size_t aligned_static_extent() noexcept {
+    using base_t = std::remove_cvref_t<in_t>;
+
+    constexpr std::size_t rank = base_t::rank();
+
+    static_assert(I < brank, "Index I must be less than broadcast rank brank.");
+    static_assert(rank <= brank,
+                  "Input rank must be less than or equal to broadcast rank.");
+
+    if constexpr (I < brank - rank) {
+        return 1;
+
+    } else {
+        return base_t::static_extent(I - (brank - rank));
+    }
+}
+
+template <std::size_t... Extents>
+[[nodiscard]] consteval std::size_t broadcast_static_extent() noexcept {
+    static_assert(sizeof...(Extents) > 0,
+                  "At least one extent must be provided for broadcasting.");
+
+    if constexpr (((Extents == 1 || Extents == dyn) && ...)) {
+        // return dyn if any extent is dyn, else return 1
+        return std::max({Extents...});
+
+    } else {
+        // select the extent that is not 1 or dyn
+        constexpr std::size_t bext =
+            std::max({((Extents != 1 && Extents != dyn) ? Extents : 0)...});
+
+        static_assert(
+            ((Extents == bext || Extents == 1 || Extents == dyn) && ...),
+            "Incompatible static extents for broadcasting.");
+
+        return bext;
+    }
+}
+
+template <std::size_t I, std::size_t brank, extents_c in_t>
+[[nodiscard]] constexpr auto aligned_extent(in_t &&in) noexcept {
+    using index_t = typename std::remove_cvref_t<in_t>::index_type;
+
+    constexpr std::size_t rank = in.rank();
+
+    static_assert(I < brank, "Index I must be less than broadcast rank brank.");
+    static_assert(rank <= brank,
+                  "Input rank must be less than or equal to broadcast rank.");
+
+    if constexpr (I < brank - rank) {
+        return index_t{1};
+
+    } else {
+        return in.extent(I - (brank - rank));
+    }
+}
+
+template <typename index_t, std::convertible_to<index_t>... exts_t>
+[[nodiscard]] constexpr index_t broadcast_extent(exts_t &&...exts) {
+    static_assert(sizeof...(exts) > 0,
+                  "At least one extent must be provided for broadcasting.");
+
+    index_t bext = 1;
+
+    for (const index_t &ext : {static_cast<index_t>(exts)...}) {
+        if (ext == 1) {
+            continue;
+
+        } else if (bext == 1) {
+            bext = ext;
+
+        } else if (ext != bext) {
+            throw std::invalid_argument(
+                "Incompatible extents for broadcasting.");
+        }
+    }
+
+    return bext;
+}
+
+} // namespace detail
+
+template <extents_c... ins_t>
+[[nodiscard]] constexpr auto broadcast_extents(ins_t &&...ins) {
+    static_assert(sizeof...(ins) > 0,
+                  "At least one extents must be provided for broadcasting.");
+
+    using index_t =
+        common_index_type_t<typename std::remove_cvref_t<ins_t>::index_type...>;
+
+    constexpr std::size_t brank = std::max({ins.rank()...});
+
+    if constexpr (brank == 0) {
+        return extents<index_t>{};
+
+    } else {
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            const auto static_extent_at = [&]<std::size_t I>() {
+                return detail::broadcast_static_extent<
+                    detail::aligned_static_extent<I, brank, ins_t>()...>();
+            };
+
+            const auto extent_at = [&]<std::size_t I>() {
+                return detail::broadcast_extent<index_t>(
+                    detail::aligned_extent<I, brank>(
+                        std::forward<ins_t>(ins))...);
+            };
+
+            return extents<index_t,
+                           static_extent_at.template operator()<Is>()...> {
+                extent_at.template operator()<Is>()...
+            };
+        }(std::make_index_sequence<brank>{});
+    }
+}
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/broadcast/bcast_extents.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/broadcast/bcast_to.hpp
+/**
+ * @file
+ * @brief Broadcast utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor::core {
+
+[[nodiscard]] constexpr auto broadcast_to(auto &&in, auto &&shape) {
+    const auto in_mds = to_const_mdspan(std::forward<decltype(in)>(in));
+    const auto exts = to_extents(std::forward<decltype(shape)>(shape));
+
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
+    using exts_t = std::remove_cvref_t<decltype(exts)>;
+
+    constexpr std::size_t org_rank = in_mds_t::rank();
+    constexpr std::size_t new_rank = exts_t::rank();
+
+    static_assert(org_rank <= new_rank, "Incompatible ranks for broadcasting.");
+
+    if constexpr (is_always_same_extents<typename in_mds_t::extents_type,
+                                         exts_t>()) {
+        return in_mds; // change to const mdspan
+
+    } else if constexpr (org_rank == 0) {
+        using index_t = typename exts_t::index_type;
+
+        auto new_strides = std::array<index_t, new_rank>{};
+
+        for (std::size_t i = 0; i < new_rank; i++) {
+            new_strides[i] = 0;
+        }
+
+        return mdspan<typename in_mds_t::element_type, exts_t,
+                      stdex::layout_stride, typename in_mds_t::accessor_type>{
+            in_mds.data_handle(),
+            stdex::layout_stride::mapping{exts, new_strides}};
+
+    } else {
+        using index_t = typename exts_t::index_type;
+        using cindex_t =
+            common_index_type_t<typename in_mds_t::index_type, index_t>;
+
+        // ni = new_rank - org_rank + oi
+        const auto get_ni = [](std::size_t i) {
+            return new_rank - org_rank + i;
+        };
+
+        // assertion
+        static_assert(
+            [&] {
+                for (std::size_t i = 0; i < org_rank; i++) {
+                    const auto src = in_mds_t::static_extent(i);
+                    const auto dst = exts_t::static_extent(get_ni(i));
+
+                    if (src != dyn && dst != dyn && src != dst && src != 1) {
+                        return false;
+                    }
+                }
+                return true;
+            }(),
+            "Incompatible extents for broadcasting.");
+
+        for (std::size_t i = 0; i < org_rank; i++) {
+            if (static_cast<cindex_t>(in_mds.extent(i)) !=
+                    static_cast<cindex_t>(exts.extent(get_ni(i))) &&
+                static_cast<cindex_t>(in_mds.extent(i)) != cindex_t{1}) {
+                throw std::invalid_argument(
+                    "Incompatible extents for broadcasting.");
+            }
+        }
+
+        // calculation
+        auto new_strides = std::array<index_t, new_rank>{};
+
+        for (std::size_t i = 0; i < new_rank - org_rank; i++) {
+            new_strides[i] = 0;
+        }
+
+        for (std::size_t i = 0; i < org_rank; i++) {
+            if (static_cast<cindex_t>(in_mds.extent(i)) ==
+                static_cast<cindex_t>(exts.extent(get_ni(i)))) {
+                new_strides[get_ni(i)] = static_cast<index_t>(in_mds.stride(i));
+
+            } else {
+                new_strides[get_ni(i)] = 0;
+            }
+        }
+
+        return mdspan<typename in_mds_t::element_type, exts_t,
+                      stdex::layout_stride, typename in_mds_t::accessor_type>{
+            in_mds.data_handle(),
+            stdex::layout_stride::mapping{exts, new_strides}};
+    }
+}
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/broadcast/bcast_to.hpp
+
+namespace mdtensor::core {
+namespace detail {
+
+template <std::size_t... uranks, mdspan_c... ios_t>
+[[nodiscard]] constexpr auto
+get_broadcast_extents(std::index_sequence<uranks...>, ios_t &&...ios) {
+    static_assert(sizeof...(uranks) == sizeof...(ios_t),
+                  "Number of uranks must match number of inputs.");
+    static_assert(((ios.rank() >= uranks) && ...),
+                  "Input rank must be greater than or equal to urank.");
+
+    return broadcast_extents(
+        slice_extents_from_left<ios.rank() - uranks>(ios.extents())...);
+}
+
+} // namespace detail
+
+template <std::size_t... uranks, bool... bcast>
+[[nodiscard]] constexpr auto broadcast(std::index_sequence<uranks...>,
+                                       std::integer_sequence<bool, bcast...>,
+                                       auto &&...ios) {
+    static_assert(sizeof...(uranks) == sizeof...(ios));
+    static_assert(sizeof...(bcast) == sizeof...(ios));
+
+    // calculate mdspans for inputs and outputs
+    const auto ios_mds =
+        std::make_tuple(to_mdspan(std::forward<decltype(ios)>(ios))...);
+
+    // calculate broadcasted extents
+    constexpr auto ur = std::array{uranks...};
+
+    const auto bexts = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return detail::get_broadcast_extents(std::index_sequence<ur[Is]...>{},
+                                             std::get<Is>(ios_mds)...);
+    }(std::make_index_sequence<sizeof...(ios)>{});
+
+    // calculate broadcasted mdspans
+    constexpr auto bc = std::array{bcast...};
+
+    return std::make_tuple(
+        [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            const auto get_broadcasted = [&]<std::size_t I>() {
+                if constexpr (!bc[I]) {
+                    // change to mdspan without broadcasting
+                    return std::get<I>(ios_mds);
+
+                } else if constexpr (bexts.rank() == 0) {
+                    // change to const mdspan without broadcasting
+                    return to_const_mdspan(std::get<I>(ios_mds));
+
+                } else {
+                    // broadcast to const mdspan
+                    return broadcast_to(
+                        std::get<I>(ios_mds),
+                        compose_extents(bexts,
+                                        slice_extents_from_right<ur[I]>(
+                                            std::get<I>(ios_mds).extents())));
+                }
+            };
+
+            return std::make_tuple(
+                get_broadcasted.template operator()<Is>()...);
+        }(std::make_index_sequence<sizeof...(ios)>{}),
+        bexts);
+}
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/broadcast/bcast.hpp
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/broadcast/broadcast.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/manipulation/manipulation.hpp
+/**
+ * @file
+ * @brief Manipulation utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/manipulation/expand_dims.hpp
+/**
+ * @file
+ * @brief Expand dimensions utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/manipulation/reshape.hpp
+/**
+ * @file
+ * @brief Reshape utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/tensor.hpp
+/**
+ * @file
+ * @brief Tensor utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/make_broadcasted_tensor.hpp
+/**
+ * @file
+ * @brief Output utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/type.hpp
+/**
+ * @file
+ * @brief Tensor type utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor::core {
+
+using bool_value_t = std::int8_t;
+
+template <typename value_t, extents_c extent_t>
+using tensor = std::conditional_t<
+    extent_t::rank() == 0, value_t,
+    std::conditional_t<
+        extent_t::rank_dynamic() == 0,
+        core::mdarray<value_t, extent_t, stdex::layout_right,
+                      std::array<value_t, core::extents_size(extent_t{})>>,
+        std::conditional_t<
+            std::is_same_v<value_t, bool>,
+            core::mdarray<bool_value_t, extent_t, stdex::layout_right,
+                          std::vector<bool_value_t>>,
+            core::mdarray<value_t, extent_t, stdex::layout_right,
+                          std::vector<value_t>>>>>;
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/type.hpp
+
+namespace mdtensor::core {
 namespace detail {
 
 template <typename T>
@@ -543,1207 +1263,6 @@ template <typename... Ts>
     requires(sizeof...(Ts) > 0 && (detail::data_scalar_v<Ts> && ...))
 using common_data_type_t = typename detail::data_promote_impl<Ts...>::type;
 
-} // namespace core
-} // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/type.hpp
-
-namespace mdtensor::core {
-
-[[nodiscard]] constexpr auto to_mdspan(auto &&io) {
-    if constexpr (mdspan_c<decltype(io)>) {
-        // If the input is already an mdspan, just return it as-is
-        return std::forward<decltype(io)>(io);
-
-    } else if constexpr (requires { io.to_mdspan(); }) {
-        // If the input has a to_mdspan() member function, call it
-        return io.to_mdspan();
-
-    } else {
-        // If the input is not an mdspan,
-        // create a new mdspan that points to the input data
-        using element_t = std::remove_reference_t<decltype(io)>;
-        using extents_t = core::extents<std::uint8_t>;
-
-        return core::mdspan<element_t, extents_t>{std::addressof(io),
-                                                  extents_t{}};
-    }
-}
-
-[[nodiscard]] constexpr auto to_const_mdspan(auto &&in) {
-    if constexpr (mdspan_c<decltype(in)>) {
-        if constexpr (std::is_const_v<typename std::remove_reference_t<
-                          decltype(in)>::element_type>) {
-            // If the input is already a const mdspan, just return it as-is
-            return std::forward<decltype(in)>(in);
-
-        } else {
-            // If the input is a non-const mdspan,
-            // create a new const mdspan with the same data handle and mapping
-            using in_t = std::remove_cvref_t<decltype(in)>;
-
-            return core::mdspan<
-                const typename in_t::value_type, typename in_t::extents_type,
-                typename in_t::layout_type,
-                stdex::default_accessor<const typename in_t::value_type>>(
-                in.data_handle(), in.mapping(), {});
-        }
-
-    } else {
-        // If the input is not an mdspan,
-        // create a new const mdspan with the same data handle and mapping
-        auto mds = to_mdspan(std::forward<decltype(in)>(in));
-
-        using mds_t = std::remove_cvref_t<decltype(mds)>;
-
-        return core::mdspan<
-            const typename mds_t::value_type, typename mds_t::extents_type,
-            typename mds_t::layout_type,
-            stdex::default_accessor<const typename mds_t::value_type>>(
-            mds.data_handle(), mds.mapping(), {});
-    }
-}
-
-[[nodiscard]] constexpr auto to_output_mdspan(auto &&out) {
-    if constexpr (mdspan_c<decltype(out)>) {
-        static_assert(
-            !std::is_const_v<
-                typename std::remove_reference_t<decltype(out)>::element_type>,
-            "Output mdspan must not be const");
-
-        // If the output is already an mdspan, just return it as-is
-        return std::forward<decltype(out)>(out);
-
-    } else {
-        static_assert(std::is_lvalue_reference_v<decltype(out)>,
-                      "Output owners and scalars must be passed as lvalues.");
-
-        return to_mdspan(std::forward<decltype(out)>(out));
-    }
-}
-
-template <typename T>
-using to_mdspan_t = decltype(to_mdspan(std::declval<T>()));
-
-[[nodiscard]] constexpr auto submdspan(auto &&io, auto &&...slices) {
-    return stdex::submdspan(to_mdspan(std::forward<decltype(io)>(io)),
-                            std::forward<decltype(slices)>(slices)...);
-}
-
-template <std::size_t lspace = 0, std::size_t rspace = 0>
-[[nodiscard]] constexpr auto submdspan_with_space(auto &&io, auto &&...slices) {
-    return [&]<std::size_t... Is, std::size_t... Js>(
-               std::index_sequence<Is...>, std::index_sequence<Js...>) {
-        return submdspan(to_mdspan(std::forward<decltype(io)>(io)),
-                         ((void)Is, core::full_extent)...,
-                         std::forward<decltype(slices)>(slices)...,
-                         ((void)Js, core::full_extent)...);
-    }(std::make_index_sequence<lspace>{}, std::make_index_sequence<rspace>{});
-}
-
-template <std::size_t lspace = 0>
-[[nodiscard]] constexpr auto submdspan_from_left(auto &&io, auto &&...slices) {
-    using base_t = std::remove_reference_t<decltype(io)>;
-
-    constexpr std::size_t rspace =
-        to_mdspan_t<base_t>::rank() - (lspace + sizeof...(slices));
-
-    return submdspan_with_space<lspace, rspace>(
-        std::forward<decltype(io)>(io),
-        std::forward<decltype(slices)>(slices)...);
-}
-
-template <std::size_t rspace = 0>
-[[nodiscard]] constexpr auto submdspan_from_right(auto &&io, auto &&...slices) {
-    using base_t = std::remove_reference_t<decltype(io)>;
-
-    constexpr std::size_t lspace =
-        to_mdspan_t<base_t>::rank() - (rspace + sizeof...(slices));
-
-    return submdspan_with_space<lspace, rspace>(
-        std::forward<decltype(io)>(io),
-        std::forward<decltype(slices)>(slices)...);
-}
-
-} // namespace mdtensor::core
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/mdspan.hpp
-
-namespace mdtensor::core {
-
-template <std::integral index_t>
-[[nodiscard]] constexpr index_t bounding_index(index_t index,
-                                               const std::size_t &bound) {
-    if constexpr (std::is_signed_v<index_t>) {
-        if (index < index_t{0}) {
-            index = static_cast<index_t>(bound + 1 -
-                                         static_cast<std::size_t>(-index));
-        }
-    }
-
-    if (index < index_t{0} || bound < static_cast<std::size_t>(index)) {
-        throw std::out_of_range(
-            "Index is out of bounds: " + std::to_string(index) +
-            " is not in [0, " + std::to_string(bound) + ").");
-    }
-
-    return index;
-}
-
-template <std::integral in_t, in_t... ins, typename compare_t>
-[[nodiscard]] consteval auto
-get_sorted_array(std::integer_sequence<in_t, ins...>,
-                 compare_t compare) noexcept {
-    auto arr = std::array{ins...};
-    std::sort(arr.begin(), arr.end(), compare);
-    return arr;
-}
-
-template <std::size_t rank, std::integral axes_t, axes_t... axes,
-          typename compare_t>
-[[nodiscard]] consteval auto
-get_sorted_axes(std::integer_sequence<axes_t, axes...>,
-                compare_t compare) noexcept {
-    constexpr auto arr =
-        get_sorted_array(std::index_sequence<static_cast<std::size_t>(
-                             bounding_index<axes_t>(axes, rank - 1))...>{},
-                         compare);
-
-    if constexpr (1 < arr.size()) {
-        static_assert(
-            [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                return ((arr[Is] != arr[Is + 1]) && ...);
-            }(std::make_index_sequence<arr.size() - 1>{}),
-            "Duplicate axes are not allowed.");
-    }
-
-    return arr;
-}
-
-template <typename value_t, std::size_t size>
-[[nodiscard]] constexpr bool contains(const std::array<value_t, size> &array,
-                                      const value_t &value) noexcept {
-    for (const auto element : array) {
-        if (element == value) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-template <extents_c exts_t>
-[[nodiscard]] inline std::string to_string(exts_t &&exts) {
-    using base_t = std::remove_cvref_t<exts_t>;
-
-    std::string str = "(";
-
-    for (std::size_t i = 0; i < base_t::rank(); i++) {
-        if (i != 0) {
-            str += ", ";
-        }
-
-        str += std::to_string(exts.extent(i));
-    }
-
-    if constexpr (base_t::rank() == 1) {
-        str += ",";
-    }
-
-    return str + ")";
-}
-
-namespace detail {
-
-inline constexpr int numpy_default_precision = 8;
-
-template <std::floating_point value_t>
-[[nodiscard]] inline std::string floating_value_to_string(const value_t value) {
-    if constexpr (requires {
-                      { std::isnan(value) } -> std::convertible_to<bool>;
-                  }) {
-        if (std::isnan(value)) {
-            return "nan";
-        }
-    }
-
-    if constexpr (requires {
-                      { std::isinf(value) } -> std::convertible_to<bool>;
-                  }) {
-        if (std::isinf(value)) {
-            return std::signbit(value) ? "-inf" : "inf";
-        }
-    }
-
-    const value_t magnitude = std::abs(value);
-
-    /*
-     * NumPy-like scalar approximation:
-     *
-     * - fixed-point:      1e-4 <= |x| < 1e8, including zero
-     * - scientific:       0 < |x| < 1e-4 or |x| >= 1e8
-     *
-     * NumPy's exact choice is array-wide, so mixed arrays may use
-     * scientific notation even when an individual value would not.
-     */
-    const bool use_scientific =
-        magnitude != value_t{0} &&
-        (magnitude < value_t{1e-4} || magnitude >= value_t{1e8});
-
-    const std::chars_format format = use_scientific
-                                         ? std::chars_format::scientific
-                                         : std::chars_format::fixed;
-
-    std::array<char, 128> buffer{};
-
-    // First obtain the shortest round-trippable representation.
-    auto [ptr, ec] = std::to_chars(buffer.data(), buffer.data() + buffer.size(),
-                                   value, format);
-
-    if (ec != std::errc{}) {
-        throw std::runtime_error(
-            "Failed to convert floating-point value to string.");
-    }
-
-    std::string text(buffer.data(), ptr);
-
-    const auto fractional_digits = [](const std::string &str) -> std::size_t {
-        const std::size_t exponent_pos = str.find_first_of("eE");
-
-        const std::size_t mantissa_end =
-            exponent_pos == std::string::npos ? str.size() : exponent_pos;
-
-        const std::size_t decimal_pos = str.find('.');
-
-        if (decimal_pos == std::string::npos || decimal_pos >= mantissa_end) {
-            return 0;
-        }
-
-        return mantissa_end - decimal_pos - 1;
-    };
-
-    // NumPy default: at most 8 fractional digits.
-    if (fractional_digits(text) >
-        static_cast<std::size_t>(numpy_default_precision)) {
-        auto [rounded_ptr, rounded_ec] =
-            std::to_chars(buffer.data(), buffer.data() + buffer.size(), value,
-                          format, numpy_default_precision);
-
-        if (rounded_ec != std::errc{}) {
-            throw std::runtime_error(
-                "Failed to convert floating-point value to string.");
-        }
-
-        text.assign(buffer.data(), rounded_ptr);
-    }
-
-    // Remove unnecessary trailing zeros, but preserve the decimal point.
-    const std::size_t exponent_pos = text.find_first_of("eE");
-
-    const std::size_t mantissa_end =
-        exponent_pos == std::string::npos ? text.size() : exponent_pos;
-
-    const std::size_t decimal_pos = text.find('.');
-
-    if (decimal_pos == std::string::npos || decimal_pos >= mantissa_end) {
-        // "21"     -> "21."
-        // "1e+08"  -> "1.e+08"
-        text.insert(mantissa_end, 1, '.');
-
-    } else {
-        std::size_t trim_end = mantissa_end;
-
-        while (trim_end > decimal_pos + 1 && text[trim_end - 1] == '0') {
-            --trim_end;
-        }
-
-        // Decimal point itself is intentionally retained.
-        text.erase(trim_end, mantissa_end - trim_end);
-    }
-
-    return text;
-}
-
-template <arithmetic_c value_t>
-[[nodiscard]] inline std::string value_to_string(const value_t &value) {
-    using base_t = std::remove_cvref_t<value_t>;
-
-    if constexpr (std::same_as<base_t, bool>) {
-        return value ? "true" : "false";
-
-    } else if constexpr (std::is_integral_v<base_t>) {
-        if constexpr (std::is_signed_v<base_t>) {
-            return std::to_string(static_cast<long long>(value));
-
-        } else {
-            return std::to_string(static_cast<unsigned long long>(value));
-        }
-
-    } else if constexpr (std::is_floating_point_v<base_t>) {
-        return floating_value_to_string(value);
-    }
-}
-
-template <typename value_t>
-[[nodiscard]] inline std::string
-value_to_string(const std::optional<value_t> &value) {
-    if (!value.has_value()) {
-        return "nullopt";
-    }
-
-    return value_to_string(*value);
-}
-
-} // namespace detail
-
-template <typename in_t>
-    requires(!extents_c<in_t>)
-[[nodiscard]] inline std::string to_string(in_t &&in) {
-    const auto in_mds = to_const_mdspan(std::forward<in_t>(in));
-
-    std::string str = "[";
-
-    if constexpr (in_mds.rank() == 0) {
-        if constexpr (requires { detail::value_to_string(in_mds()); }) {
-            return detail::value_to_string(in_mds());
-
-        } else {
-            return "NOT_STRING_CONVERTIBLE";
-        }
-
-    } else {
-        using index_t = typename decltype(in_mds)::index_type;
-
-        for (index_t i = 0; i < in_mds.extent(0); i++) {
-            if (i != 0) {
-                str += ", ";
-            }
-
-            str += to_string(submdspan_from_left(in_mds, i));
-        }
-    }
-
-    return str + "]";
-}
-
-} // namespace mdtensor::core
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/util.hpp
-
-namespace mdtensor::core {
-
-template <extents_c in_t>
-[[nodiscard]] constexpr std::size_t extents_size(in_t &&in) noexcept {
-    if constexpr (in.rank() == 0) {
-        // NOTE: mdspan with rank 0 can capture a single element.
-        return 1;
-
-    } else if constexpr (in.rank_dynamic() == 0) {
-        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-            return (in.static_extent(Is) * ...);
-        }(std::make_index_sequence<in.rank()>{});
-
-    } else {
-        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-            return (static_cast<std::size_t>(in.extent(Is)) * ...);
-        }(std::make_index_sequence<in.rank()>{});
-    }
-}
-
-template <extents_c in_t>
-[[nodiscard]] consteval bool is_always_same_extents() noexcept {
-    return true;
-}
-
-template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
-[[nodiscard]] consteval bool is_always_same_extents() noexcept {
-    using base1_t = std::remove_cvref_t<in1_t>;
-    using base2_t = std::remove_cvref_t<in2_t>;
-
-    if constexpr (base1_t::rank() != base2_t::rank()) {
-        return false;
-
-    } else if constexpr (base1_t::rank_dynamic() != 0 ||
-                         base2_t::rank_dynamic() != 0) {
-        return false;
-
-    } else if constexpr ([&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                             return ((base1_t::static_extent(Is) !=
-                                      base2_t::static_extent(Is)) ||
-                                     ...);
-                         }(std::make_index_sequence<base1_t::rank()>{})) {
-        return false;
-    }
-
-    if constexpr (sizeof...(ins_t) != 0) {
-        return is_always_same_extents<in2_t, ins_t...>();
-
-    } else {
-        return true;
-    }
-}
-
-template <extents_c in_t>
-[[nodiscard]] constexpr bool is_same_extents(in_t &&in) noexcept {
-    return true;
-}
-
-template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
-[[nodiscard]] constexpr bool is_same_extents(in1_t &&in1, in2_t &&in2,
-                                             ins_t &&...ins) noexcept {
-    using base1_t = std::remove_cvref_t<in1_t>;
-    using base2_t = std::remove_cvref_t<in2_t>;
-
-    if constexpr (base1_t::rank() != base2_t::rank()) {
-        return false;
-    }
-
-    using index_t = common_index_type_t<typename base1_t::index_type,
-                                        typename base2_t::index_type>;
-
-    for (std::size_t i = 0; i < base1_t::rank(); i++) {
-        if (static_cast<index_t>(in1.extent(i)) !=
-            static_cast<index_t>(in2.extent(i))) {
-            return false;
-        }
-    }
-
-    if constexpr (sizeof...(ins_t) != 0) {
-        return is_same_extents(in2, ins...);
-
-    } else {
-        return true;
-    }
-}
-
-template <std::size_t offset, std::size_t rank, extents_c in_t>
-[[nodiscard]] constexpr auto slice_extents(in_t &&in) noexcept {
-    using index_t = typename std::remove_cvref_t<in_t>::index_type;
-
-    static_assert(in.rank() >= offset + rank,
-                  "Incompatible offset and rank for slicing.");
-
-    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        return extents<index_t, in.static_extent(offset + Is)...>{
-            in.extent(offset + Is)...};
-    }(std::make_index_sequence<rank>{});
-}
-
-template <std::size_t rank, extents_c in_t>
-[[nodiscard]] constexpr auto slice_extents_from_left(in_t &&in) noexcept {
-    return slice_extents<0, rank>(std::forward<in_t>(in));
-}
-
-template <std::size_t rank, extents_c in_t>
-[[nodiscard]] constexpr auto slice_extents_from_right(in_t &&in) noexcept {
-    return slice_extents<std::remove_cvref_t<in_t>::rank() - rank, rank>(
-        std::forward<in_t>(in));
-}
-
-[[nodiscard]] constexpr auto to_extents(auto &&shape) {
-    using base_t = std::remove_cvref_t<decltype(shape)>;
-
-    if constexpr (core::extents_c<base_t>) {
-        return std::forward<decltype(shape)>(shape);
-
-    } else if constexpr (integral_c<base_t>) {
-        if (shape < base_t{0}) {
-            throw std::invalid_argument("shape must be non-negative");
-        }
-
-        using index_t = std::make_unsigned_t<base_t>;
-
-        return core::dextents<index_t, 1>{static_cast<index_t>(shape)};
-    }
-}
-
-template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
-[[nodiscard]] constexpr auto compose_extents(in1_t &&in1, in2_t &&in2,
-                                             ins_t &&...ins) noexcept {
-    using base1_t = std::remove_cvref_t<in1_t>;
-    using base2_t = std::remove_cvref_t<in2_t>;
-    using index_t = common_index_type_t<typename base1_t::index_type,
-                                        typename base2_t::index_type>;
-
-    const auto cexts =
-        [&]<std::size_t... Is, std::size_t... Js>(std::index_sequence<Is...>,
-                                                  std::index_sequence<Js...>) {
-            return extents<index_t, base1_t::static_extent(Is)...,
-                           base2_t::static_extent(Js)...>{
-                static_cast<index_t>(in1.extent(Is))...,
-                static_cast<index_t>(in2.extent(Js))...};
-        }(std::make_index_sequence<base1_t::rank()>{},
-          std::make_index_sequence<base2_t::rank()>{});
-
-    if constexpr (sizeof...(ins_t) == 0) {
-        return cexts;
-
-    } else {
-        return compose_extents(cexts, std::forward<ins_t>(ins)...);
-    }
-}
-
-namespace {
-
-template <extents_c in_t>
-[[nodiscard]] constexpr auto expand_extents_dims_impl_(in_t &&in,
-                                                       std::index_sequence<>) {
-    return std::forward<in_t>(in);
-}
-
-template <extents_c in_t, std::size_t axis, std::size_t... axes>
-[[nodiscard]] constexpr auto
-expand_extents_dims_impl_(in_t &&in, std::index_sequence<axis, axes...>) {
-    // NOTE: this function requires ordered axes and does not check duplicates.
-
-    using base_t = std::remove_cvref_t<in_t>;
-
-    return expand_extents_dims_impl_(
-        compose_extents(slice_extents_from_left<axis>(std::forward<in_t>(in)),
-                        extents<uint8_t, 1>{},
-                        slice_extents_from_right<base_t::rank() - axis>(
-                            std::forward<in_t>(in))),
-        std::index_sequence<axes...>{});
-}
-
-} // namespace
-
-template <extents_c in_t, std::integral axes_t, axes_t... axes>
-[[nodiscard]] constexpr auto
-expand_extents_dims(in_t &&in, std::integer_sequence<axes_t, axes...>) {
-    constexpr auto axes_sorted = get_sorted_axes<in.rank() + sizeof...(axes)>(
-        std::integer_sequence<axes_t, axes...>{}, std::less<std::size_t>{});
-
-    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        return expand_extents_dims_impl_(
-            std::forward<in_t>(in), std::index_sequence<axes_sorted[Is]...>{});
-    }(std::make_index_sequence<axes_sorted.size()>{});
-}
-
-} // namespace mdtensor::core
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/extents.hpp
-
-namespace mdtensor::core {
-namespace detail {
-
-template <std::size_t I, std::size_t brank, extents_c in_t>
-[[nodiscard]] consteval std::size_t aligned_static_extent() noexcept {
-    using base_t = std::remove_cvref_t<in_t>;
-
-    constexpr std::size_t rank = base_t::rank();
-
-    static_assert(I < brank, "Index I must be less than broadcast rank brank.");
-    static_assert(rank <= brank,
-                  "Input rank must be less than or equal to broadcast rank.");
-
-    if constexpr (I < brank - rank) {
-        return 1;
-
-    } else {
-        return base_t::static_extent(I - (brank - rank));
-    }
-}
-
-template <std::size_t... Extents>
-[[nodiscard]] consteval std::size_t broadcast_static_extent() noexcept {
-    static_assert(sizeof...(Extents) > 0,
-                  "At least one extent must be provided for broadcasting.");
-
-    if constexpr (((Extents == 1 || Extents == core::dyn) && ...)) {
-        // return dyn if any extent is dyn, else return 1
-        return std::max({Extents...});
-
-    } else {
-        // select the extent that is not 1 or dyn
-        constexpr std::size_t bext = std::max(
-            {((Extents != 1 && Extents != core::dyn) ? Extents : 0)...});
-
-        static_assert(
-            ((Extents == bext || Extents == 1 || Extents == core::dyn) && ...),
-            "Incompatible static extents for broadcasting.");
-
-        return bext;
-    }
-}
-
-template <std::size_t I, std::size_t brank, extents_c in_t>
-[[nodiscard]] constexpr auto aligned_extent(in_t &&in) noexcept {
-    using index_t = typename std::remove_cvref_t<in_t>::index_type;
-
-    constexpr std::size_t rank = in.rank();
-
-    static_assert(I < brank, "Index I must be less than broadcast rank brank.");
-    static_assert(rank <= brank,
-                  "Input rank must be less than or equal to broadcast rank.");
-
-    if constexpr (I < brank - rank) {
-        return index_t{1};
-
-    } else {
-        return in.extent(I - (brank - rank));
-    }
-}
-
-template <typename index_t, std::convertible_to<index_t>... exts_t>
-[[nodiscard]] constexpr index_t broadcast_extent(exts_t &&...exts) {
-    static_assert(sizeof...(exts) > 0,
-                  "At least one extent must be provided for broadcasting.");
-
-    index_t bext = 1;
-
-    for (const index_t &ext : {static_cast<index_t>(exts)...}) {
-        if (ext == 1) {
-            continue;
-
-        } else if (bext == 1) {
-            bext = ext;
-
-        } else if (ext != bext) {
-            throw std::invalid_argument(
-                "Incompatible extents for broadcasting.");
-        }
-    }
-
-    return bext;
-}
-
-} // namespace detail
-
-template <extents_c... ins_t>
-[[nodiscard]] constexpr auto broadcast_extents(ins_t &&...ins) {
-    static_assert(sizeof...(ins) > 0,
-                  "At least one extents must be provided for broadcasting.");
-
-    using index_t =
-        common_index_type_t<typename std::remove_cvref_t<ins_t>::index_type...>;
-
-    constexpr std::size_t brank = std::max({ins.rank()...});
-
-    if constexpr (brank == 0) {
-        return core::extents<index_t>{};
-
-    } else {
-        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-            const auto static_extent_at = [&]<std::size_t I>() {
-                return detail::broadcast_static_extent<
-                    detail::aligned_static_extent<I, brank, ins_t>()...>();
-            };
-
-            const auto extent_at = [&]<std::size_t I>() {
-                return detail::broadcast_extent<index_t>(
-                    detail::aligned_extent<I, brank>(
-                        std::forward<ins_t>(ins))...);
-            };
-
-            return core::extents<
-                index_t, static_extent_at.template operator()<Is>()...> {
-                extent_at.template operator()<Is>()...
-            };
-        }(std::make_index_sequence<brank>{});
-    }
-}
-
-[[nodiscard]] constexpr auto broadcast_to(auto &&in, auto &&shape) {
-    const auto in_mds = to_const_mdspan(std::forward<decltype(in)>(in));
-    const auto exts = core::to_extents(std::forward<decltype(shape)>(shape));
-
-    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
-    using exts_t = std::remove_cvref_t<decltype(exts)>;
-
-    constexpr std::size_t org_rank = in_mds_t::rank();
-    constexpr std::size_t new_rank = exts_t::rank();
-
-    static_assert(org_rank <= new_rank, "Incompatible ranks for broadcasting.");
-
-    if constexpr (is_always_same_extents<typename in_mds_t::extents_type,
-                                         exts_t>()) {
-        return in_mds; // change to const mdspan
-
-    } else if constexpr (org_rank == 0) {
-        using index_t = typename exts_t::index_type;
-
-        auto new_strides = std::array<index_t, new_rank>{};
-
-        for (std::size_t i = 0; i < new_rank; i++) {
-            new_strides[i] = 0;
-        }
-
-        return core::mdspan<typename in_mds_t::element_type, exts_t,
-                            stdex::layout_stride,
-                            typename in_mds_t::accessor_type>{
-            in_mds.data_handle(),
-            stdex::layout_stride::mapping{exts, new_strides}};
-
-    } else {
-        using index_t = typename exts_t::index_type;
-        using cindex_t =
-            common_index_type_t<typename in_mds_t::index_type, index_t>;
-
-        // ni = new_rank - org_rank + oi
-        const auto get_ni = [](std::size_t i) {
-            return new_rank - org_rank + i;
-        };
-
-        // assertion
-        static_assert(
-            [&] {
-                for (std::size_t i = 0; i < org_rank; i++) {
-                    const auto src = in_mds_t::static_extent(i);
-                    const auto dst = exts_t::static_extent(get_ni(i));
-
-                    if (src != core::dyn && //
-                        dst != core::dyn && //
-                        src != dst &&       //
-                        src != 1) {
-                        return false;
-                    }
-                }
-                return true;
-            }(),
-            "Incompatible extents for broadcasting.");
-
-        for (std::size_t i = 0; i < org_rank; i++) {
-            if (static_cast<cindex_t>(in_mds.extent(i)) !=
-                    static_cast<cindex_t>(exts.extent(get_ni(i))) &&
-                static_cast<cindex_t>(in_mds.extent(i)) != cindex_t{1}) {
-                throw std::invalid_argument(
-                    "Incompatible extents for broadcasting.");
-            }
-        }
-
-        // calculation
-        auto new_strides = std::array<index_t, new_rank>{};
-
-        for (std::size_t i = 0; i < new_rank - org_rank; i++) {
-            new_strides[i] = 0;
-        }
-
-        for (std::size_t i = 0; i < org_rank; i++) {
-            if (static_cast<cindex_t>(in_mds.extent(i)) ==
-                static_cast<cindex_t>(exts.extent(get_ni(i)))) {
-                new_strides[get_ni(i)] = static_cast<index_t>(in_mds.stride(i));
-
-            } else {
-                new_strides[get_ni(i)] = 0;
-            }
-        }
-
-        return core::mdspan<typename in_mds_t::element_type, exts_t,
-                            stdex::layout_stride,
-                            typename in_mds_t::accessor_type>{
-            in_mds.data_handle(),
-            stdex::layout_stride::mapping{exts, new_strides}};
-    }
-}
-
-namespace detail {
-
-template <std::size_t... uranks, core::mdspan_c... ios_t>
-[[nodiscard]] constexpr auto
-get_broadcast_extents(std::index_sequence<uranks...>, ios_t &&...ios) {
-    static_assert(sizeof...(uranks) == sizeof...(ios_t),
-                  "Number of uranks must match number of inputs.");
-    static_assert(((ios.rank() >= uranks) && ...),
-                  "Input rank must be greater than or equal to urank.");
-
-    return broadcast_extents(
-        slice_extents_from_left<ios.rank() - uranks>(ios.extents())...);
-}
-
-} // namespace detail
-
-template <std::size_t... uranks, bool... bcast>
-[[nodiscard]] constexpr auto broadcast(std::index_sequence<uranks...>,
-                                       std::integer_sequence<bool, bcast...>,
-                                       auto &&...ios) {
-    static_assert(sizeof...(uranks) == sizeof...(ios));
-    static_assert(sizeof...(bcast) == sizeof...(ios));
-
-    // calculate mdspans for inputs and outputs
-    const auto ios_mds =
-        std::make_tuple(to_mdspan(std::forward<decltype(ios)>(ios))...);
-
-    // calculate broadcasted extents
-    constexpr auto ur = std::array{uranks...};
-
-    const auto bexts = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        return detail::get_broadcast_extents(std::index_sequence<ur[Is]...>{},
-                                             std::get<Is>(ios_mds)...);
-    }(std::make_index_sequence<sizeof...(ios)>{});
-
-    // calculate broadcasted mdspans
-    constexpr auto bc = std::array{bcast...};
-
-    return std::make_tuple(
-        [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-            const auto get_broadcasted = [&]<std::size_t I>() {
-                if constexpr (!bc[I]) {
-                    // change to mdspan without broadcasting
-                    return std::get<I>(ios_mds);
-
-                } else if constexpr (bexts.rank() == 0) {
-                    // change to const mdspan without broadcasting
-                    return core::to_const_mdspan(std::get<I>(ios_mds));
-
-                } else {
-                    // broadcast to const mdspan
-                    return broadcast_to(
-                        std::get<I>(ios_mds),
-                        compose_extents(bexts,
-                                        slice_extents_from_right<ur[I]>(
-                                            std::get<I>(ios_mds).extents())));
-                }
-            };
-
-            return std::make_tuple(
-                get_broadcasted.template operator()<Is>()...);
-        }(std::make_index_sequence<sizeof...(ios)>{}),
-        bexts);
-}
-
-} // namespace mdtensor::core
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/broadcast.hpp
-
-namespace mdtensor::core {
-namespace detail {
-
-template <std::size_t brank, mdspan_c io_t, mdspan_c... ios_t>
-constexpr void batch_impl_native(auto &&func, io_t &&io, ios_t &&...ios) {
-    if constexpr (brank == 0) {
-        func(std::forward<io_t>(io), std::forward<ios_t>(ios)...);
-
-    } else {
-        using index_t = typename std::remove_cvref_t<io_t>::index_type;
-
-        for (index_t i = 0; i < io.extent(0); i++) {
-            batch_impl_native<brank - 1>(
-                std::forward<decltype(func)>(func),
-                submdspan_from_left(std::forward<io_t>(io), i),
-                submdspan_from_left(std::forward<ios_t>(ios), i)...);
-        }
-    }
-}
-
-#ifdef MDTENSOR_USE_OPENMP
-
-template <std::size_t brank, mdspan_c io_t, mdspan_c... ios_t>
-void batch_impl_openmp(auto &&func, io_t &&io, ios_t &&...ios) {
-    if constexpr (brank == 0) {
-        func(std::forward<io_t>(io), std::forward<ios_t>(ios)...);
-
-    } else {
-        // Parallelize only the outermost batch axis.
-        using index_t = typename std::remove_cvref_t<io_t>::index_type;
-
-#pragma omp parallel for
-        for (index_t i = 0; i < io.extent(0); i++) {
-            batch_impl_native<brank - 1>(
-                std::forward<decltype(func)>(func),
-                submdspan_from_left(std::forward<io_t>(io), i),
-                submdspan_from_left(std::forward<ios_t>(ios), i)...);
-        }
-    }
-}
-
-#endif
-
-} // namespace detail
-
-template <core::Backend backend, std::size_t brank>
-constexpr void batch(auto &&func, auto &&...ios) {
-    // TODO: assert when backend is not specified in each funciton call
-    // assert(backend != core::Backend::AUTO);
-    [[maybe_unused]] constexpr auto be = [&]() {
-        if constexpr (backend == core::Backend::AUTO) {
-            return core::Backend::NATIVE; // temporary approach.
-
-        } else {
-            return backend;
-        }
-    }();
-
-    if constexpr (
-#ifdef MDTENSOR_USE_OPENMP
-        be == core::Backend::OPENMP
-#else
-        false
-#endif
-    ) {
-#ifdef MDTENSOR_USE_OPENMP
-        detail::batch_impl_openmp<brank>(
-            std::forward<decltype(func)>(func),
-            core::to_mdspan(std::forward<decltype(ios)>(ios))...);
-#endif
-
-    } else {
-        detail::batch_impl_native<brank>(
-            std::forward<decltype(func)>(func),
-            core::to_mdspan(std::forward<decltype(ios)>(ios))...);
-    }
-}
-
-template <core::Backend backend, std::size_t... uranks, bool... bcast>
-constexpr void batch_with_broadcast(auto &&func, std::index_sequence<uranks...>,
-                                    std::integer_sequence<bool, bcast...>,
-                                    auto &&...ios) {
-    // broadcast which bcast = true
-    const auto [ios_bcast, bexts] =
-        broadcast(std::index_sequence<uranks...>{},
-                  std::integer_sequence<bool, bcast...>{},
-                  std::forward<decltype(ios)>(ios)...);
-
-    // batch
-    [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        batch<backend, bexts.rank()>(std::forward<decltype(func)>(func),
-                                     std::get<Is>(ios_bcast)...);
-    }(std::make_index_sequence<sizeof...(ios)>{});
-}
-
-template <core::Backend backend, bool... bcast>
-constexpr void batch_with_broadcast(auto &&func,
-                                    std::integer_sequence<bool, bcast...>,
-                                    auto &&...ios) {
-    [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        batch_with_broadcast<backend>(std::forward<decltype(func)>(func),
-                                      std::index_sequence<((void)Is, 0)...>{},
-                                      std::integer_sequence<bool, bcast...>{},
-                                      std::forward<decltype(ios)>(ios)...);
-    }(std::make_index_sequence<sizeof...(ios)>{});
-}
-
-} // namespace mdtensor::core
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/batch.hpp
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/manipulation.hpp
-/**
- * @file
- * @brief Manipulation utilities for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor.hpp
-/**
- * @file
- * @brief Tensor utilities for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
-
-namespace mdtensor::core {
-
-using bool_value_t = std::int8_t;
-
-template <typename value_t, extents_c extent_t>
-using tensor = std::conditional_t<
-    extent_t::rank() == 0, value_t,
-    std::conditional_t<
-        extent_t::rank_dynamic() == 0,
-        core::mdarray<value_t, extent_t, stdex::layout_right,
-                      std::array<value_t, core::extents_size(extent_t{})>>,
-        std::conditional_t<
-            std::is_same_v<value_t, bool>,
-            core::mdarray<bool_value_t, extent_t, stdex::layout_right,
-                          std::vector<bool_value_t>>,
-            core::mdarray<value_t, extent_t, stdex::layout_right,
-                          std::vector<value_t>>>>>;
-
-template <typename value_t = double, extents_c exts_t>
-[[nodiscard]] constexpr auto make_tensor(exts_t &&exts) {
-    using base_t = std::remove_cvref_t<decltype(exts)>;
-
-    if constexpr (base_t::rank() == 0) {
-        return tensor<value_t, base_t>{};
-
-    } else {
-        return tensor<value_t, base_t>{std::forward<exts_t>(exts)};
-    }
-}
-
-[[nodiscard]] constexpr auto make_tensor_like(auto &&in) {
-    const auto in_mds = to_const_mdspan(std::forward<decltype(in)>(in));
-
-    using value_t = typename decltype(in_mds)::value_type;
-
-    return make_tensor<value_t>(in_mds.extents());
-}
-
-template <typename T>
-using make_tensor_like_t = decltype(make_tensor_like(std::declval<T>()));
-
-} // namespace mdtensor::core
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor.hpp
-
-namespace mdtensor::core {
-namespace detail {
-
-template <typename in_t>
-    requires(mdspan_c<in_t> || mdarray_c<in_t>)
-[[nodiscard]] consteval bool is_always_c_contiguous() noexcept {
-    return std::same_as<typename std::remove_cvref_t<in_t>::layout_type,
-                        stdex::layout_right>;
-}
-
-template <mdspan_c in_t>
-[[nodiscard]] constexpr bool is_c_contiguous(const in_t &in) noexcept {
-    if constexpr (in.rank() == 0) {
-        return true;
-
-    } else {
-        // Empty tensors have no observable element ordering.
-        if (extents_size(in.extents()) == 0) {
-            return true;
-        }
-
-        if (!in.is_unique() || !in.is_exhaustive() || !in.is_strided()) {
-            return false;
-        }
-
-        std::size_t expected_stride = 1;
-
-        for (std::size_t i = in.rank(); i-- > 0;) {
-            const std::size_t extent = static_cast<std::size_t>(in.extent(i));
-
-            if (extent > 1 &&
-                static_cast<std::size_t>(in.stride(i)) != expected_stride) {
-                return false;
-            }
-
-            expected_stride *= extent;
-        }
-
-        return true;
-    }
-}
-
-template <extents_c exts_t>
-[[nodiscard]] constexpr auto make_reshape_view(auto &&in, exts_t &&exts) {
-    const auto in_mds = to_mdspan(std::forward<decltype(in)>(in));
-
-    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
-    using new_exts_t = std::remove_cvref_t<exts_t>;
-
-    using out_mds_t =
-        mdspan<typename in_mds_t::element_type, new_exts_t, stdex::layout_right,
-               typename in_mds_t::accessor_type>;
-
-    if constexpr (is_always_same_extents<typename in_mds_t::extents_type,
-                                         new_exts_t>()) {
-        return in_mds;
-
-    } else {
-        return out_mds_t{
-            in_mds.data_handle(),
-            typename out_mds_t::mapping_type{std::forward<exts_t>(exts)},
-            in_mds.accessor()};
-    }
-}
-
-template <extents_c exts_t>
-[[nodiscard]] constexpr auto make_reshape_copy(auto &&in, exts_t &&exts) {
-    const auto in_mds = to_const_mdspan(std::forward<decltype(in)>(in));
-
-    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
-    using value_t = typename in_mds_t::value_type;
-
-    auto out = make_tensor<value_t>(std::forward<exts_t>(exts));
-
-    batch<Backend::NATIVE, in_mds.rank()>(
-        [&](auto &&in, auto &&out) { out() = in(); }, in_mds,
-        make_reshape_view(out, in_mds.extents()));
-
-    return out;
-}
-
-} // namespace detail
-
-template <Copy copy = Copy::AUTO>
-[[nodiscard]] constexpr auto reshape(auto &&in, auto &&shape) {
-    const auto in_mds = to_mdspan(std::forward<decltype(in)>(in));
-    const auto exts = to_extents(std::forward<decltype(shape)>(shape));
-
-    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
-    using in_exts_t = typename in_mds_t::extents_type;
-    using exts_t = std::remove_cvref_t<decltype(exts)>;
-
-    if constexpr (in_exts_t::rank_dynamic() == 0 &&
-                  exts_t::rank_dynamic() == 0) {
-        static_assert(extents_size(in_exts_t{}) == extents_size(exts_t{}),
-                      "Reshape error: input and output extents "
-                      "must have the same size.");
-
-    } else if (extents_size(in_mds.extents()) != extents_size(exts)) {
-        throw std::invalid_argument("Reshape error: input and output "
-                                    "extents must have the same size.");
-    }
-
-    constexpr bool can_borrow =
-        std::is_lvalue_reference_v<decltype(in)> || mdspan_c<decltype(in)>;
-
-    if constexpr (copy == Copy::AUTO) {
-        if constexpr (can_borrow &&
-                      detail::is_always_c_contiguous<in_mds_t>()) {
-            return reshape<Copy::FALSE>(in_mds, exts);
-
-        } else {
-            return reshape<Copy::TRUE>(in_mds, exts);
-        }
-
-    } else if constexpr (copy == Copy::TRUE) {
-        return detail::make_reshape_copy(in_mds, exts);
-
-    } else if constexpr (copy == Copy::FALSE) {
-        static_assert(can_borrow, "Reshape error: zero-copy reshape cannot "
-                                  "bind to a temporary owning tensor.");
-
-        if (!detail::is_c_contiguous(in_mds)) {
-            throw std::invalid_argument("Reshape error: zero-copy reshape "
-                                        "requires a C-contiguous input.");
-        }
-
-        if constexpr (is_always_same_extents<in_exts_t, exts_t>()) {
-            return std::forward<decltype(in)>(in);
-
-        } else {
-            return detail::make_reshape_view(in_mds, exts);
-        }
-    }
-}
-
-template <std::integral axes_t, axes_t... axes>
-[[nodiscard]] constexpr auto
-expand_dims(auto &&in, std::integer_sequence<axes_t, axes...>) {
-    const auto in_mds = to_mdspan(std::forward<decltype(in)>(in));
-
-    return reshape<Copy::FALSE>(
-        in_mds, expand_extents_dims(in_mds.extents(),
-                                    std::integer_sequence<axes_t, axes...>{}));
-}
-
-template <std::int64_t... axes>
-[[nodiscard]] constexpr auto expand_dims(auto &&in) {
-    return expand_dims(std::forward<decltype(in)>(in),
-                       std::integer_sequence<std::int64_t, axes...>{});
-}
-
-} // namespace mdtensor::core
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/manipulation.hpp
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/output.hpp
-/**
- * @file
- * @brief Output utilities for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
-
-namespace mdtensor::core {
 namespace detail {
 
 template <typename dtype, typename... Ts> struct output_value {
@@ -1831,17 +1350,16 @@ template <typename dtype = void, extents_c uout_exts_t>
     }(std::make_index_sequence<sizeof...(ins)>{});
 }
 
-template <typename dtype = void, std::size_t... uranks,
-          extents_tuple_c uout_exts_tuple_t>
+template <typename dtype = void, std::size_t... uranks>
 [[nodiscard]] constexpr auto make_outputs(std::index_sequence<uranks...>,
-                                          uout_exts_tuple_t &&uout_exts_tuple,
+                                          auto &&uout_exts_tuple,
                                           auto &&...ins) {
     static_assert(sizeof...(uranks) == sizeof...(ins),
                   "Number of uranks must match number of inputs.");
 
     constexpr std::size_t ins_num = sizeof...(uranks);
     constexpr std::size_t outs_num =
-        std::tuple_size_v<std::remove_cvref_t<uout_exts_tuple_t>>;
+        std::tuple_size_v<std::remove_cvref_t<decltype(uout_exts_tuple)>>;
 
     if constexpr (ins_num == 0) {
         return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
@@ -1875,12 +1393,300 @@ template <typename dtype = void>
     }(std::make_index_sequence<sizeof...(ins)>{});
 }
 
+// TODO: develop make_reduce_outputs
+
 } // namespace mdtensor::core
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/output.hpp
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/ufunc.hpp
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/make_broadcasted_tensor.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/make_reduced_tensor.hpp
 /**
  * @file
- * @brief Universal function (ufunc) utilities for mdtensor.
+ * @brief Output utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor::core {
+
+template <typename dtype = void, bool keepdims = false, std::integral axes_t,
+          axes_t... axes, std::size_t... uranks, extents_c uout_exts_t>
+[[nodiscard]] constexpr auto
+make_reduce_output(std::integer_sequence<axes_t, axes...>,
+                   std::index_sequence<uranks...>, uout_exts_t &&uout_exts,
+                   auto &&...ins) {
+    static_assert(sizeof...(ins) > 0, "At least one input must be provided.");
+    static_assert(sizeof...(uranks) == sizeof...(ins),
+                  "Number of uranks must match number of inputs.");
+
+    // calculate input broadcasted extents
+    const auto ins_bexts = detail::get_broadcast_extents(
+        std::index_sequence<uranks...>{},
+        to_const_mdspan(std::forward<decltype(ins)>(ins))...);
+
+    using ins_bexts_t = decltype(ins_bexts);
+
+    // get sorted array
+    constexpr auto axes_sorted = [&]() {
+        if constexpr (ins_bexts_t::rank() == 0) {
+            return std::array<std::size_t, 0>{};
+
+        } else if constexpr (sizeof...(axes) == 0) {
+            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                return std::array{(ins_bexts_t::rank() - 1 - Is)...};
+            }(std::make_index_sequence<ins_bexts_t::rank()>{});
+
+        } else {
+            return get_sorted_axes<ins_bexts_t::rank()>(
+                std::integer_sequence<axes_t, axes...>{},
+                std::greater<std::size_t>{});
+        }
+    }();
+
+    // generate out_bexts
+    constexpr auto not_axes_size = ins_bexts_t::rank() - axes_sorted.size();
+
+    const auto out_bexts = [&]() {
+        using index_t = typename ins_bexts_t::index_type;
+
+        if constexpr (keepdims) {
+            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                return extents<index_t,
+                               (contains(axes_sorted, Is)
+                                    ? std::size_t{1}
+                                    : ins_bexts_t::static_extent(Is))...>{
+                    (contains(axes_sorted, Is)
+                         ? index_t{1}
+                         : static_cast<index_t>(ins_bexts.extent(Is)))...};
+            }(std::make_index_sequence<ins_bexts_t::rank()>{});
+
+        } else {
+            // generate unselected axes sequence
+            constexpr auto not_axes_arr = [&]() {
+                auto not_axes_arr = std::array<std::size_t, not_axes_size>{};
+
+                std::size_t not_axes_idx = 0;
+                for (std::size_t i = 0; i < ins_bexts_t::rank(); i++) {
+                    if (!contains(axes_sorted, i)) {
+                        not_axes_arr[not_axes_idx++] = i;
+                    }
+                }
+
+                return not_axes_arr;
+            }();
+
+            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                return extents<index_t,
+                               ins_bexts_t::static_extent(not_axes_arr[Is])...>{
+                    ins_bexts.extent(not_axes_arr[Is])...};
+            }(std::make_index_sequence<not_axes_arr.size()>{});
+        }
+    }();
+
+    // generate out
+    using value_t = output_value_t<dtype, decltype(ins)...>;
+
+    return make_tensor<value_t>(
+        compose_extents(out_bexts, std::forward<uout_exts_t>(uout_exts)));
+}
+
+// TODO: develop make_reduce_outputs
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/make_reduced_tensor.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/make_tensor.hpp
+/**
+ * @file
+ * @brief Make tensor utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor::core {
+
+template <typename value_t = double, extents_c exts_t>
+[[nodiscard]] constexpr auto make_tensor(exts_t &&exts) {
+    using base_t = std::remove_cvref_t<decltype(exts)>;
+
+    if constexpr (base_t::rank() == 0) {
+        return tensor<value_t, base_t>{};
+
+    } else {
+        return tensor<value_t, base_t>{std::forward<exts_t>(exts)};
+    }
+}
+
+[[nodiscard]] constexpr auto make_tensor_like(auto &&in) {
+    const auto in_mds = to_const_mdspan(std::forward<decltype(in)>(in));
+
+    using value_t = typename decltype(in_mds)::value_type;
+
+    return make_tensor<value_t>(in_mds.extents());
+}
+
+template <typename T>
+using make_tensor_like_t = decltype(make_tensor_like(std::declval<T>()));
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/make_tensor.hpp
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/tensor.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/ufunc/ufunc.hpp
+/**
+ * @file
+ * @brief Ufunc utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/ufunc/batch.hpp
+/**
+ * @file
+ * @brief Batch utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor::core {
+
+enum class Backend {
+    AUTO,   // Automatically select backend based on input types and sizes
+    NATIVE, // Native mdtensor implementation
+    SIMD,   // SIMD parallelization
+
+#ifdef MDTENSOR_USE_EIGEN
+    EIGEN, // Eigen backend
+#endif
+
+#ifdef MDTENSOR_USE_OPENMP
+    OPENMP, // CPU multi-processing with OpenMP
+#endif
+};
+
+namespace detail {
+
+template <std::size_t brank, mdspan_c io_t, mdspan_c... ios_t>
+constexpr void batch_impl_native(auto &&func, io_t &&io, ios_t &&...ios) {
+    if constexpr (brank == 0) {
+        func(std::forward<io_t>(io), std::forward<ios_t>(ios)...);
+
+    } else {
+        using index_t = typename std::remove_cvref_t<io_t>::index_type;
+
+        for (index_t i = 0; i < io.extent(0); i++) {
+            batch_impl_native<brank - 1>(
+                std::forward<decltype(func)>(func),
+                submdspan_from_left(std::forward<io_t>(io), i),
+                submdspan_from_left(std::forward<ios_t>(ios), i)...);
+        }
+    }
+}
+
+#ifdef MDTENSOR_USE_OPENMP
+
+template <std::size_t brank, mdspan_c io_t, mdspan_c... ios_t>
+void batch_impl_openmp(auto &&func, io_t &&io, ios_t &&...ios) {
+    if constexpr (brank == 0) {
+        func(std::forward<io_t>(io), std::forward<ios_t>(ios)...);
+
+    } else {
+        // Parallelize only the outermost batch axis.
+        using index_t = typename std::remove_cvref_t<io_t>::index_type;
+
+#pragma omp parallel for
+        for (index_t i = 0; i < io.extent(0); i++) {
+            batch_impl_native<brank - 1>(
+                std::forward<decltype(func)>(func),
+                submdspan_from_left(std::forward<io_t>(io), i),
+                submdspan_from_left(std::forward<ios_t>(ios), i)...);
+        }
+    }
+}
+
+#endif
+
+} // namespace detail
+
+template <Backend backend, std::size_t brank>
+constexpr void batch(auto &&func, auto &&...ios) {
+    // TODO: assert when backend is not specified in each funciton call
+    // assert(backend != Backend::AUTO);
+    [[maybe_unused]] constexpr auto be = [&]() {
+        if constexpr (backend == Backend::AUTO) {
+            return Backend::NATIVE; // temporary approach.
+
+        } else {
+            return backend;
+        }
+    }();
+
+    if constexpr (
+#ifdef MDTENSOR_USE_OPENMP
+        be == Backend::OPENMP
+#else
+        false
+#endif
+    ) {
+#ifdef MDTENSOR_USE_OPENMP
+        detail::batch_impl_openmp<brank>(
+            std::forward<decltype(func)>(func),
+            to_mdspan(std::forward<decltype(ios)>(ios))...);
+#endif
+
+    } else {
+        detail::batch_impl_native<brank>(
+            std::forward<decltype(func)>(func),
+            to_mdspan(std::forward<decltype(ios)>(ios))...);
+    }
+}
+
+template <Backend backend, std::size_t... uranks, bool... bcast>
+constexpr void batch_with_broadcast(auto &&func, std::index_sequence<uranks...>,
+                                    std::integer_sequence<bool, bcast...>,
+                                    auto &&...ios) {
+    // broadcast which bcast = true
+    const auto [ios_bcast, bexts] =
+        broadcast(std::index_sequence<uranks...>{},
+                  std::integer_sequence<bool, bcast...>{},
+                  std::forward<decltype(ios)>(ios)...);
+
+    // batch
+    [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        batch<backend, bexts.rank()>(std::forward<decltype(func)>(func),
+                                     std::get<Is>(ios_bcast)...);
+    }(std::make_index_sequence<sizeof...(ios)>{});
+}
+
+template <Backend backend, bool... bcast>
+constexpr void batch_with_broadcast(auto &&func,
+                                    std::integer_sequence<bool, bcast...>,
+                                    auto &&...ios) {
+    [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        batch_with_broadcast<backend>(std::forward<decltype(func)>(func),
+                                      std::index_sequence<((void)Is, 0)...>{},
+                                      std::integer_sequence<bool, bcast...>{},
+                                      std::forward<decltype(ios)>(ios)...);
+    }(std::make_index_sequence<sizeof...(ios)>{});
+}
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/ufunc/batch.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/ufunc/reduce.hpp
+/**
+ * @file
+ * @brief Reduce utilities for mdtensor.
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -2053,91 +1859,398 @@ constexpr void reduce(auto &&func, std::integer_sequence<axes_t, axes...>,
     }(std::make_index_sequence<sizeof...(ios)>{});
 }
 
-template <typename dtype = void, bool keepdims = false, std::integral axes_t,
-          axes_t... axes, std::size_t... uranks, extents_c uout_exts_t>
-[[nodiscard]] constexpr auto
-make_reduce_output(std::integer_sequence<axes_t, axes...>,
-                   std::index_sequence<uranks...>, uout_exts_t &&uout_exts,
-                   auto &&...ins) {
-    static_assert(sizeof...(ins) > 0, "At least one input must be provided.");
-    static_assert(sizeof...(uranks) == sizeof...(ins),
-                  "Number of uranks must match number of inputs.");
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/ufunc/reduce.hpp
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/ufunc/ufunc.hpp
 
-    // calculate input broadcasted extents
-    const auto ins_bexts = detail::get_broadcast_extents(
-        std::index_sequence<uranks...>{},
-        to_const_mdspan(std::forward<decltype(ins)>(ins))...);
+namespace mdtensor::core {
 
-    using ins_bexts_t = decltype(ins_bexts);
+enum class Copy {
+    TRUE,  // Copy the input tensor to a new tensor
+    FALSE, // Do not copy the input tensor; return a view of the input tensor
+    AUTO,  // Automatically determine whether to copy or not based on input
+};
 
-    // get sorted array
-    constexpr auto axes_sorted = [&]() {
-        if constexpr (ins_bexts_t::rank() == 0) {
-            return std::array<std::size_t, 0>{};
+namespace detail {
 
-        } else if constexpr (sizeof...(axes) == 0) {
-            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                return std::array{(ins_bexts_t::rank() - 1 - Is)...};
-            }(std::make_index_sequence<ins_bexts_t::rank()>{});
-
-        } else {
-            return get_sorted_axes<ins_bexts_t::rank()>(
-                std::integer_sequence<axes_t, axes...>{},
-                std::greater<std::size_t>{});
-        }
-    }();
-
-    // generate out_bexts
-    constexpr auto not_axes_size = ins_bexts_t::rank() - axes_sorted.size();
-
-    const auto out_bexts = [&]() {
-        using index_t = typename ins_bexts_t::index_type;
-
-        if constexpr (keepdims) {
-            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                return extents<index_t,
-                               (contains(axes_sorted, Is)
-                                    ? std::size_t{1}
-                                    : ins_bexts_t::static_extent(Is))...>{
-                    (contains(axes_sorted, Is)
-                         ? index_t{1}
-                         : static_cast<index_t>(ins_bexts.extent(Is)))...};
-            }(std::make_index_sequence<ins_bexts_t::rank()>{});
-
-        } else {
-            // generate unselected axes sequence
-            constexpr auto not_axes_arr = [&]() {
-                auto not_axes_arr = std::array<std::size_t, not_axes_size>{};
-
-                std::size_t not_axes_idx = 0;
-                for (std::size_t i = 0; i < ins_bexts_t::rank(); i++) {
-                    if (!contains(axes_sorted, i)) {
-                        not_axes_arr[not_axes_idx++] = i;
-                    }
-                }
-
-                return not_axes_arr;
-            }();
-
-            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                return extents<index_t,
-                               ins_bexts_t::static_extent(not_axes_arr[Is])...>{
-                    ins_bexts.extent(not_axes_arr[Is])...};
-            }(std::make_index_sequence<not_axes_arr.size()>{});
-        }
-    }();
-
-    // generate out
-    using value_t = output_value_t<dtype, decltype(ins)...>;
-
-    return make_tensor<value_t>(
-        compose_extents(out_bexts, std::forward<uout_exts_t>(uout_exts)));
+template <typename in_t>
+    requires(mdspan_c<in_t> || mdarray_c<in_t>)
+[[nodiscard]] consteval bool is_always_c_contiguous() noexcept {
+    return std::same_as<typename std::remove_cvref_t<in_t>::layout_type,
+                        stdex::layout_right>;
 }
 
-// TODO: develop make_reduce_outputs
+template <mdspan_c in_t>
+[[nodiscard]] constexpr bool is_c_contiguous(const in_t &in) noexcept {
+    if constexpr (in.rank() == 0) {
+        return true;
+
+    } else {
+        // Empty tensors have no observable element ordering.
+        if (extents_size(in.extents()) == 0) {
+            return true;
+        }
+
+        if (!in.is_unique() || !in.is_exhaustive() || !in.is_strided()) {
+            return false;
+        }
+
+        std::size_t expected_stride = 1;
+
+        for (std::size_t i = in.rank(); i-- > 0;) {
+            const std::size_t extent = static_cast<std::size_t>(in.extent(i));
+
+            if (extent > 1 &&
+                static_cast<std::size_t>(in.stride(i)) != expected_stride) {
+                return false;
+            }
+
+            expected_stride *= extent;
+        }
+
+        return true;
+    }
+}
+
+template <extents_c exts_t>
+[[nodiscard]] constexpr auto make_reshape_view(auto &&in, exts_t &&exts) {
+    const auto in_mds = to_mdspan(std::forward<decltype(in)>(in));
+
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
+    using new_exts_t = std::remove_cvref_t<exts_t>;
+
+    using out_mds_t =
+        mdspan<typename in_mds_t::element_type, new_exts_t, stdex::layout_right,
+               typename in_mds_t::accessor_type>;
+
+    if constexpr (is_always_same_extents<typename in_mds_t::extents_type,
+                                         new_exts_t>()) {
+        return in_mds;
+
+    } else {
+        return out_mds_t{
+            in_mds.data_handle(),
+            typename out_mds_t::mapping_type{std::forward<exts_t>(exts)},
+            in_mds.accessor()};
+    }
+}
+
+template <extents_c exts_t>
+[[nodiscard]] constexpr auto make_reshape_copy(auto &&in, exts_t &&exts) {
+    const auto in_mds = to_const_mdspan(std::forward<decltype(in)>(in));
+
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
+    using value_t = typename in_mds_t::value_type;
+
+    auto out = make_tensor<value_t>(std::forward<exts_t>(exts));
+
+    batch<Backend::NATIVE, in_mds.rank()>(
+        [&](auto &&in, auto &&out) { out() = in(); }, in_mds,
+        make_reshape_view(out, in_mds.extents()));
+
+    return out;
+}
+
+} // namespace detail
+
+template <Copy copy = Copy::AUTO>
+[[nodiscard]] constexpr auto reshape(auto &&in, auto &&shape) {
+    const auto in_mds = to_mdspan(std::forward<decltype(in)>(in));
+    const auto exts = to_extents(std::forward<decltype(shape)>(shape));
+
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
+    using in_exts_t = typename in_mds_t::extents_type;
+    using exts_t = std::remove_cvref_t<decltype(exts)>;
+
+    if constexpr (in_exts_t::rank_dynamic() == 0 &&
+                  exts_t::rank_dynamic() == 0) {
+        static_assert(extents_size(in_exts_t{}) == extents_size(exts_t{}),
+                      "Reshape error: input and output extents "
+                      "must have the same size.");
+
+    } else if (extents_size(in_mds.extents()) != extents_size(exts)) {
+        throw std::invalid_argument("Reshape error: input and output "
+                                    "extents must have the same size.");
+    }
+
+    constexpr bool can_borrow =
+        std::is_lvalue_reference_v<decltype(in)> || mdspan_c<decltype(in)>;
+
+    if constexpr (copy == Copy::AUTO) {
+        if constexpr (can_borrow &&
+                      detail::is_always_c_contiguous<in_mds_t>()) {
+            return reshape<Copy::FALSE>(in_mds, exts);
+
+        } else {
+            return reshape<Copy::TRUE>(in_mds, exts);
+        }
+
+    } else if constexpr (copy == Copy::TRUE) {
+        return detail::make_reshape_copy(in_mds, exts);
+
+    } else if constexpr (copy == Copy::FALSE) {
+        static_assert(can_borrow, "Reshape error: zero-copy reshape cannot "
+                                  "bind to a temporary owning tensor.");
+
+        if (!detail::is_c_contiguous(in_mds)) {
+            throw std::invalid_argument("Reshape error: zero-copy reshape "
+                                        "requires a C-contiguous input.");
+        }
+
+        if constexpr (is_always_same_extents<in_exts_t, exts_t>()) {
+            return std::forward<decltype(in)>(in);
+
+        } else {
+            return detail::make_reshape_view(in_mds, exts);
+        }
+    }
+}
 
 } // namespace mdtensor::core
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/ufunc.hpp
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/manipulation/reshape.hpp
+
+namespace mdtensor::core {
+
+template <std::integral axes_t, axes_t... axes>
+[[nodiscard]] constexpr auto
+expand_dims(auto &&in, std::integer_sequence<axes_t, axes...>) {
+    const auto in_mds = to_mdspan(std::forward<decltype(in)>(in));
+
+    return reshape<Copy::FALSE>(
+        in_mds, expand_extents_dims(in_mds.extents(),
+                                    std::integer_sequence<axes_t, axes...>{}));
+}
+
+template <std::int64_t... axes>
+[[nodiscard]] constexpr auto expand_dims(auto &&in) {
+    return expand_dims(std::forward<decltype(in)>(in),
+                       std::integer_sequence<std::int64_t, axes...>{});
+}
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/manipulation/expand_dims.hpp
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/manipulation/manipulation.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/util/util.hpp
+/**
+ * @file
+ * @brief Other utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/util/to_string.hpp
+/**
+ * @file
+ * @brief To-string conversion utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor::core {
+namespace detail {
+
+inline constexpr int numpy_default_precision = 8;
+
+template <std::floating_point value_t>
+[[nodiscard]] inline std::string floating_value_to_string(const value_t value) {
+    if constexpr (requires {
+                      { std::isnan(value) } -> std::convertible_to<bool>;
+                  }) {
+        if (std::isnan(value)) {
+            return "nan";
+        }
+    }
+
+    if constexpr (requires {
+                      { std::isinf(value) } -> std::convertible_to<bool>;
+                  }) {
+        if (std::isinf(value)) {
+            return std::signbit(value) ? "-inf" : "inf";
+        }
+    }
+
+    const value_t magnitude = std::abs(value);
+
+    /*
+     * NumPy-like scalar approximation:
+     *
+     * - fixed-point:      1e-4 <= |x| < 1e8, including zero
+     * - scientific:       0 < |x| < 1e-4 or |x| >= 1e8
+     *
+     * NumPy's exact choice is array-wide, so mixed arrays may use
+     * scientific notation even when an individual value would not.
+     */
+    const bool use_scientific =
+        magnitude != value_t{0} &&
+        (magnitude < value_t{1e-4} || magnitude >= value_t{1e8});
+
+    const std::chars_format format = use_scientific
+                                         ? std::chars_format::scientific
+                                         : std::chars_format::fixed;
+
+    std::array<char, 128> buffer{};
+
+    // First obtain the shortest round-trippable representation.
+    auto [ptr, ec] = std::to_chars(buffer.data(), buffer.data() + buffer.size(),
+                                   value, format);
+
+    if (ec != std::errc{}) {
+        throw std::runtime_error(
+            "Failed to convert floating-point value to string.");
+    }
+
+    std::string text(buffer.data(), ptr);
+
+    const auto fractional_digits = [](const std::string &str) -> std::size_t {
+        const std::size_t exponent_pos = str.find_first_of("eE");
+
+        const std::size_t mantissa_end =
+            exponent_pos == std::string::npos ? str.size() : exponent_pos;
+
+        const std::size_t decimal_pos = str.find('.');
+
+        if (decimal_pos == std::string::npos || decimal_pos >= mantissa_end) {
+            return 0;
+        }
+
+        return mantissa_end - decimal_pos - 1;
+    };
+
+    // NumPy default: at most 8 fractional digits.
+    if (fractional_digits(text) >
+        static_cast<std::size_t>(numpy_default_precision)) {
+        auto [rounded_ptr, rounded_ec] =
+            std::to_chars(buffer.data(), buffer.data() + buffer.size(), value,
+                          format, numpy_default_precision);
+
+        if (rounded_ec != std::errc{}) {
+            throw std::runtime_error(
+                "Failed to convert floating-point value to string.");
+        }
+
+        text.assign(buffer.data(), rounded_ptr);
+    }
+
+    // Remove unnecessary trailing zeros, but preserve the decimal point.
+    const std::size_t exponent_pos = text.find_first_of("eE");
+
+    const std::size_t mantissa_end =
+        exponent_pos == std::string::npos ? text.size() : exponent_pos;
+
+    const std::size_t decimal_pos = text.find('.');
+
+    if (decimal_pos == std::string::npos || decimal_pos >= mantissa_end) {
+        // "21"     -> "21."
+        // "1e+08"  -> "1.e+08"
+        text.insert(mantissa_end, 1, '.');
+
+    } else {
+        std::size_t trim_end = mantissa_end;
+
+        while (trim_end > decimal_pos + 1 && text[trim_end - 1] == '0') {
+            --trim_end;
+        }
+
+        // Decimal point itself is intentionally retained.
+        text.erase(trim_end, mantissa_end - trim_end);
+    }
+
+    return text;
+}
+
+template <arithmetic_c value_t>
+[[nodiscard]] inline std::string value_to_string(const value_t &value) {
+    using base_t = std::remove_cvref_t<value_t>;
+
+    if constexpr (std::same_as<base_t, bool>) {
+        return value ? "true" : "false";
+
+    } else if constexpr (std::is_integral_v<base_t>) {
+        if constexpr (std::is_signed_v<base_t>) {
+            return std::to_string(static_cast<long long>(value));
+
+        } else {
+            return std::to_string(static_cast<unsigned long long>(value));
+        }
+
+    } else if constexpr (std::is_floating_point_v<base_t>) {
+        return floating_value_to_string(value);
+    }
+}
+
+template <typename value_t>
+[[nodiscard]] inline std::string
+value_to_string(const std::optional<value_t> &value) {
+    if (!value.has_value()) {
+        return "nullopt";
+    }
+
+    return value_to_string(*value);
+}
+
+} // namespace detail
+
+template <extents_c exts_t>
+[[nodiscard]] inline std::string to_string(exts_t &&exts) {
+    using base_t = std::remove_cvref_t<exts_t>;
+
+    std::string str = "(";
+
+    for (std::size_t i = 0; i < base_t::rank(); i++) {
+        if (i != 0) {
+            str += ", ";
+        }
+
+        str += std::to_string(exts.extent(i));
+    }
+
+    if constexpr (base_t::rank() == 1) {
+        str += ",";
+    }
+
+    return str + ")";
+}
+
+template <typename in_t>
+    requires(!extents_c<in_t>)
+[[nodiscard]] inline std::string to_string(in_t &&in) {
+    const auto in_mds = to_const_mdspan(std::forward<in_t>(in));
+
+    std::string str = "[";
+
+    if constexpr (in_mds.rank() == 0) {
+        if constexpr (requires { detail::value_to_string(in_mds()); }) {
+            return detail::value_to_string(in_mds());
+
+        } else {
+            return "NOT_STRING_CONVERTIBLE";
+        }
+
+    } else {
+        using index_t = typename decltype(in_mds)::index_type;
+
+        for (index_t i = 0; i < in_mds.extent(0); i++) {
+            if (i != 0) {
+                str += ", ";
+            }
+
+            str += to_string(submdspan_from_left(in_mds, i));
+        }
+    }
+
+    return str + "]";
+}
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/util/to_string.hpp
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/util/util.hpp
 
 namespace mdtensor {
 
@@ -2161,8 +2274,6 @@ using extents = core::extents<IndexType, Extents...>;
 template <typename IndexType, std::size_t Rank>
 using dextents = core::dextents<IndexType, Rank>;
 
-// dims: will be included in C++23
-// (https://en.cppreference.com/w/cpp/container/mdspan/extents)
 template <std::size_t Rank, class IndexType = std::size_t>
 using dims = core::dims<Rank, IndexType>;
 
@@ -2231,8 +2342,10 @@ template <extents_c exts_t>
     return core::to_string(std::forward<exts_t>(exts));
 }
 
-[[nodiscard]] constexpr std::string to_string(auto &&in) {
-    return core::to_string(std::forward<decltype(in)>(in));
+template <typename in_t>
+    requires(!extents_c<in_t>)
+[[nodiscard]] constexpr std::string to_string(in_t &&in) {
+    return core::to_string(std::forward<in_t>(in));
 }
 
 } // namespace mdtensor
@@ -2293,7 +2406,7 @@ template <typename dtype = void, core::extents_c exts_t,
     static_assert(exts.rank() == 1, "arange only supports rank-1 extents");
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             using value_t = core::output_value_t<dtype, start_t, step_t>;
 
             return empty<value_t>(std::forward<decltype(exts)>(exts));
@@ -2407,7 +2520,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return empty_like<dtype>(in_mds);
 
         } else {
@@ -2469,7 +2582,7 @@ template <typename dtype = double, core::Backend backend = core::Backend::AUTO,
         static_assert(exts.rank() >= 2, "eye requires rank >= 2");
 
         auto out_md = [&]() {
-            if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            if constexpr (core::nullopt_t_c<decltype(out)>) {
                 return empty<dtype>(exts);
 
             } else {
@@ -2539,7 +2652,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     using value_t = core::output_value_t<dtype, decltype(val_mds)>;
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return empty<value_t>(std::forward<decltype(shape)>(shape));
 
         } else {
@@ -2633,7 +2746,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_output<dtype>(core::extents<std::uint8_t>{},
                                             in1_mds, in2_mds);
 
@@ -2696,7 +2809,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_output<dtype>(core::extents<std::uint8_t>{},
                                             in1_mds, in2_mds);
 
@@ -2758,7 +2871,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_output<dtype>(core::extents<std::uint8_t>{},
                                             in1_mds, in2_mds);
 
@@ -2859,7 +2972,7 @@ template <std::int64_t axis = 0, typename dtype = void,
     constexpr std::size_t out_urank = bexts.rank() + 1 - baxis;
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             using value_t =
                 core::output_value_t<dtype,
                                      typename decltype(start_bcast)::value_type,
@@ -3102,7 +3215,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return empty_like<dtype>(in_mds);
 
         } else {
@@ -3358,7 +3471,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return empty_like<dtype>(in_mds);
 
         } else {
@@ -3380,136 +3493,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/absolute.hpp
 
 #ifdef MDTENSOR_USE_EIGEN
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/eigen/eigen.hpp
-/**
- * @file
- * @brief Eigen interop utilities for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
-#include <Eigen/Dense>
-
-
-namespace mdtensor::core::eigen {
-namespace detail {
-
-template <std::size_t Extent>
-[[nodiscard]] consteval int to_eigen_static_extent() {
-    static_assert(
-        Extent == core::dyn ||
-            Extent <= static_cast<std::size_t>(std::numeric_limits<int>::max()),
-        "Static extent value exceeds maximum int value for Eigen mapping.");
-
-    if constexpr (Extent == core::dyn) {
-        return Eigen::Dynamic;
-
-    } else {
-        return static_cast<int>(Extent);
-    }
-}
-
-template <core::integral_c ext_t>
-[[nodiscard]] constexpr Eigen::Index to_eigen_extent(ext_t &&ext) {
-    if constexpr (std::signed_integral<ext_t>) {
-        if (ext < 0) {
-            throw std::invalid_argument(
-                "Negative extent value is invalid for Eigen mapping.");
-        }
-    }
-
-    if (!std::in_range<Eigen::Index>(ext)) {
-        throw std::invalid_argument(
-            "Extent value exceeds maximum int value for Eigen mapping.");
-    }
-
-    return static_cast<Eigen::Index>(ext);
-}
-
-template <typename Layout, int Rows, int Cols>
-consteval int get_storage_option() {
-    if constexpr (Rows == 1 && Cols != 1) {
-        return Eigen::RowMajor;
-
-    } else if constexpr (Cols == 1 && Rows != 1) {
-        return Eigen::ColMajor;
-
-    } else if constexpr (std::same_as<Layout, core::stdex::layout_right>) {
-        return Eigen::RowMajor;
-
-    } else {
-        return Eigen::ColMajor;
-    }
-}
-
-template <typename T> consteval bool evaluate_eigen_mappable() {
-    using mds_t = core::to_mdspan_t<T>;
-
-    if constexpr (!mdspan_c<mds_t>) {
-        return false;
-
-    } else {
-        return (std::same_as<typename mds_t::layout_type,
-                             core::stdex::layout_right> ||
-                std::same_as<typename mds_t::layout_type,
-                             core::stdex::layout_left>) &&
-               mds_t::rank() == 2 && mds_t::is_always_unique() &&
-               mds_t::is_always_exhaustive() && mds_t::is_always_strided();
-    }
-}
-
-template <typename T, typename = void>
-struct is_eigen_mappable_impl : std::false_type {};
-
-template <typename T>
-struct is_eigen_mappable_impl<T, std::void_t<core::to_mdspan_t<T>>>
-    : std::bool_constant<evaluate_eigen_mappable<T>()> {};
-
-} // namespace detail
-
-template <typename T>
-struct is_eigen_mappable
-    : detail::is_eigen_mappable_impl<std::remove_cvref_t<T>> {};
-
-template <typename T>
-inline constexpr bool is_eigen_mappable_v = is_eigen_mappable<T>::value;
-
-template <typename T>
-concept eigen_mappable_c = is_eigen_mappable_v<T>;
-
-template <eigen_mappable_c in_t> [[nodiscard]] auto to_eigen(in_t &&in) {
-    const auto in_mds = core::to_mdspan(std::forward<in_t>(in));
-    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
-
-    constexpr int static_rows =
-        detail::to_eigen_static_extent<in_mds_t::static_extent(0)>();
-
-    constexpr int static_cols =
-        detail::to_eigen_static_extent<in_mds_t::static_extent(1)>();
-
-    constexpr auto option =
-        detail::get_storage_option<typename in_mds_t::layout_type, static_rows,
-                                   static_cols>();
-
-    const Eigen::Index rows = detail::to_eigen_extent(in_mds.extent(0));
-    const Eigen::Index cols = detail::to_eigen_extent(in_mds.extent(1));
-
-    using matrix_t = Eigen::Matrix<typename in_mds_t::value_type, static_rows,
-                                   static_cols, option>;
-
-    using mapped_matrix_t =
-        std::conditional_t<std::is_const_v<typename in_mds_t::element_type>,
-                           const matrix_t, matrix_t>;
-
-    return Eigen::Map<mapped_matrix_t, Eigen::Unaligned>{in_mds.data_handle(),
-                                                         rows, cols};
-}
-
-} // namespace mdtensor::core::eigen
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/eigen/eigen.hpp
+#include "../core/eigen/eigen.hpp"
 #endif
 
 namespace mdtensor::linalg {
@@ -4040,6 +4024,7 @@ template <std::int64_t... axes>
 
 
 #ifdef MDTENSOR_USE_EIGEN
+#include "../core/eigen/eigen.hpp"
 #endif
 
 namespace mdtensor::linalg {
@@ -4206,6 +4191,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
 
 
 #ifdef MDTENSOR_USE_EIGEN
+#include "../core/eigen/eigen.hpp"
 #endif
 
 namespace mdtensor::linalg {
@@ -4361,6 +4347,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/vecmat.hpp
 
 #ifdef MDTENSOR_USE_EIGEN
+#include "../core/eigen/eigen.hpp"
 #endif
 
 // TODO: modifiy
@@ -4608,7 +4595,7 @@ template <typename dtype = void, bool keepdims = false,
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_reduce_output<dtype, keepdims>(
                 std::integer_sequence<axes_t, axes...>{},
                 std::index_sequence<0>{}, core::extents<std::uint8_t>{},
@@ -4620,7 +4607,7 @@ template <typename dtype = void, bool keepdims = false,
     }();
 
     // TODO: move to reduce
-    if constexpr (core::is_nullopt_t_c<decltype(initial)>) {
+    if constexpr (core::nullopt_t_c<decltype(initial)>) {
         fill<backend>(out_md, 0);
 
     } else {
@@ -4970,7 +4957,7 @@ logical_and(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_output<dtype>(core::extents<std::uint8_t>{},
                                             in1_mds, in2_mds);
 
@@ -5005,7 +4992,7 @@ template <typename dtype = bool, bool keepdims = false,
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_reduce_output<dtype, keepdims>(
                 std::integer_sequence<axes_t, axes...>{},
                 std::index_sequence<0>{}, core::extents<std::uint8_t>{},
@@ -5141,7 +5128,7 @@ isclose(auto &&in1, auto &&in2, rtol_t &&rtol = rtol_t{1e-05},
         core::to_const_mdspan(std::forward<decltype(atol)>(atol));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_output<dtype>(core::extents<std::uint8_t>{},
                                             in1_mds, in2_mds, rtol_mds,
                                             atol_mds);
@@ -5232,7 +5219,7 @@ logical_or(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_output<dtype>(core::extents<std::uint8_t>{},
                                             in1_mds, in2_mds);
 
@@ -5267,7 +5254,7 @@ template <typename dtype = bool, bool keepdims = false,
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_reduce_output<dtype, keepdims>(
                 std::integer_sequence<axes_t, axes...>{},
                 std::index_sequence<0>{}, core::extents<std::uint8_t>{},
@@ -5478,7 +5465,7 @@ template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_output<dtype>(core::extents<std::uint8_t>{},
                                             in1_mds, in2_mds);
 
@@ -5539,7 +5526,7 @@ template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_output<dtype>(core::extents<std::uint8_t>{},
                                             in1_mds, in2_mds);
 
@@ -5601,7 +5588,7 @@ greater_equal(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_output<dtype>(core::extents<std::uint8_t>{},
                                             in1_mds, in2_mds);
 
@@ -5667,7 +5654,7 @@ template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return empty_like<dtype>(in_mds);
 
         } else {
@@ -5732,7 +5719,7 @@ template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return empty_like<dtype>(in_mds);
 
         } else {
@@ -5792,7 +5779,7 @@ template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_output<dtype>(core::extents<std::uint8_t>{},
                                             in1_mds, in2_mds);
 
@@ -5854,7 +5841,7 @@ less_equal(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_output<dtype>(core::extents<std::uint8_t>{},
                                             in1_mds, in2_mds);
 
@@ -5912,7 +5899,7 @@ logical_not(auto &&in, out_t &&out = out_t{std::nullopt},
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return empty_like<dtype>(in_mds);
 
         } else {
@@ -5973,7 +5960,7 @@ logical_xor(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_output<dtype>(core::extents<std::uint8_t>{},
                                             in1_mds, in2_mds);
 
@@ -6035,7 +6022,7 @@ not_equal(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_output<dtype>(core::extents<std::uint8_t>{},
                                             in1_mds, in2_mds);
 
@@ -6488,7 +6475,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             // NOTE: ensure that the output type is at least float precision
             using value_t = core::output_value_t<
                 dtype, typename decltype(in1_mds)::value_type,
@@ -6538,11 +6525,11 @@ constexpr void clip_ufunc(auto &&in, auto &&min, auto &&max, auto &&out) {
 
     out() = in();
 
-    if constexpr (!core::is_nullopt_t_c<decltype(min())>) {
+    if constexpr (!core::nullopt_t_c<decltype(min())>) {
         out() = std::max(out(), static_cast<value_t>(min()));
     }
 
-    if constexpr (!core::is_nullopt_t_c<decltype(max())>) {
+    if constexpr (!core::nullopt_t_c<decltype(max())>) {
         out() = std::min(out(), static_cast<value_t>(max()));
     }
 }
@@ -6558,7 +6545,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return empty_like<dtype>(in_mds);
 
         } else {
@@ -6617,7 +6604,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             // NOTE: ensure that the output type is at least float precision
             using value_t = core::output_value_t<
                 dtype, typename decltype(in_mds)::value_type, float>;
@@ -6664,7 +6651,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             // NOTE: ensure that the output type is at least float precision
             using value_t = core::output_value_t<
                 dtype, typename decltype(in_mds)::value_type, float>;
@@ -6734,7 +6721,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_output<dtype>(core::extents<std::uint8_t>{},
                                             in1_mds, in2_mds);
 
@@ -6827,7 +6814,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_output<dtype>(core::extents<std::uint8_t>{},
                                             in1_mds, in2_mds);
 
@@ -6864,7 +6851,7 @@ template <typename dtype = void, bool keepdims = false,
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_reduce_output<dtype, keepdims>(
                 std::integer_sequence<axes_t, axes...>{},
                 std::index_sequence<0>{}, core::extents<std::uint8_t>{},
@@ -6876,7 +6863,7 @@ template <typename dtype = void, bool keepdims = false,
     }();
 
     // TODO: move to reduce
-    if constexpr (core::is_nullopt_t_c<decltype(initial)>) {
+    if constexpr (core::nullopt_t_c<decltype(initial)>) {
         using value_t =
             typename core::to_mdspan_t<decltype(out_md)>::value_type;
 
@@ -7005,7 +6992,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_output<dtype>(core::extents<std::uint8_t>{},
                                             in1_mds, in2_mds);
 
@@ -7042,7 +7029,7 @@ template <typename dtype = void, bool keepdims = false,
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_reduce_output<dtype, keepdims>(
                 std::integer_sequence<axes_t, axes...>{},
                 std::index_sequence<0>{}, core::extents<std::uint8_t>{},
@@ -7054,7 +7041,7 @@ template <typename dtype = void, bool keepdims = false,
     }();
 
     // TODO: move to reduce
-    if constexpr (core::is_nullopt_t_c<decltype(initial)>) {
+    if constexpr (core::nullopt_t_c<decltype(initial)>) {
         using value_t =
             typename core::to_mdspan_t<decltype(out_md)>::value_type;
 
@@ -7142,7 +7129,7 @@ nanmax(auto &&in, std::integer_sequence<axes_t, axes...>,
     const auto is_not_nan = logical_not(isnan(in_mds, std::nullopt, where_mds));
 
     const auto mask = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(where)>) {
+        if constexpr (core::nullopt_t_c<decltype(where)>) {
             return is_not_nan;
 
         } else {
@@ -7220,7 +7207,7 @@ nanmin(auto &&in, std::integer_sequence<axes_t, axes...>,
     const auto is_not_nan = logical_not(isnan(in_mds, std::nullopt, where_mds));
 
     const auto mask = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(where)>) {
+        if constexpr (core::nullopt_t_c<decltype(where)>) {
             return is_not_nan;
 
         } else {
@@ -7304,7 +7291,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return empty_like<dtype>(in_mds);
 
         } else {
@@ -7346,7 +7333,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             // NOTE: ensure that the output type is at least float precision
             using value_t = core::output_value_t<
                 dtype, typename decltype(in_mds)::value_type, float>;
@@ -7413,7 +7400,7 @@ template <typename dtype = std::int8_t,
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return empty_like<dtype>(in_mds);
 
         } else {
@@ -7471,7 +7458,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             // NOTE: ensure that the output type is at least float precision
             using value_t = core::output_value_t<
                 dtype, typename decltype(in_mds)::value_type, float>;
@@ -7534,7 +7521,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             // NOTE: ensure that the output type is at least float precision
             using value_t = core::output_value_t<
                 dtype, typename decltype(in_mds)::value_type, float>;
@@ -7870,9 +7857,9 @@ constexpr void randint_ufunc(auto &&out, auto &&low, auto &&high,
                   "randint_ufunc requires integral value type.");
 
     constexpr bool has_low =
-        !core::is_nullopt_t_c<std::remove_cvref_t<decltype(low())>>;
+        !core::nullopt_t_c<std::remove_cvref_t<decltype(low())>>;
     constexpr bool has_high =
-        !core::is_nullopt_t_c<std::remove_cvref_t<decltype(high())>>;
+        !core::nullopt_t_c<std::remove_cvref_t<decltype(high())>>;
 
     if constexpr (has_low && has_high) {
         // NOTE: This implementation matches the behavior of
@@ -7920,7 +7907,7 @@ randint(shape_t &&shape = shape_t{}, low_t &&low = low_t{std::nullopt},
         core::to_const_mdspan(std::forward<decltype(high)>(high));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_output<dtype>(
                 core::to_extents(std::forward<decltype(shape)>(shape)), low_mds,
                 high_mds);
@@ -8014,7 +8001,7 @@ template <typename dtype = double,
                                   out_t &&out = out_t{std::nullopt},
                                   const seed_t seed = make_random_seed()) {
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return empty<dtype>(std::forward<decltype(shape)>(shape));
 
         } else {
@@ -8083,7 +8070,7 @@ uniform(shape_t &&shape = shape_t{}, low_t &&low = low_t{0},
         core::to_const_mdspan(std::forward<decltype(high)>(high));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_output<dtype>(
                 core::to_extents(std::forward<decltype(shape)>(shape)), low_mds,
                 high_mds);
