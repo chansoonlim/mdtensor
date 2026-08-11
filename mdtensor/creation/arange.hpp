@@ -22,7 +22,7 @@ template <typename dtype = void, core::extents_c exts_t,
     static_assert(exts.rank() == 1, "arange only supports rank-1 extents");
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             using value_t = core::output_value_t<dtype, start_t, step_t>;
 
             return empty<value_t>(std::forward<decltype(exts)>(exts));

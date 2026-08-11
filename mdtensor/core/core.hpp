@@ -9,16 +9,12 @@
 
 #pragma once
 
-#include "batch.hpp"
-#include "broadcast.hpp"
-#include "extents.hpp"
-#include "manipulation.hpp"
-#include "mdspan.hpp"
-#include "output.hpp"
-#include "tensor.hpp"
-#include "type.hpp"
-#include "ufunc.hpp"
-#include "util.hpp"
+#include "base/base.hpp"
+#include "broadcast/broadcast.hpp"
+#include "manipulation/manipulation.hpp"
+#include "tensor/tensor.hpp"
+#include "ufunc/ufunc.hpp"
+#include "util/util.hpp"
 
 namespace mdtensor {
 
@@ -42,8 +38,6 @@ using extents = core::extents<IndexType, Extents...>;
 template <typename IndexType, std::size_t Rank>
 using dextents = core::dextents<IndexType, Rank>;
 
-// dims: will be included in C++23
-// (https://en.cppreference.com/w/cpp/container/mdspan/extents)
 template <std::size_t Rank, class IndexType = std::size_t>
 using dims = core::dims<Rank, IndexType>;
 
@@ -112,8 +106,10 @@ template <extents_c exts_t>
     return core::to_string(std::forward<exts_t>(exts));
 }
 
-[[nodiscard]] constexpr std::string to_string(auto &&in) {
-    return core::to_string(std::forward<decltype(in)>(in));
+template <typename in_t>
+    requires(!extents_c<in_t>)
+[[nodiscard]] constexpr std::string to_string(in_t &&in) {
+    return core::to_string(std::forward<in_t>(in));
 }
 
 } // namespace mdtensor

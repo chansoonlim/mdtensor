@@ -42,7 +42,7 @@ template <typename dtype = double, core::Backend backend = core::Backend::AUTO,
         static_assert(exts.rank() >= 2, "eye requires rank >= 2");
 
         auto out_md = [&]() {
-            if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+            if constexpr (core::nullopt_t_c<decltype(out)>) {
                 return empty<dtype>(exts);
 
             } else {

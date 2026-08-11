@@ -29,9 +29,9 @@ constexpr void randint_ufunc(auto &&out, auto &&low, auto &&high,
                   "randint_ufunc requires integral value type.");
 
     constexpr bool has_low =
-        !core::is_nullopt_t_c<std::remove_cvref_t<decltype(low())>>;
+        !core::nullopt_t_c<std::remove_cvref_t<decltype(low())>>;
     constexpr bool has_high =
-        !core::is_nullopt_t_c<std::remove_cvref_t<decltype(high())>>;
+        !core::nullopt_t_c<std::remove_cvref_t<decltype(high())>>;
 
     if constexpr (has_low && has_high) {
         // NOTE: This implementation matches the behavior of
@@ -79,7 +79,7 @@ randint(shape_t &&shape = shape_t{}, low_t &&low = low_t{std::nullopt},
         core::to_const_mdspan(std::forward<decltype(high)>(high));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_output<dtype>(
                 core::to_extents(std::forward<decltype(shape)>(shape)), low_mds,
                 high_mds);

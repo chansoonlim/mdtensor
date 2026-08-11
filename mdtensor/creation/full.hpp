@@ -28,7 +28,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     using value_t = core::output_value_t<dtype, decltype(val_mds)>;
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return empty<value_t>(std::forward<decltype(shape)>(shape));
 
         } else {

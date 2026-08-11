@@ -42,7 +42,7 @@ uniform(shape_t &&shape = shape_t{}, low_t &&low = low_t{0},
         core::to_const_mdspan(std::forward<decltype(high)>(high));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_output<dtype>(
                 core::to_extents(std::forward<decltype(shape)>(shape)), low_mds,
                 high_mds);

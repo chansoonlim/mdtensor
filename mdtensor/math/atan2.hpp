@@ -43,7 +43,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             // NOTE: ensure that the output type is at least float precision
             using value_t = core::output_value_t<
                 dtype, typename decltype(in1_mds)::value_type,

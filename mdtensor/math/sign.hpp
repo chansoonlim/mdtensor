@@ -36,7 +36,7 @@ template <typename dtype = std::int8_t,
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return empty_like<dtype>(in_mds);
 
         } else {

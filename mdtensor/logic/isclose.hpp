@@ -71,7 +71,7 @@ isclose(auto &&in1, auto &&in2, rtol_t &&rtol = rtol_t{1e-05},
         core::to_const_mdspan(std::forward<decltype(atol)>(atol));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_output<dtype>(core::extents<std::uint8_t>{},
                                             in1_mds, in2_mds, rtol_mds,
                                             atol_mds);

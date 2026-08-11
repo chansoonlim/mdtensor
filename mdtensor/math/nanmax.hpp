@@ -32,7 +32,7 @@ nanmax(auto &&in, std::integer_sequence<axes_t, axes...>,
     const auto is_not_nan = logical_not(isnan(in_mds, std::nullopt, where_mds));
 
     const auto mask = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(where)>) {
+        if constexpr (core::nullopt_t_c<decltype(where)>) {
             return is_not_nan;
 
         } else {

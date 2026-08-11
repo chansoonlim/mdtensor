@@ -13,6 +13,31 @@
 
 namespace mdtensor::core {
 
+template <typename ElementType, typename Extents,
+          typename LayoutPolicy = stdex::layout_right,
+          typename AccessorPolicy = stdex::default_accessor<ElementType>>
+using mdspan =
+    stdex::mdspan<ElementType, Extents, LayoutPolicy, AccessorPolicy>;
+
+namespace detail {
+
+template <typename T> struct is_mdspan_impl : std::false_type {};
+
+template <typename ElementType, typename ExtentsType, typename LayoutType,
+          typename AccessorType>
+struct is_mdspan_impl<
+    mdspan<ElementType, ExtentsType, LayoutType, AccessorType>>
+    : std::true_type {};
+
+} // namespace detail
+
+template <typename T> struct is_mdspan : detail::is_mdspan_impl<T> {};
+
+template <typename T> constexpr bool is_mdspan_v = is_mdspan<T>::value;
+
+template <typename T>
+concept mdspan_c = is_mdspan_v<std::remove_cvref_t<T>>;
+
 [[nodiscard]] constexpr auto to_mdspan(auto &&io) {
     if constexpr (mdspan_c<decltype(io)>) {
         // If the input is already an mdspan, just return it as-is
@@ -26,10 +51,9 @@ namespace mdtensor::core {
         // If the input is not an mdspan,
         // create a new mdspan that points to the input data
         using element_t = std::remove_reference_t<decltype(io)>;
-        using extents_t = core::extents<std::uint8_t>;
+        using extents_t = extents<std::uint8_t>;
 
-        return core::mdspan<element_t, extents_t>{std::addressof(io),
-                                                  extents_t{}};
+        return mdspan<element_t, extents_t>{std::addressof(io), extents_t{}};
     }
 }
 
@@ -45,7 +69,7 @@ namespace mdtensor::core {
             // create a new const mdspan with the same data handle and mapping
             using in_t = std::remove_cvref_t<decltype(in)>;
 
-            return core::mdspan<
+            return mdspan<
                 const typename in_t::value_type, typename in_t::extents_type,
                 typename in_t::layout_type,
                 stdex::default_accessor<const typename in_t::value_type>>(
@@ -59,7 +83,7 @@ namespace mdtensor::core {
 
         using mds_t = std::remove_cvref_t<decltype(mds)>;
 
-        return core::mdspan<
+        return mdspan<
             const typename mds_t::value_type, typename mds_t::extents_type,
             typename mds_t::layout_type,
             stdex::default_accessor<const typename mds_t::value_type>>(
@@ -87,45 +111,5 @@ namespace mdtensor::core {
 
 template <typename T>
 using to_mdspan_t = decltype(to_mdspan(std::declval<T>()));
-
-[[nodiscard]] constexpr auto submdspan(auto &&io, auto &&...slices) {
-    return stdex::submdspan(to_mdspan(std::forward<decltype(io)>(io)),
-                            std::forward<decltype(slices)>(slices)...);
-}
-
-template <std::size_t lspace = 0, std::size_t rspace = 0>
-[[nodiscard]] constexpr auto submdspan_with_space(auto &&io, auto &&...slices) {
-    return [&]<std::size_t... Is, std::size_t... Js>(
-               std::index_sequence<Is...>, std::index_sequence<Js...>) {
-        return submdspan(to_mdspan(std::forward<decltype(io)>(io)),
-                         ((void)Is, core::full_extent)...,
-                         std::forward<decltype(slices)>(slices)...,
-                         ((void)Js, core::full_extent)...);
-    }(std::make_index_sequence<lspace>{}, std::make_index_sequence<rspace>{});
-}
-
-template <std::size_t lspace = 0>
-[[nodiscard]] constexpr auto submdspan_from_left(auto &&io, auto &&...slices) {
-    using base_t = std::remove_reference_t<decltype(io)>;
-
-    constexpr std::size_t rspace =
-        to_mdspan_t<base_t>::rank() - (lspace + sizeof...(slices));
-
-    return submdspan_with_space<lspace, rspace>(
-        std::forward<decltype(io)>(io),
-        std::forward<decltype(slices)>(slices)...);
-}
-
-template <std::size_t rspace = 0>
-[[nodiscard]] constexpr auto submdspan_from_right(auto &&io, auto &&...slices) {
-    using base_t = std::remove_reference_t<decltype(io)>;
-
-    constexpr std::size_t lspace =
-        to_mdspan_t<base_t>::rank() - (rspace + sizeof...(slices));
-
-    return submdspan_with_space<lspace, rspace>(
-        std::forward<decltype(io)>(io),
-        std::forward<decltype(slices)>(slices)...);
-}
 
 } // namespace mdtensor::core

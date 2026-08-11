@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Manipulation utilities for mdtensor.
+ * @brief Reshape utilities for mdtensor.
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -9,11 +9,17 @@
 
 #pragma once
 
-#include "batch.hpp"
-#include "mdspan.hpp"
-#include "tensor.hpp"
+#include "../tensor/tensor.hpp"
+#include "../ufunc/ufunc.hpp"
 
 namespace mdtensor::core {
+
+enum class Copy {
+    TRUE,  // Copy the input tensor to a new tensor
+    FALSE, // Do not copy the input tensor; return a view of the input tensor
+    AUTO,  // Automatically determine whether to copy or not based on input
+};
+
 namespace detail {
 
 template <typename in_t>
@@ -147,22 +153,6 @@ template <Copy copy = Copy::AUTO>
             return detail::make_reshape_view(in_mds, exts);
         }
     }
-}
-
-template <std::integral axes_t, axes_t... axes>
-[[nodiscard]] constexpr auto
-expand_dims(auto &&in, std::integer_sequence<axes_t, axes...>) {
-    const auto in_mds = to_mdspan(std::forward<decltype(in)>(in));
-
-    return reshape<Copy::FALSE>(
-        in_mds, expand_extents_dims(in_mds.extents(),
-                                    std::integer_sequence<axes_t, axes...>{}));
-}
-
-template <std::int64_t... axes>
-[[nodiscard]] constexpr auto expand_dims(auto &&in) {
-    return expand_dims(std::forward<decltype(in)>(in),
-                       std::integer_sequence<std::int64_t, axes...>{});
 }
 
 } // namespace mdtensor::core

@@ -76,7 +76,7 @@ template <typename dtype = double,
                                   out_t &&out = out_t{std::nullopt},
                                   const seed_t seed = make_random_seed()) {
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return empty<dtype>(std::forward<decltype(shape)>(shape));
 
         } else {

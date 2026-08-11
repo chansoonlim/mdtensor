@@ -9,9 +9,24 @@
 
 #pragma once
 
-#include "broadcast.hpp"
+#include "../broadcast/broadcast.hpp"
 
 namespace mdtensor::core {
+
+enum class Backend {
+    AUTO,   // Automatically select backend based on input types and sizes
+    NATIVE, // Native mdtensor implementation
+    SIMD,   // SIMD parallelization
+
+#ifdef MDTENSOR_USE_EIGEN
+    EIGEN, // Eigen backend
+#endif
+
+#ifdef MDTENSOR_USE_OPENMP
+    OPENMP, // CPU multi-processing with OpenMP
+#endif
+};
+
 namespace detail {
 
 template <std::size_t brank, mdspan_c io_t, mdspan_c... ios_t>
@@ -56,13 +71,13 @@ void batch_impl_openmp(auto &&func, io_t &&io, ios_t &&...ios) {
 
 } // namespace detail
 
-template <core::Backend backend, std::size_t brank>
+template <Backend backend, std::size_t brank>
 constexpr void batch(auto &&func, auto &&...ios) {
     // TODO: assert when backend is not specified in each funciton call
-    // assert(backend != core::Backend::AUTO);
+    // assert(backend != Backend::AUTO);
     [[maybe_unused]] constexpr auto be = [&]() {
-        if constexpr (backend == core::Backend::AUTO) {
-            return core::Backend::NATIVE; // temporary approach.
+        if constexpr (backend == Backend::AUTO) {
+            return Backend::NATIVE; // temporary approach.
 
         } else {
             return backend;
@@ -71,7 +86,7 @@ constexpr void batch(auto &&func, auto &&...ios) {
 
     if constexpr (
 #ifdef MDTENSOR_USE_OPENMP
-        be == core::Backend::OPENMP
+        be == Backend::OPENMP
 #else
         false
 #endif
@@ -79,17 +94,17 @@ constexpr void batch(auto &&func, auto &&...ios) {
 #ifdef MDTENSOR_USE_OPENMP
         detail::batch_impl_openmp<brank>(
             std::forward<decltype(func)>(func),
-            core::to_mdspan(std::forward<decltype(ios)>(ios))...);
+            to_mdspan(std::forward<decltype(ios)>(ios))...);
 #endif
 
     } else {
         detail::batch_impl_native<brank>(
             std::forward<decltype(func)>(func),
-            core::to_mdspan(std::forward<decltype(ios)>(ios))...);
+            to_mdspan(std::forward<decltype(ios)>(ios))...);
     }
 }
 
-template <core::Backend backend, std::size_t... uranks, bool... bcast>
+template <Backend backend, std::size_t... uranks, bool... bcast>
 constexpr void batch_with_broadcast(auto &&func, std::index_sequence<uranks...>,
                                     std::integer_sequence<bool, bcast...>,
                                     auto &&...ios) {
@@ -106,7 +121,7 @@ constexpr void batch_with_broadcast(auto &&func, std::index_sequence<uranks...>,
     }(std::make_index_sequence<sizeof...(ios)>{});
 }
 
-template <core::Backend backend, bool... bcast>
+template <Backend backend, bool... bcast>
 constexpr void batch_with_broadcast(auto &&func,
                                     std::integer_sequence<bool, bcast...>,
                                     auto &&...ios) {

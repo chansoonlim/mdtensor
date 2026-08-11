@@ -40,7 +40,7 @@ less_equal(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_output<dtype>(core::extents<std::uint8_t>{},
                                             in1_mds, in2_mds);
 

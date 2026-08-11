@@ -9,10 +9,114 @@
 
 #pragma once
 
-#include "broadcast.hpp"
-#include "tensor.hpp"
+#include "../broadcast/broadcast.hpp"
+#include "type.hpp"
 
 namespace mdtensor::core {
+namespace detail {
+
+template <typename T>
+constexpr bool data_bool_v = std::same_as<std::remove_cvref_t<T>, bool>;
+
+template <typename T> constexpr bool data_fpoint_v = floating_point_c<T>;
+
+template <typename T>
+constexpr bool data_integer_v =
+    std::integral<std::remove_cvref_t<T>> && !data_bool_v<T>;
+
+template <typename T>
+constexpr bool data_scalar_v =
+    data_bool_v<T> || data_integer_v<T> || data_fpoint_v<T>;
+
+template <typename T1, typename T2> struct common_data_pair_impl {
+    // no type
+};
+
+// bool + bool -> bool
+template <typename T1, typename T2>
+    requires(data_bool_v<T1> && data_bool_v<T2>)
+struct common_data_pair_impl<T1, T2> {
+    using type = bool;
+};
+
+// bool + T -> T
+template <typename B, typename T>
+    requires(data_bool_v<B> && !data_bool_v<T> && data_scalar_v<T>)
+struct common_data_pair_impl<B, T> {
+    using type = std::remove_cvref_t<T>;
+};
+
+// T + bool -> T
+template <typename T, typename B>
+    requires(!data_bool_v<T> && data_scalar_v<T> && data_bool_v<B>)
+struct common_data_pair_impl<T, B> {
+    using type = std::remove_cvref_t<T>;
+};
+
+// floating + scalar -> floating
+template <typename T1, typename T2>
+    requires(!data_bool_v<T1> && !data_bool_v<T2> && data_scalar_v<T1> &&
+             data_scalar_v<T2> && (data_fpoint_v<T1> || data_fpoint_v<T2>))
+struct common_data_pair_impl<T1, T2> {
+  private:
+    using lhs_t = std::remove_cvref_t<T1>;
+    using rhs_t = std::remove_cvref_t<T2>;
+
+  public:
+    using type = std::conditional_t<
+        data_fpoint_v<T1> && data_fpoint_v<T2>,
+        std::conditional_t<(sizeof(lhs_t) >= sizeof(rhs_t)), lhs_t, rhs_t>,
+        std::conditional_t<data_fpoint_v<T1>, lhs_t, rhs_t>>;
+};
+
+// integer + integer -> common_index_type_t
+template <typename T1, typename T2>
+    requires(data_integer_v<T1> && data_integer_v<T2> &&
+             requires {
+                 typename common_index_type_t<std::remove_cvref_t<T1>,
+                                              std::remove_cvref_t<T2>>;
+             })
+struct common_data_pair_impl<T1, T2> {
+    using type =
+        common_index_type_t<std::remove_cvref_t<T1>, std::remove_cvref_t<T2>>;
+};
+
+template <typename... Ts> struct data_promote_impl {
+    // no type
+};
+
+template <typename T>
+    requires data_scalar_v<T>
+struct data_promote_impl<T> {
+    using type = std::remove_cvref_t<T>;
+};
+
+template <typename T1, typename T2>
+struct data_promote_impl<T1, T2>
+    : common_data_pair_impl<std::remove_cvref_t<T1>, std::remove_cvref_t<T2>> {
+};
+
+template <typename T1, typename T2, typename... Ts>
+    requires requires {
+        typename common_data_pair_impl<std::remove_cvref_t<T1>,
+                                       std::remove_cvref_t<T2>>::type;
+    }
+struct data_promote_impl<T1, T2, Ts...> {
+  private:
+    using pair_t =
+        typename common_data_pair_impl<std::remove_cvref_t<T1>,
+                                       std::remove_cvref_t<T2>>::type;
+
+  public:
+    using type = typename data_promote_impl<pair_t, Ts...>::type;
+};
+
+} // namespace detail
+
+template <typename... Ts>
+    requires(sizeof...(Ts) > 0 && (detail::data_scalar_v<Ts> && ...))
+using common_data_type_t = typename detail::data_promote_impl<Ts...>::type;
+
 namespace detail {
 
 template <typename dtype, typename... Ts> struct output_value {
@@ -100,17 +204,16 @@ template <typename dtype = void, extents_c uout_exts_t>
     }(std::make_index_sequence<sizeof...(ins)>{});
 }
 
-template <typename dtype = void, std::size_t... uranks,
-          extents_tuple_c uout_exts_tuple_t>
+template <typename dtype = void, std::size_t... uranks>
 [[nodiscard]] constexpr auto make_outputs(std::index_sequence<uranks...>,
-                                          uout_exts_tuple_t &&uout_exts_tuple,
+                                          auto &&uout_exts_tuple,
                                           auto &&...ins) {
     static_assert(sizeof...(uranks) == sizeof...(ins),
                   "Number of uranks must match number of inputs.");
 
     constexpr std::size_t ins_num = sizeof...(uranks);
     constexpr std::size_t outs_num =
-        std::tuple_size_v<std::remove_cvref_t<uout_exts_tuple_t>>;
+        std::tuple_size_v<std::remove_cvref_t<decltype(uout_exts_tuple)>>;
 
     if constexpr (ins_num == 0) {
         return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
@@ -143,5 +246,7 @@ template <typename dtype = void>
             std::forward<decltype(ins)>(ins)...);
     }(std::make_index_sequence<sizeof...(ins)>{});
 }
+
+// TODO: develop make_reduce_outputs
 
 } // namespace mdtensor::core

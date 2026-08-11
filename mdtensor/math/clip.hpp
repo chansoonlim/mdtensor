@@ -23,11 +23,11 @@ constexpr void clip_ufunc(auto &&in, auto &&min, auto &&max, auto &&out) {
 
     out() = in();
 
-    if constexpr (!core::is_nullopt_t_c<decltype(min())>) {
+    if constexpr (!core::nullopt_t_c<decltype(min())>) {
         out() = std::max(out(), static_cast<value_t>(min()));
     }
 
-    if constexpr (!core::is_nullopt_t_c<decltype(max())>) {
+    if constexpr (!core::nullopt_t_c<decltype(max())>) {
         out() = std::min(out(), static_cast<value_t>(max()));
     }
 }
@@ -43,7 +43,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return empty_like<dtype>(in_mds);
 
         } else {

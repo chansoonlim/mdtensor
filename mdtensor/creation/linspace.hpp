@@ -93,7 +93,7 @@ template <std::int64_t axis = 0, typename dtype = void,
     constexpr std::size_t out_urank = bexts.rank() + 1 - baxis;
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             using value_t =
                 core::output_value_t<dtype,
                                      typename decltype(start_bcast)::value_type,

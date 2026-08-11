@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "../core/broadcast.hpp"
+#include "../core/core.hpp"
 
 namespace mdtensor {
 

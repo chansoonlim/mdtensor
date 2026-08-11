@@ -27,7 +27,7 @@ template <typename dtype = void, bool keepdims = false,
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out_md = [&]() {
-        if constexpr (core::is_nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return core::make_reduce_output<dtype, keepdims>(
                 std::integer_sequence<axes_t, axes...>{},
                 std::index_sequence<0>{}, core::extents<std::uint8_t>{},
@@ -39,7 +39,7 @@ template <typename dtype = void, bool keepdims = false,
     }();
 
     // TODO: move to reduce
-    if constexpr (core::is_nullopt_t_c<decltype(initial)>) {
+    if constexpr (core::nullopt_t_c<decltype(initial)>) {
         fill<backend>(out_md, 0);
 
     } else {
