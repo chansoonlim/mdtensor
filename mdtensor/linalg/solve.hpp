@@ -126,14 +126,14 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
 
     constexpr std::size_t rhs_rank = b_mds.rank() == 1 ? 1 : 2;
 
-    auto x = core::make_output<dtype>(
+    auto x = core::make_broadcasted_tensor<dtype>(
         std::index_sequence<2, rhs_rank>{},
         core::slice_extents_from_right<rhs_rank>(b_mds.extents()), a_mds,
         b_mds);
 
-    auto valid =
-        core::make_output<bool>(std::index_sequence<2, rhs_rank>{},
-                                core::extents<std::uint8_t>{}, a_mds, b_mds);
+    auto valid = core::make_broadcasted_tensor<bool>(
+        std::index_sequence<2, rhs_rank>{}, core::extents<std::uint8_t>{},
+        a_mds, b_mds);
 
     solve_to<backend>(a_mds, b_mds, x, valid);
 

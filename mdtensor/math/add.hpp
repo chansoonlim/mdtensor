@@ -40,8 +40,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
 
     auto out_md = [&]() {
         if constexpr (core::nullopt_t_c<decltype(out)>) {
-            return core::make_output<dtype>(core::extents<std::uint8_t>{},
-                                            in1_mds, in2_mds);
+            return core::make_broadcasted_tensor<dtype>(
+                core::extents<std::uint8_t>{}, in1_mds, in2_mds);
 
         } else {
             // check that out is not rvalue

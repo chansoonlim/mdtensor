@@ -26,8 +26,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
             using value_t = core::output_value_t<
                 dtype, typename decltype(in_mds)::value_type, float>;
 
-            return core::make_output<value_t>(core::extents<std::uint8_t>{},
-                                              in_mds);
+            return core::make_broadcasted_tensor<value_t>(
+                core::extents<std::uint8_t>{}, in_mds);
 
         } else {
             return core::to_output_mdspan(std::forward<decltype(out)>(out));

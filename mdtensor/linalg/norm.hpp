@@ -60,8 +60,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
 [[nodiscard]] constexpr auto norm(auto &&in) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out = core::make_output<dtype>(std::index_sequence<1>{},
-                                        core::extents<std::uint8_t>{}, in_mds);
+    auto out = core::make_broadcasted_tensor<dtype>(
+        std::index_sequence<1>{}, core::extents<std::uint8_t>{}, in_mds);
 
     norm_to<backend>(in_mds, out);
 

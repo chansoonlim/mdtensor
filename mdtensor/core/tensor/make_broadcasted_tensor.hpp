@@ -170,9 +170,9 @@ using output_value_with_nullopt_t = typename detail::output_value_from_tuple<
     dtype, typename detail::filter_nullopt<Ts...>::type>::type;
 
 template <typename dtype = void, std::size_t... uranks, extents_c uout_exts_t>
-[[nodiscard]] constexpr auto make_output(std::index_sequence<uranks...>,
-                                         uout_exts_t &&uout_exts,
-                                         auto &&...ins) {
+[[nodiscard]] constexpr auto
+make_broadcasted_tensor(std::index_sequence<uranks...>, uout_exts_t &&uout_exts,
+                        auto &&...ins) {
     static_assert(sizeof...(uranks) == sizeof...(ins),
                   "Number of uranks must match number of inputs.");
 
@@ -195,19 +195,20 @@ template <typename dtype = void, std::size_t... uranks, extents_c uout_exts_t>
 }
 
 template <typename dtype = void, extents_c uout_exts_t>
-[[nodiscard]] constexpr auto make_output(uout_exts_t &&uout_exts,
-                                         auto &&...ins) {
+[[nodiscard]] constexpr auto make_broadcasted_tensor(uout_exts_t &&uout_exts,
+                                                     auto &&...ins) {
     return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        return make_output<dtype>(std::index_sequence<((void)Is, 0)...>{},
-                                  std::forward<uout_exts_t>(uout_exts),
-                                  std::forward<decltype(ins)>(ins)...);
+        return make_broadcasted_tensor<dtype>(
+            std::index_sequence<((void)Is, 0)...>{},
+            std::forward<uout_exts_t>(uout_exts),
+            std::forward<decltype(ins)>(ins)...);
     }(std::make_index_sequence<sizeof...(ins)>{});
 }
 
 template <typename dtype = void, std::size_t... uranks>
-[[nodiscard]] constexpr auto make_outputs(std::index_sequence<uranks...>,
-                                          auto &&uout_exts_tuple,
-                                          auto &&...ins) {
+[[nodiscard]] constexpr auto
+make_broadcasted_tensors(std::index_sequence<uranks...>, auto &&uout_exts_tuple,
+                         auto &&...ins) {
     static_assert(sizeof...(uranks) == sizeof...(ins),
                   "Number of uranks must match number of inputs.");
 
@@ -237,10 +238,10 @@ template <typename dtype = void, std::size_t... uranks>
 }
 
 template <typename dtype = void>
-[[nodiscard]] constexpr auto make_outputs(auto &&uout_exts_tuple,
-                                          auto &&...ins) {
+[[nodiscard]] constexpr auto make_broadcasted_tensors(auto &&uout_exts_tuple,
+                                                      auto &&...ins) {
     return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        return make_outputs<dtype>(
+        return make_broadcasted_tensors<dtype>(
             std::index_sequence<((void)Is, 0)...>{},
             std::forward<decltype(uout_exts_tuple)>(uout_exts_tuple),
             std::forward<decltype(ins)>(ins)...);

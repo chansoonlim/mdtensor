@@ -17,9 +17,9 @@ namespace mdtensor::core {
 template <typename dtype = void, bool keepdims = false, std::integral axes_t,
           axes_t... axes, std::size_t... uranks, extents_c uout_exts_t>
 [[nodiscard]] constexpr auto
-make_reduce_output(std::integer_sequence<axes_t, axes...>,
-                   std::index_sequence<uranks...>, uout_exts_t &&uout_exts,
-                   auto &&...ins) {
+make_reduced_tensor(std::integer_sequence<axes_t, axes...>,
+                    std::index_sequence<uranks...>, uout_exts_t &&uout_exts,
+                    auto &&...ins) {
     static_assert(sizeof...(ins) > 0, "At least one input must be provided.");
     static_assert(sizeof...(uranks) == sizeof...(ins),
                   "Number of uranks must match number of inputs.");

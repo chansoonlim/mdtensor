@@ -80,7 +80,7 @@ randint(shape_t &&shape = shape_t{}, low_t &&low = low_t{std::nullopt},
 
     auto out_md = [&]() {
         if constexpr (core::nullopt_t_c<decltype(out)>) {
-            return core::make_output<dtype>(
+            return core::make_broadcasted_tensor<dtype>(
                 core::to_extents(std::forward<decltype(shape)>(shape)), low_mds,
                 high_mds);
 

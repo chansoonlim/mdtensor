@@ -157,8 +157,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
                                  typename decltype(uin2_exts)::index_type>,
         decltype(uin2_exts)::static_extent(1)>{uin2_exts.extent(1)};
 
-    auto out = core::make_output<dtype>(std::index_sequence<1, 2>{}, uout_exts,
-                                        in1_mds, in2_mds);
+    auto out = core::make_broadcasted_tensor<dtype>(
+        std::index_sequence<1, 2>{}, uout_exts, in1_mds, in2_mds);
 
     vecmat_to<backend>(in1_mds, in2_mds, out);
 

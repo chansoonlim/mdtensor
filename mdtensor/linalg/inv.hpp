@@ -130,8 +130,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
     auto out = empty_like<dtype>(in_mds);
-    auto valid = core::make_output<bool>(std::index_sequence<2>{},
-                                         core::extents<std::uint8_t>{}, in_mds);
+    auto valid = core::make_broadcasted_tensor<bool>(
+        std::index_sequence<2>{}, core::extents<std::uint8_t>{}, in_mds);
 
     inv_to<backend>(in_mds, out, valid);
 

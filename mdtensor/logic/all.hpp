@@ -26,7 +26,7 @@ template <typename dtype = bool, bool keepdims = false,
 
     auto out_md = [&]() {
         if constexpr (core::nullopt_t_c<decltype(out)>) {
-            return core::make_reduce_output<dtype, keepdims>(
+            return core::make_reduced_tensor<dtype, keepdims>(
                 std::integer_sequence<axes_t, axes...>{},
                 std::index_sequence<0>{}, core::extents<std::uint8_t>{},
                 in_mds);

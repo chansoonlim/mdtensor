@@ -41,8 +41,8 @@ logical_or(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
 
     auto out_md = [&]() {
         if constexpr (core::nullopt_t_c<decltype(out)>) {
-            return core::make_output<dtype>(core::extents<std::uint8_t>{},
-                                            in1_mds, in2_mds);
+            return core::make_broadcasted_tensor<dtype>(
+                core::extents<std::uint8_t>{}, in1_mds, in2_mds);
 
         } else {
             return core::to_output_mdspan(std::forward<decltype(out)>(out));

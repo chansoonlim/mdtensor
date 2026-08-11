@@ -251,7 +251,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
     const index_t n = in_mds.extent(rank - 1);
     const index_t k = m < n ? m : n;
 
-    auto outs = core::make_outputs<dtype>(
+    auto outs = core::make_broadcasted_tensors<dtype>(
         std::index_sequence<2>{},
         std::tuple{extents<index_t, m_s>{m},
                    core::extents<index_t, m_s, k_s>{m, k},
@@ -288,7 +288,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
     const index_t n = in_mds.extent(rank - 1);
     const index_t k = m < n ? m : n;
 
-    auto outs = core::make_outputs<dtype>(
+    auto outs = core::make_broadcasted_tensors<dtype>(
         std::index_sequence<2>{},
         std::tuple{extents<index_t, m_s, m_s>{m, m},
                    core::extents<index_t, m_s, k_s>{m, k},
@@ -325,7 +325,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
     const index_t n = in_mds.extent(rank - 1);
     const index_t k = m < n ? m : n;
 
-    auto outs = core::make_outputs<dtype>(
+    auto outs = core::make_broadcasted_tensors<dtype>(
         std::index_sequence<2>{},
         std::tuple{extents<index_t, m_s, k_s>{m, k},
                    core::extents<index_t, k_s, n_s>{k, n}},

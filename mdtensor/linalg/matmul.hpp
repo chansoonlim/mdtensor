@@ -215,7 +215,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
             core::compose_extents(core::slice_extents_from_left<1>(uin1_exts),
                                   core::slice_extents_from_right<1>(uin2_exts));
 
-        auto out = core::make_output<dtype>(
+        auto out = core::make_broadcasted_tensor<dtype>(
             std::index_sequence<uin1_exts.rank(), uin2_exts.rank()>{},
             uout_exts, in1_mds, in2_mds);
 

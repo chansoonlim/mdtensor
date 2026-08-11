@@ -157,8 +157,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
                                   typename decltype(uin2_exts)::index_type>,
         decltype(uin1_exts)::static_extent(0)>{uin1_exts.extent(0)};
 
-    auto out = core::make_output<dtype>(std::index_sequence<2, 1>{}, uout_exts,
-                                        in1_mds, in2_mds);
+    auto out = core::make_broadcasted_tensor<dtype>(
+        std::index_sequence<2, 1>{}, uout_exts, in1_mds, in2_mds);
 
     matvec_to<backend>(in1_mds, in2_mds, out);
 
