@@ -20,8 +20,7 @@ namespace md = mdtensor;
 TEST(run_time, 1) {
     using value_t = double;
 
-    const auto a =
-        md::container<value_t, md::dims<1>>{{0.5, 1.5}, md::dims<1>{2}};
+    const auto a = md::tensor<value_t, md::dims<1>>{{0.5, 1.5}, md::dims<1>{2}};
     const auto b = md::sum(a);
 
     static_assert(std::is_same_v<std::remove_cvref_t<decltype(b)>, value_t>);
@@ -32,8 +31,8 @@ TEST(run_time, 1) {
 TEST(run_time, 2) {
     using value_t = double;
 
-    const auto a = md::container<value_t, md::dims<1>>{{0.5, 0.7, 0.2, 1.5},
-                                                       md::dims<1>{4}};
+    const auto a =
+        md::tensor<value_t, md::dims<1>>{{0.5, 0.7, 0.2, 1.5}, md::dims<1>{4}};
     const auto b = md::sum<int>(a);
 
     static_assert(std::is_same_v<std::remove_cvref_t<decltype(b)>, int>);
@@ -45,7 +44,7 @@ TEST(run_time, 3) {
     using value_t = int;
 
     const auto a =
-        md::container<value_t, md::dims<1>>{{0, 1, 0, 5}, md::dims<1>{4}};
+        md::tensor<value_t, md::dims<1>>{{0, 1, 0, 5}, md::dims<1>{4}};
     const auto b = md::sum(a);
 
     static_assert(std::is_same_v<std::remove_cvref_t<decltype(b)>, value_t>);
@@ -58,13 +57,13 @@ TEST(run_time, 4) {
     using index_t = std::size_t;
 
     const auto a =
-        md::container<value_t, md::dims<2>>{{0, 1, 0, 5}, md::dims<2>{2, 2}};
+        md::tensor<value_t, md::dims<2>>{{0, 1, 0, 5}, md::dims<2>{2, 2}};
     const auto b = md::sum<0>(a);
 
     static_assert(std::is_same_v<typename decltype(b)::value_type, value_t>);
 
     EXPECT_TRUE(md::array_equal(
-        b, md::container<value_t, md::extents<index_t, 2>>{{0, 6}}));
+        b, md::tensor<value_t, md::extents<index_t, 2>>{{0, 6}}));
 }
 
 TEST(run_time, 5) {
@@ -72,30 +71,30 @@ TEST(run_time, 5) {
     using index_t = std::size_t;
 
     const auto a =
-        md::container<value_t, md::dims<2>>{{0, 1, 0, 5}, md::dims<2>{2, 2}};
+        md::tensor<value_t, md::dims<2>>{{0, 1, 0, 5}, md::dims<2>{2, 2}};
     const auto b = md::sum<1>(a);
 
     static_assert(std::is_same_v<typename decltype(b)::value_type, value_t>);
 
     EXPECT_TRUE(md::array_equal(
-        b, md::container<value_t, md::extents<index_t, 2>>{{1, 5}}));
+        b, md::tensor<value_t, md::extents<index_t, 2>>{{1, 5}}));
 }
 
 TEST(run_time, 6) {
     using value_t = double;
     using index_t = std::size_t;
 
-    const auto a = md::container<value_t, md::dims<2>>{
+    const auto a = md::tensor<value_t, md::dims<2>>{
         {0, 1, std::numeric_limits<value_t>::quiet_NaN(), 5},
         md::dims<2>{2, 2}};
     const auto b = md::sum<1>(
         a, std::nullopt, 0,
-        md::container<bool, md::dims<1>>{{false, true}, md::dims<1>{2}});
+        md::tensor<bool, md::dims<1>>{{false, true}, md::dims<1>{2}});
 
     static_assert(std::is_same_v<typename decltype(b)::value_type, value_t>);
 
     EXPECT_TRUE(md::array_equal(
-        b, md::container<value_t, md::extents<index_t, 2>>{{1, 5}}));
+        b, md::tensor<value_t, md::extents<index_t, 2>>{{1, 5}}));
 }
 
 TEST(run_time, 7) {
@@ -112,7 +111,7 @@ TEST(run_time, 7) {
 TEST(run_time, 8) {
     using value_t = int;
 
-    const auto a = md::container<value_t, md::dims<1>>{{10}, md::dims<1>{1}};
+    const auto a = md::tensor<value_t, md::dims<1>>{{10}, md::dims<1>{1}};
     const auto b = md::sum(a, std::nullopt, 5);
 
     static_assert(std::is_same_v<std::remove_cvref_t<decltype(b)>, value_t>);
@@ -124,8 +123,7 @@ TEST(compile_time, 1) {
     using value_t = double;
     using index_t = std::size_t;
 
-    constexpr auto a =
-        md::container<value_t, md::extents<index_t, 2>>{{0.5, 1.5}};
+    constexpr auto a = md::tensor<value_t, md::extents<index_t, 2>>{{0.5, 1.5}};
     constexpr auto b = md::sum(a);
 
     static_assert(std::is_same_v<std::remove_cvref_t<decltype(b)>, value_t>);
@@ -138,7 +136,7 @@ TEST(compile_time, 2) {
     using index_t = std::size_t;
 
     constexpr auto a =
-        md::container<value_t, md::extents<index_t, 4>>{{0.5, 0.7, 0.2, 1.5}};
+        md::tensor<value_t, md::extents<index_t, 4>>{{0.5, 0.7, 0.2, 1.5}};
     constexpr auto b = md::sum<int>(a);
 
     static_assert(std::is_same_v<std::remove_cvref_t<decltype(b)>, int>);
@@ -151,7 +149,7 @@ TEST(compile_time, 3) {
     using index_t = std::size_t;
 
     constexpr auto a =
-        md::container<value_t, md::extents<index_t, 4>>{{0, 1, 0, 5}};
+        md::tensor<value_t, md::extents<index_t, 4>>{{0, 1, 0, 5}};
     constexpr auto b = md::sum(a);
 
     static_assert(std::is_same_v<std::remove_cvref_t<decltype(b)>, value_t>);
@@ -164,13 +162,13 @@ TEST(compile_time, 4) {
     using index_t = std::size_t;
 
     constexpr auto a =
-        md::container<value_t, md::extents<index_t, 2, 2>>{{0, 1, 0, 5}};
+        md::tensor<value_t, md::extents<index_t, 2, 2>>{{0, 1, 0, 5}};
     constexpr auto b = md::sum<0>(a);
 
     static_assert(std::is_same_v<typename decltype(b)::value_type, value_t>);
 
     static_assert(md::array_equal(
-        b, md::container<value_t, md::extents<index_t, 2>>{{0, 6}}));
+        b, md::tensor<value_t, md::extents<index_t, 2>>{{0, 6}}));
 }
 
 TEST(compile_time, 5) {
@@ -178,29 +176,29 @@ TEST(compile_time, 5) {
     using index_t = std::size_t;
 
     constexpr auto a =
-        md::container<value_t, md::extents<index_t, 2, 2>>{{0, 1, 0, 5}};
+        md::tensor<value_t, md::extents<index_t, 2, 2>>{{0, 1, 0, 5}};
     constexpr auto b = md::sum<1>(a);
 
     static_assert(std::is_same_v<typename decltype(b)::value_type, value_t>);
 
     static_assert(md::array_equal(
-        b, md::container<value_t, md::extents<index_t, 2>>{{1, 5}}));
+        b, md::tensor<value_t, md::extents<index_t, 2>>{{1, 5}}));
 }
 
 TEST(compile_time, 6) {
     using value_t = double;
     using index_t = std::size_t;
 
-    constexpr auto a = md::container<value_t, md::extents<index_t, 2, 2>>{
+    constexpr auto a = md::tensor<value_t, md::extents<index_t, 2, 2>>{
         {0, 1, std::numeric_limits<value_t>::quiet_NaN(), 5}};
     constexpr auto b =
         md::sum<1>(a, std::nullopt, 0,
-                   md::container<bool, md::extents<index_t, 2>>{{false, true}});
+                   md::tensor<bool, md::extents<index_t, 2>>{{false, true}});
 
     static_assert(std::is_same_v<typename decltype(b)::value_type, value_t>);
 
     static_assert(md::array_equal(
-        b, md::container<value_t, md::extents<index_t, 2>>{{1, 5}}));
+        b, md::tensor<value_t, md::extents<index_t, 2>>{{1, 5}}));
 }
 
 TEST(compile_time, 7) {
@@ -219,7 +217,7 @@ TEST(compile_time, 8) {
     using value_t = int;
     using index_t = std::size_t;
 
-    constexpr auto a = md::container<value_t, md::extents<index_t, 1>>{{10}};
+    constexpr auto a = md::tensor<value_t, md::extents<index_t, 1>>{{10}};
     constexpr auto b = md::sum(a, std::nullopt, 5);
 
     static_assert(std::is_same_v<std::remove_cvref_t<decltype(b)>, value_t>);

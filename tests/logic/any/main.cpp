@@ -20,8 +20,8 @@ namespace md = mdtensor;
 TEST(run_time, 1) {
     using value_t = bool;
 
-    const auto a = md::container<value_t, md::dims<2>>{
-        {true, false, true, true}, md::dims<2>{2, 2}};
+    const auto a = md::tensor<value_t, md::dims<2>>{{true, false, true, true},
+                                                    md::dims<2>{2, 2}};
 
     EXPECT_TRUE(md::any(a));
 }
@@ -30,19 +30,18 @@ TEST(run_time, 2) {
     using value_t = bool;
     using index_t = std::size_t;
 
-    const auto a = md::container<value_t, md::dims<2>>{
+    const auto a = md::tensor<value_t, md::dims<2>>{
         {true, false, true, false, false, false}, md::dims<2>{2, 3}};
 
     EXPECT_TRUE(md::array_equal(
         md::any<0>(a),
-        md::container<value_t, md::extents<index_t, 3>>{{true, false, true}}));
+        md::tensor<value_t, md::extents<index_t, 3>>{{true, false, true}}));
 }
 
 TEST(run_time, 3) {
     using value_t = int;
 
-    const auto a =
-        md::container<value_t, md::dims<1>>{{-1, 0, 5}, md::dims<1>{3}};
+    const auto a = md::tensor<value_t, md::dims<1>>{{-1, 0, 5}, md::dims<1>{3}};
 
     EXPECT_TRUE(md::any(a));
 }
@@ -50,24 +49,24 @@ TEST(run_time, 3) {
 TEST(run_time, 4) {
     using value_t = double;
 
-    const auto a = md::container<value_t, md::dims<2>>{
+    const auto a = md::tensor<value_t, md::dims<2>>{
         {std::numeric_limits<value_t>::quiet_NaN(),
          std::numeric_limits<value_t>::infinity()},
         md::dims<2>{2, 1}};
 
     EXPECT_TRUE(md::array_equal(
         md::any<1, void, true>(a),
-        md::container<bool, md::dims<2>>{{true, true}, md::dims<2>{2, 1}}));
+        md::tensor<bool, md::dims<2>>{{true, true}, md::dims<2>{2, 1}}));
 }
 
 TEST(run_time, 5) {
     using value_t = bool;
 
-    const auto a = md::container<value_t, md::dims<2>>{
-        {true, false, false, false}, md::dims<2>{2, 2}};
+    const auto a = md::tensor<value_t, md::dims<2>>{{true, false, false, false},
+                                                    md::dims<2>{2, 2}};
 
     const auto where =
-        md::container<bool, md::dims<2>>{{false, true}, md::dims<2>{2, 1}};
+        md::tensor<bool, md::dims<2>>{{false, true}, md::dims<2>{2, 1}};
 
     EXPECT_EQ(md::any(a, std::nullopt, where), false);
 }
@@ -76,22 +75,22 @@ TEST(run_time, 6) {
     using value_t = int;
     using index_t = std::size_t;
 
-    const auto a = md::container<value_t, md::dims<2>>{
-        {1, 0, 0, 0, 0, 1, 0, 0, 0}, md::dims<2>{3, 3}};
+    const auto a = md::tensor<value_t, md::dims<2>>{{1, 0, 0, 0, 0, 1, 0, 0, 0},
+                                                    md::dims<2>{3, 3}};
 
     EXPECT_TRUE(md::array_equal(
         md::any<0>(a),
-        md::container<bool, md::extents<index_t, 3>>{{true, false, true}}));
+        md::tensor<bool, md::extents<index_t, 3>>{{true, false, true}}));
     EXPECT_TRUE(md::array_equal(
         md::any<1>(a),
-        md::container<bool, md::extents<index_t, 3>>{{true, true, false}}));
+        md::tensor<bool, md::extents<index_t, 3>>{{true, true, false}}));
 }
 
 TEST(compile_time, 1) {
     using value_t = bool;
     using index_t = std::size_t;
 
-    constexpr auto a = md::container<value_t, md::extents<index_t, 2, 2>>{
+    constexpr auto a = md::tensor<value_t, md::extents<index_t, 2, 2>>{
         {true, false, true, true}};
 
     static_assert(md::any(a));
@@ -101,20 +100,19 @@ TEST(compile_time, 2) {
     using value_t = bool;
     using index_t = std::size_t;
 
-    constexpr auto a = md::container<value_t, md::extents<index_t, 2, 3>>{
+    constexpr auto a = md::tensor<value_t, md::extents<index_t, 2, 3>>{
         {true, false, true, false, false, false}};
 
     static_assert(md::array_equal(
         md::any<0>(a),
-        md::container<value_t, md::extents<index_t, 3>>{{true, false, true}}));
+        md::tensor<value_t, md::extents<index_t, 3>>{{true, false, true}}));
 }
 
 TEST(compile_time, 3) {
     using value_t = int;
     using index_t = std::size_t;
 
-    constexpr auto a =
-        md::container<value_t, md::extents<index_t, 3>>{{-1, 0, 5}};
+    constexpr auto a = md::tensor<value_t, md::extents<index_t, 3>>{{-1, 0, 5}};
 
     static_assert(md::any(a));
 }
@@ -123,24 +121,24 @@ TEST(compile_time, 4) {
     using value_t = double;
     using index_t = std::size_t;
 
-    constexpr auto a = md::container<value_t, md::extents<index_t, 2, 1>>{
+    constexpr auto a = md::tensor<value_t, md::extents<index_t, 2, 1>>{
         {std::numeric_limits<value_t>::quiet_NaN(),
          std::numeric_limits<value_t>::infinity()}};
 
     static_assert(md::array_equal(
         md::any<1, void, true>(a),
-        md::container<bool, md::extents<index_t, 2, 1>>{{true, true}}));
+        md::tensor<bool, md::extents<index_t, 2, 1>>{{true, true}}));
 }
 
 TEST(compile_time, 5) {
     using value_t = bool;
     using index_t = std::size_t;
 
-    constexpr auto a = md::container<value_t, md::extents<index_t, 2, 2>>{
+    constexpr auto a = md::tensor<value_t, md::extents<index_t, 2, 2>>{
         {true, false, false, false}};
 
     constexpr auto where =
-        md::container<bool, md::extents<index_t, 2, 1>>{{false, true}};
+        md::tensor<bool, md::extents<index_t, 2, 1>>{{false, true}};
 
     static_assert(md::any(a, std::nullopt, where) == false);
 }
@@ -149,13 +147,13 @@ TEST(compile_time, 6) {
     using value_t = int;
     using index_t = std::size_t;
 
-    constexpr auto a = md::container<value_t, md::extents<index_t, 3, 3>>{
+    constexpr auto a = md::tensor<value_t, md::extents<index_t, 3, 3>>{
         {1, 0, 0, 0, 0, 1, 0, 0, 0}};
 
     static_assert(md::array_equal(
         md::any<0>(a),
-        md::container<bool, md::extents<index_t, 3>>{{true, false, true}}));
+        md::tensor<bool, md::extents<index_t, 3>>{{true, false, true}}));
     static_assert(md::array_equal(
         md::any<1>(a),
-        md::container<bool, md::extents<index_t, 3>>{{true, true, false}}));
+        md::tensor<bool, md::extents<index_t, 3>>{{true, true, false}}));
 }

@@ -21,12 +21,12 @@ TEST(run_time, 1) {
     using value_t = int;
     using index_t = std::size_t;
 
-    auto a = md::container<value_t, md::dims<1>>{{1, 2}, md::dims<1>{2}};
+    auto a = md::tensor<value_t, md::dims<1>>{{1, 2}, md::dims<1>{2}};
 
     md::fill(a, 0);
 
     EXPECT_TRUE(md::array_equal(
-        a, md::container<value_t, md::extents<index_t, 2>>{{0, 0}}));
+        a, md::tensor<value_t, md::extents<index_t, 2>>{{0, 0}}));
 }
 
 TEST(run_time, 2) {
@@ -38,7 +38,7 @@ TEST(run_time, 2) {
     md::fill(a, 1);
 
     EXPECT_TRUE(md::array_equal(
-        a, md::container<value_t, md::extents<index_t, 2>>{{1, 1}}));
+        a, md::tensor<value_t, md::extents<index_t, 2>>{{1, 1}}));
 }
 
 TEST(compile_time, 1) {
@@ -46,7 +46,7 @@ TEST(compile_time, 1) {
     using index_t = std::size_t;
 
     constexpr auto a = [] {
-        auto a = md::container<value_t, md::extents<index_t, 2>>{{1, 2}};
+        auto a = md::tensor<value_t, md::extents<index_t, 2>>{{1, 2}};
         md::fill(a, 0);
         return a;
     }();

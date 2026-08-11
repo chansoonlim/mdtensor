@@ -27,7 +27,7 @@ TEST(run_time, 1) {
     std::cout << "x: " << md::to_string(x) << std::endl;
 
     EXPECT_TRUE(
-        md::array_equal(x, md::container<value_t, md::extents<index_t, 2, 2>>{
+        md::array_equal(x, md::tensor<value_t, md::extents<index_t, 2, 2>>{
                                {std::numeric_limits<value_t>::infinity(),
                                 std::numeric_limits<value_t>::infinity(),
                                 std::numeric_limits<value_t>::infinity(),
@@ -43,8 +43,7 @@ TEST(run_time, 2) {
     std::cout << "x: " << md::to_string(x) << std::endl;
 
     EXPECT_TRUE(md::array_equal(
-        x,
-        md::container<value_t, md::extents<index_t, 2, 2>>{{10, 10, 10, 10}}));
+        x, md::tensor<value_t, md::extents<index_t, 2, 2>>{{10, 10, 10, 10}}));
 }
 
 TEST(run_time, 3) {
@@ -53,12 +52,12 @@ TEST(run_time, 3) {
 
     const auto x =
         md::full(md::dims<2>{2, 2},
-                 md::container<value_t, md::dims<1>>{{1, 2}, md::dims<1>{2}});
+                 md::tensor<value_t, md::dims<1>>{{1, 2}, md::dims<1>{2}});
 
     std::cout << "x: " << md::to_string(x) << std::endl;
 
     EXPECT_TRUE(md::array_equal(
-        x, md::container<value_t, md::extents<index_t, 2, 2>>{{1, 2, 1, 2}}));
+        x, md::tensor<value_t, md::extents<index_t, 2, 2>>{{1, 2, 1, 2}}));
 }
 
 TEST(compile_time, 1) {
@@ -71,7 +70,7 @@ TEST(compile_time, 1) {
     std::cout << "x: " << md::to_string(x) << std::endl;
 
     static_assert(
-        md::array_equal(x, md::container<value_t, md::extents<index_t, 2, 2>>{
+        md::array_equal(x, md::tensor<value_t, md::extents<index_t, 2, 2>>{
                                {std::numeric_limits<value_t>::infinity(),
                                 std::numeric_limits<value_t>::infinity(),
                                 std::numeric_limits<value_t>::infinity(),
@@ -87,8 +86,7 @@ TEST(compile_time, 2) {
     std::cout << "x: " << md::to_string(x) << std::endl;
 
     static_assert(md::array_equal(
-        x,
-        md::container<value_t, md::extents<index_t, 2, 2>>{{10, 10, 10, 10}}));
+        x, md::tensor<value_t, md::extents<index_t, 2, 2>>{{10, 10, 10, 10}}));
 }
 
 TEST(compile_time, 3) {
@@ -97,10 +95,10 @@ TEST(compile_time, 3) {
 
     constexpr auto x =
         md::full(md::extents<index_t, 2, 2>{},
-                 md::container<value_t, md::extents<index_t, 2>>{{1, 2}});
+                 md::tensor<value_t, md::extents<index_t, 2>>{{1, 2}});
 
     std::cout << "x: " << md::to_string(x) << std::endl;
 
     static_assert(md::array_equal(
-        x, md::container<value_t, md::extents<index_t, 2, 2>>{{1, 2, 1, 2}}));
+        x, md::tensor<value_t, md::extents<index_t, 2, 2>>{{1, 2, 1, 2}}));
 }

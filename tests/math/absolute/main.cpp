@@ -22,14 +22,14 @@ TEST(run_time, 1) {
     using index_t = std::size_t;
 
     const auto x =
-        md::container<value_t, md::dims<1>>{{-1.2, 1.2}, md::dims<1>{2}};
+        md::tensor<value_t, md::dims<1>>{{-1.2, 1.2}, md::dims<1>{2}};
 
     const auto x_abs = md::absolute(x);
 
     std::cout << "x_abs: " << md::to_string(x_abs) << std::endl;
 
     ASSERT_TRUE(md::allclose(
-        x_abs, md::container<value_t, md::extents<index_t, 2>>{{1.2, 1.2}}));
+        x_abs, md::tensor<value_t, md::extents<index_t, 2>>{{1.2, 1.2}}));
 }
 
 TEST(compile_time, 1) {
@@ -37,12 +37,12 @@ TEST(compile_time, 1) {
     using index_t = std::size_t;
 
     constexpr auto x =
-        md::container<value_t, md::extents<index_t, 2>>{{-1.2, 1.2}};
+        md::tensor<value_t, md::extents<index_t, 2>>{{-1.2, 1.2}};
 
     constexpr auto x_abs = md::absolute(x);
 
     std::cout << "x_abs: " << md::to_string(x_abs) << std::endl;
 
     static_assert(md::allclose(
-        x_abs, md::container<value_t, md::extents<index_t, 2>>{{1.2, 1.2}}));
+        x_abs, md::tensor<value_t, md::extents<index_t, 2>>{{1.2, 1.2}}));
 }

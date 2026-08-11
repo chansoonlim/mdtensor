@@ -21,15 +21,14 @@ TEST(run_time, 1) {
     using value_t = float;
     using index_t = std::size_t;
 
-    const auto a =
-        md::container<value_t, md::dims<1>>{{-5, 4.5}, md::dims<1>{2}};
+    const auto a = md::tensor<value_t, md::dims<1>>{{-5, 4.5}, md::dims<1>{2}};
 
     const auto a_sign = md::sign(a);
 
     std::cout << "a_sign: " << md::to_string(a_sign) << std::endl;
 
     ASSERT_TRUE(md::array_equal(
-        a_sign, md::container<int, md::extents<index_t, 2>>{{-1, 1}}));
+        a_sign, md::tensor<int, md::extents<index_t, 2>>{{-1, 1}}));
 }
 
 TEST(run_time, 2) { ASSERT_EQ(md::sign(0), 0); }
@@ -38,15 +37,14 @@ TEST(compile_time, 1) {
     using value_t = float;
     using index_t = std::size_t;
 
-    constexpr auto a =
-        md::container<value_t, md::extents<index_t, 2>>{{-5, 4.5}};
+    constexpr auto a = md::tensor<value_t, md::extents<index_t, 2>>{{-5, 4.5}};
 
     constexpr auto a_sign = md::sign(a);
 
     std::cout << "a_sign: " << md::to_string(a_sign) << std::endl;
 
     static_assert(md::array_equal(
-        a_sign, md::container<int, md::extents<index_t, 2>>{{-1, 1}}));
+        a_sign, md::tensor<int, md::extents<index_t, 2>>{{-1, 1}}));
 }
 
 TEST(compile_time, 2) { static_assert(md::sign(0) == 0); }

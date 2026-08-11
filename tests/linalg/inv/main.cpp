@@ -22,12 +22,12 @@ TEST(run_time, 1) {
     using index_t = std::size_t;
 
     const auto a =
-        md::container<value_t, md::extents<index_t, 2, 2>>{{1, 2, 3, 4}};
+        md::tensor<value_t, md::extents<index_t, 2, 2>>{{1, 2, 3, 4}};
     const auto [a_inv, valid] = md::linalg::inv(a);
 
-    EXPECT_TRUE(
-        md::allclose(a_inv, md::container<value_t, md::extents<index_t, 2, 2>>{
-                                {-2, 1, 1.5, -0.5}}));
+    EXPECT_TRUE(md::allclose(
+        a_inv,
+        md::tensor<value_t, md::extents<index_t, 2, 2>>{{-2, 1, 1.5, -0.5}}));
 
     EXPECT_TRUE(
         md::allclose(md::linalg::matmul(a, a_inv), md::eye<value_t>(2)));
@@ -40,20 +40,20 @@ TEST(run_time, 2) {
     using value_t = double;
     using index_t = std::size_t;
 
-    const auto a = md::container<value_t, md::extents<index_t, 2, 2, 2>>{
+    const auto a = md::tensor<value_t, md::extents<index_t, 2, 2, 2>>{
         {1, 2, 3, 4, 1, 3, 3, 5}};
     const auto [a_inv, valid] = md::linalg::inv(a);
 
-    EXPECT_TRUE(md::allclose(
-        a_inv, md::container<value_t, md::extents<index_t, 2, 2, 2>>{
-                   {-2, 1, 1.5, -0.5, -1.25, 0.75, 0.75, -0.25}}));
+    EXPECT_TRUE(
+        md::allclose(a_inv, md::tensor<value_t, md::extents<index_t, 2, 2, 2>>{
+                                {-2, 1, 1.5, -0.5, -1.25, 0.75, 0.75, -0.25}}));
 }
 
 TEST(run_time, 3) {
     using value_t = double;
     using index_t = std::size_t;
 
-    const auto a = md::container<value_t, md::extents<index_t, 3, 3>>{
+    const auto a = md::tensor<value_t, md::extents<index_t, 3, 3>>{
         {2, 4, 6, 2, 0, 2, 6, 8, 14}};
     const auto [a_inv, valid] = md::linalg::inv(a);
 
@@ -72,12 +72,12 @@ TEST(compile_time, 1) {
     using index_t = std::size_t;
 
     constexpr auto a =
-        md::container<value_t, md::extents<index_t, 2, 2>>{{1, 2, 3, 4}};
+        md::tensor<value_t, md::extents<index_t, 2, 2>>{{1, 2, 3, 4}};
     constexpr auto a_inv = std::get<0>(md::linalg::inv(a));
 
-    static_assert(
-        md::allclose(a_inv, md::container<value_t, md::extents<index_t, 2, 2>>{
-                                {-2, 1, 1.5, -0.5}}));
+    static_assert(md::allclose(
+        a_inv,
+        md::tensor<value_t, md::extents<index_t, 2, 2>>{{-2, 1, 1.5, -0.5}}));
 
     static_assert(
         md::allclose(md::linalg::matmul(a, a_inv), md::eye<2, value_t>()));
@@ -90,20 +90,20 @@ TEST(compile_time, 2) {
     using value_t = double;
     using index_t = std::size_t;
 
-    constexpr auto a = md::container<value_t, md::extents<index_t, 2, 2, 2>>{
+    constexpr auto a = md::tensor<value_t, md::extents<index_t, 2, 2, 2>>{
         {1, 2, 3, 4, 1, 3, 3, 5}};
     constexpr auto a_inv = std::get<0>(md::linalg::inv(a));
 
-    static_assert(md::allclose(
-        a_inv, md::container<value_t, md::extents<index_t, 2, 2, 2>>{
-                   {-2, 1, 1.5, -0.5, -1.25, 0.75, 0.75, -0.25}}));
+    static_assert(
+        md::allclose(a_inv, md::tensor<value_t, md::extents<index_t, 2, 2, 2>>{
+                                {-2, 1, 1.5, -0.5, -1.25, 0.75, 0.75, -0.25}}));
 }
 
 TEST(compile_time, 3) {
     using value_t = double;
     using index_t = std::size_t;
 
-    constexpr auto a = md::container<value_t, md::extents<index_t, 3, 3>>{
+    constexpr auto a = md::tensor<value_t, md::extents<index_t, 3, 3>>{
         {2, 4, 6, 2, 0, 2, 6, 8, 14}};
     constexpr auto out = md::linalg::inv(a);
     constexpr auto a_inv = std::get<0>(out);

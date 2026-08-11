@@ -24,7 +24,7 @@ TEST(run_time, 1) {
     const auto out = md::eye<value_t>(2);
 
     EXPECT_TRUE(md::array_equal(
-        out, md::container<value_t, md::extents<index_t, 2, 2>>{{1, 0, 0, 1}}));
+        out, md::tensor<value_t, md::extents<index_t, 2, 2>>{{1, 0, 0, 1}}));
 }
 
 TEST(run_time, 2) {
@@ -34,7 +34,7 @@ TEST(run_time, 2) {
     const auto out = md::eye<value_t>(3, 1);
 
     EXPECT_TRUE(
-        md::array_equal(out, md::container<value_t, md::extents<index_t, 3, 3>>{
+        md::array_equal(out, md::tensor<value_t, md::extents<index_t, 3, 3>>{
                                  {0, 1, 0, 0, 0, 1, 0, 0, 0}}));
 }
 
@@ -45,7 +45,7 @@ TEST(compile_time, 1) {
     const auto out = md::eye<2, value_t>();
 
     EXPECT_TRUE(md::array_equal(
-        out, md::container<value_t, md::extents<index_t, 2, 2>>{{1, 0, 0, 1}}));
+        out, md::tensor<value_t, md::extents<index_t, 2, 2>>{{1, 0, 0, 1}}));
 }
 
 TEST(compile_time, 2) {
@@ -55,6 +55,6 @@ TEST(compile_time, 2) {
     const auto out = md::eye<3, value_t>(1);
 
     EXPECT_TRUE(
-        md::array_equal(out, md::container<value_t, md::extents<index_t, 3, 3>>{
+        md::array_equal(out, md::tensor<value_t, md::extents<index_t, 3, 3>>{
                                  {0, 1, 0, 0, 0, 1, 0, 0, 0}}));
 }

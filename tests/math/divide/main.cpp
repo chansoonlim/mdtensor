@@ -37,7 +37,7 @@ TEST(run_time, 2) {
 
     ASSERT_TRUE(
         md::allclose(out,
-                     md::container<value_t, md::extents<index_t, 3, 3>>{
+                     md::tensor<value_t, md::extents<index_t, 3, 3>>{
                          {std::numeric_limits<double>::quiet_NaN(), 1., 1.,
                           std::numeric_limits<double>::infinity(), 4., 2.5,
                           std::numeric_limits<double>::infinity(), 7., 4.}},
@@ -67,7 +67,7 @@ TEST(compile_time, 2) {
 
     ASSERT_TRUE(
         md::allclose(out,
-                     md::container<value_t, md::extents<index_t, 3, 3>>{
+                     md::tensor<value_t, md::extents<index_t, 3, 3>>{
                          {std::numeric_limits<double>::quiet_NaN(), 1., 1.,
                           std::numeric_limits<double>::infinity(), 4., 2.5,
                           std::numeric_limits<double>::infinity(), 7., 4.}},

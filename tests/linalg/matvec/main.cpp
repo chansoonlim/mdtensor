@@ -21,30 +21,29 @@ TEST(run_time, 1) {
     using value_t = double;
     using index_t = std::size_t;
 
-    const auto a = md::container<value_t, md::extents<index_t, 3, 3>>{
+    const auto a = md::tensor<value_t, md::extents<index_t, 3, 3>>{
         {0, 1, 0, -1, 0, 0, 0, 0, 1}};
-    const auto v = md::container<value_t, md::extents<index_t, 4, 3>>{
+    const auto v = md::tensor<value_t, md::extents<index_t, 4, 3>>{
         {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 8}};
 
     const auto c = md::linalg::matvec(a, v);
 
-    EXPECT_TRUE(
-        md::allclose(c, md::container<value_t, md::extents<index_t, 4, 3>>{
-                            {0, -1, 0, 1, 0, 0, 0, 0, 1, 6, 0, 8}}));
+    EXPECT_TRUE(md::allclose(c, md::tensor<value_t, md::extents<index_t, 4, 3>>{
+                                    {0, -1, 0, 1, 0, 0, 0, 0, 1, 6, 0, 8}}));
 }
 
 TEST(compile_time, 1) {
     using value_t = double;
     using index_t = std::size_t;
 
-    constexpr auto a = md::container<value_t, md::extents<index_t, 3, 3>>{
+    constexpr auto a = md::tensor<value_t, md::extents<index_t, 3, 3>>{
         {0, 1, 0, -1, 0, 0, 0, 0, 1}};
-    constexpr auto v = md::container<value_t, md::extents<index_t, 4, 3>>{
+    constexpr auto v = md::tensor<value_t, md::extents<index_t, 4, 3>>{
         {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 8}};
 
     constexpr auto c = md::linalg::matvec(a, v);
 
     static_assert(
-        md::allclose(c, md::container<value_t, md::extents<index_t, 4, 3>>{
+        md::allclose(c, md::tensor<value_t, md::extents<index_t, 4, 3>>{
                             {0, -1, 0, 1, 0, 0, 0, 0, 1, 6, 0, 8}}));
 }

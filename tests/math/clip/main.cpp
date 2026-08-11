@@ -29,10 +29,10 @@ TEST(run_time, 1) {
     std::cout << "out2: " << md::to_string(out2) << std::endl;
 
     ASSERT_TRUE(
-        md::array_equal(out1, md::container<value_t, md::extents<index_t, 10>>{
+        md::array_equal(out1, md::tensor<value_t, md::extents<index_t, 10>>{
                                   {1, 1, 2, 3, 4, 5, 6, 7, 8, 8}}));
     ASSERT_TRUE(
-        md::array_equal(out2, md::container<value_t, md::extents<index_t, 10>>{
+        md::array_equal(out2, md::tensor<value_t, md::extents<index_t, 10>>{
                                   {1, 1, 1, 1, 1, 1, 1, 1, 1, 1}}));
 }
 
@@ -47,7 +47,7 @@ TEST(run_time, 2) {
     std::cout << "a: " << md::to_string(a) << std::endl;
 
     ASSERT_TRUE(
-        md::array_equal(a, md::container<value_t, md::extents<index_t, 10>>{
+        md::array_equal(a, md::tensor<value_t, md::extents<index_t, 10>>{
                                {3, 3, 3, 3, 4, 5, 6, 6, 6, 6}}));
 }
 
@@ -57,14 +57,14 @@ TEST(run_time, 3) {
 
     const auto a = md::arange(10);
     const auto out = md::clip(a,
-                              md::container<value_t, md::extents<index_t, 10>>{
+                              md::tensor<value_t, md::extents<index_t, 10>>{
                                   {3, 4, 1, 1, 1, 4, 4, 4, 4, 4}},
                               8);
 
     std::cout << "out: " << md::to_string(out) << std::endl;
 
     ASSERT_TRUE(
-        md::array_equal(out, md::container<value_t, md::extents<index_t, 10>>{
+        md::array_equal(out, md::tensor<value_t, md::extents<index_t, 10>>{
                                  {3, 4, 2, 3, 4, 5, 6, 7, 8, 8}}));
 }
 
@@ -80,10 +80,10 @@ TEST(compile_time, 1) {
     std::cout << "out2: " << md::to_string(out2) << std::endl;
 
     static_assert(
-        md::array_equal(out1, md::container<value_t, md::extents<index_t, 10>>{
+        md::array_equal(out1, md::tensor<value_t, md::extents<index_t, 10>>{
                                   {1, 1, 2, 3, 4, 5, 6, 7, 8, 8}}));
     static_assert(
-        md::array_equal(out2, md::container<value_t, md::extents<index_t, 10>>{
+        md::array_equal(out2, md::tensor<value_t, md::extents<index_t, 10>>{
                                   {1, 1, 1, 1, 1, 1, 1, 1, 1, 1}}));
 }
 
@@ -96,9 +96,8 @@ TEST(compile_time, 2) {
 
         static_cast<void>(md::clip(a, 3, 6, a));
 
-        return md::array_equal(a,
-                               md::container<value_t, md::extents<index_t, 10>>{
-                                   {3, 3, 3, 3, 4, 5, 6, 6, 6, 6}});
+        return md::array_equal(a, md::tensor<value_t, md::extents<index_t, 10>>{
+                                      {3, 3, 3, 3, 4, 5, 6, 6, 6, 6}});
     }());
 }
 
@@ -107,15 +106,14 @@ TEST(compile_time, 3) {
     using index_t = std::size_t;
 
     constexpr auto a = md::arange<10>();
-    constexpr auto out =
-        md::clip(a,
-                 md::container<value_t, md::extents<index_t, 10>>{
-                     {3, 4, 1, 1, 1, 4, 4, 4, 4, 4}},
-                 8);
+    constexpr auto out = md::clip(a,
+                                  md::tensor<value_t, md::extents<index_t, 10>>{
+                                      {3, 4, 1, 1, 1, 4, 4, 4, 4, 4}},
+                                  8);
 
     std::cout << "out: " << md::to_string(out) << std::endl;
 
     static_assert(
-        md::array_equal(out, md::container<value_t, md::extents<index_t, 10>>{
+        md::array_equal(out, md::tensor<value_t, md::extents<index_t, 10>>{
                                  {3, 4, 2, 3, 4, 5, 6, 7, 8, 8}}));
 }

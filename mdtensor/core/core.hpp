@@ -11,11 +11,11 @@
 
 #include "batch.hpp"
 #include "broadcast.hpp"
-#include "container.hpp"
 #include "extents.hpp"
 #include "manipulation.hpp"
 #include "mdspan.hpp"
 #include "output.hpp"
+#include "tensor.hpp"
 #include "type.hpp"
 #include "ufunc.hpp"
 #include "util.hpp"
@@ -55,7 +55,7 @@ using mdspan = core::mdspan<ElementType, Extents, LayoutPolicy, AccessorPolicy>;
 constexpr auto full_extent = core::full_extent;
 
 template <typename value_t, extents_c extent_t>
-using container = core::container<value_t, extent_t>;
+using tensor = core::tensor<value_t, extent_t>;
 
 using Backend = core::Backend;
 

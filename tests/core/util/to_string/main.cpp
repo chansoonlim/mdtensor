@@ -67,7 +67,7 @@ TEST(run_time, 3) {
 
 TEST(run_time, 4) {
     const auto a =
-        md::core::container<int, md::core::extents<std::size_t, 2, 1, 2>>{
+        md::core::tensor<int, md::core::extents<std::size_t, 2, 1, 2>>{
             {1, 2, 3, 4}};
 
     std::cout << "a : " << md::core::to_string(a) << std::endl;

@@ -51,7 +51,7 @@ TEST(run_time, 3) {
 
     const auto out = md::random::randint(
         md::extents<index_t>{}, 1,
-        md::container<value_t, md::dims<1>>{{3, 5, 10}, md::dims<1>{3}});
+        md::tensor<value_t, md::dims<1>>{{3, 5, 10}, md::dims<1>{3}});
 
     EXPECT_TRUE(md::is_same_extents(out.extents(), md::extents<index_t, 3>{}));
 
@@ -64,7 +64,7 @@ TEST(run_time, 4) {
 
     const auto out = md::random::randint(
         md::extents<index_t>{},
-        md::container<value_t, md::dims<1>>{{1, 5, 7}, md::dims<1>{3}}, 10);
+        md::tensor<value_t, md::dims<1>>{{1, 5, 7}, md::dims<1>{3}}, 10);
 
     EXPECT_TRUE(md::is_same_extents(out.extents(), md::extents<index_t, 3>{}));
 
@@ -77,8 +77,8 @@ TEST(run_time, 5) {
 
     const auto out = md::random::randint<value_t>(
         md::extents<index_t>{},
-        md::container<value_t, md::dims<1>>{{1, 3, 5, 7}, md::dims<1>{4}},
-        md::container<value_t, md::dims<2>>{{10, 20}, md::dims<2>{2, 1}});
+        md::tensor<value_t, md::dims<1>>{{1, 3, 5, 7}, md::dims<1>{4}},
+        md::tensor<value_t, md::dims<2>>{{10, 20}, md::dims<2>{2, 1}});
 
     EXPECT_TRUE(
         md::is_same_extents(out.extents(), md::extents<index_t, 2, 4>{}));
@@ -132,7 +132,7 @@ TEST(compile_time, 3) {
     constexpr auto out =
         md::random::randint<value_t, md::random::generator::SplitMix64>(
             md::extents<index_t>{}, 1,
-            md::container<value_t, md::extents<index_t, 3>>{{3, 5, 10}},
+            md::tensor<value_t, md::extents<index_t, 3>>{{3, 5, 10}},
             std::nullopt, md::random::seed_t{0});
 
     static_assert(
@@ -148,7 +148,7 @@ TEST(compile_time, 4) {
     constexpr auto out =
         md::random::randint<value_t, md::random::generator::SplitMix64>(
             md::extents<index_t>{},
-            md::container<value_t, md::extents<index_t, 3>>{{1, 5, 7}}, 10,
+            md::tensor<value_t, md::extents<index_t, 3>>{{1, 5, 7}}, 10,
             std::nullopt, md::random::seed_t{0});
 
     static_assert(
@@ -164,8 +164,8 @@ TEST(compile_time, 5) {
     constexpr auto out =
         md::random::randint<value_t, md::random::generator::SplitMix64>(
             md::extents<index_t>{},
-            md::container<value_t, md::extents<index_t, 4>>{{1, 3, 5, 7}},
-            md::container<value_t, md::extents<index_t, 2, 1>>{{10, 20}},
+            md::tensor<value_t, md::extents<index_t, 4>>{{1, 3, 5, 7}},
+            md::tensor<value_t, md::extents<index_t, 2, 1>>{{10, 20}},
             std::nullopt, md::random::seed_t{0});
 
     static_assert(

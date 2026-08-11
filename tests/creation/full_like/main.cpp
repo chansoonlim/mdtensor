@@ -22,20 +22,19 @@ TEST(run_time, 1) {
 
     EXPECT_TRUE(md::array_equal(
         md::full_like(x, 1),
-        md::container<int, md::extents<std::size_t, 6>>{{1, 1, 1, 1, 1, 1}}));
+        md::tensor<int, md::extents<std::size_t, 6>>{{1, 1, 1, 1, 1, 1}}));
 
     EXPECT_TRUE(md::array_equal(
         md::full_like(x, 0.1),
-        md::container<int, md::extents<std::size_t, 6>>{{0, 0, 0, 0, 0, 0}}));
+        md::tensor<int, md::extents<std::size_t, 6>>{{0, 0, 0, 0, 0, 0}}));
 
-    EXPECT_TRUE(
-        md::array_equal(md::full_like<double>(x, 0.1),
-                        md::container<double, md::extents<std::size_t, 6>>{
-                            {0.1, 0.1, 0.1, 0.1, 0.1, 0.1}}));
+    EXPECT_TRUE(md::array_equal(md::full_like<double>(x, 0.1),
+                                md::tensor<double, md::extents<std::size_t, 6>>{
+                                    {0.1, 0.1, 0.1, 0.1, 0.1, 0.1}}));
 
     EXPECT_TRUE(md::array_equal(
         md::full_like<double>(x, std::numeric_limits<double>::quiet_NaN()),
-        md::container<double, md::extents<std::size_t, 6>>{
+        md::tensor<double, md::extents<std::size_t, 6>>{
             {std::numeric_limits<double>::quiet_NaN(),
              std::numeric_limits<double>::quiet_NaN(),
              std::numeric_limits<double>::quiet_NaN(),
@@ -52,7 +51,7 @@ TEST(run_time, 2) {
     const auto z = md::full_like(y, 0.1);
 
     EXPECT_TRUE(
-        md::array_equal(z, md::container<value_t, md::extents<std::size_t, 6>>{
+        md::array_equal(z, md::tensor<value_t, md::extents<std::size_t, 6>>{
                                {0.1, 0.1, 0.1, 0.1, 0.1, 0.1}}));
 }
 
@@ -62,11 +61,11 @@ TEST(run_time, 3) {
 
     const auto y = md::zeros<value_t>(md::extents<index_t, 2, 2, 3>{});
     const auto z = md::full_like(
-        y, md::container<value_t, md::extents<index_t, 3>>{{0, 0, 255}});
+        y, md::tensor<value_t, md::extents<index_t, 3>>{{0, 0, 255}});
 
-    EXPECT_TRUE(md::array_equal(
-        z, md::container<value_t, md::extents<index_t, 2, 2, 3>>{
-               {0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255}}));
+    EXPECT_TRUE(
+        md::array_equal(z, md::tensor<value_t, md::extents<index_t, 2, 2, 3>>{
+                               {0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255}}));
 }
 
 TEST(compile_time, 1) {
@@ -74,20 +73,20 @@ TEST(compile_time, 1) {
 
     static_assert(md::array_equal(
         md::full_like(x, 1),
-        md::container<int, md::extents<std::size_t, 6>>{{1, 1, 1, 1, 1, 1}}));
+        md::tensor<int, md::extents<std::size_t, 6>>{{1, 1, 1, 1, 1, 1}}));
 
     static_assert(md::array_equal(
         md::full_like(x, 0.1),
-        md::container<int, md::extents<std::size_t, 6>>{{0, 0, 0, 0, 0, 0}}));
+        md::tensor<int, md::extents<std::size_t, 6>>{{0, 0, 0, 0, 0, 0}}));
 
     static_assert(
         md::array_equal(md::full_like<double>(x, 0.1),
-                        md::container<double, md::extents<std::size_t, 6>>{
+                        md::tensor<double, md::extents<std::size_t, 6>>{
                             {0.1, 0.1, 0.1, 0.1, 0.1, 0.1}}));
 
     static_assert(md::array_equal(
         md::full_like<double>(x, std::numeric_limits<double>::quiet_NaN()),
-        md::container<double, md::extents<std::size_t, 6>>{
+        md::tensor<double, md::extents<std::size_t, 6>>{
             {std::numeric_limits<double>::quiet_NaN(),
              std::numeric_limits<double>::quiet_NaN(),
              std::numeric_limits<double>::quiet_NaN(),
@@ -104,7 +103,7 @@ TEST(compile_time, 2) {
     constexpr auto z = md::full_like(y, 0.1);
 
     static_assert(
-        md::array_equal(z, md::container<value_t, md::extents<std::size_t, 6>>{
+        md::array_equal(z, md::tensor<value_t, md::extents<std::size_t, 6>>{
                                {0.1, 0.1, 0.1, 0.1, 0.1, 0.1}}));
 }
 
@@ -114,9 +113,9 @@ TEST(compile_time, 3) {
 
     constexpr auto y = md::zeros<value_t>(md::extents<index_t, 2, 2, 3>{});
     constexpr auto z = md::full_like(
-        y, md::container<value_t, md::extents<index_t, 3>>{{0, 0, 255}});
+        y, md::tensor<value_t, md::extents<index_t, 3>>{{0, 0, 255}});
 
-    static_assert(md::array_equal(
-        z, md::container<value_t, md::extents<index_t, 2, 2, 3>>{
-               {0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255}}));
+    static_assert(
+        md::array_equal(z, md::tensor<value_t, md::extents<index_t, 2, 2, 3>>{
+                               {0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255}}));
 }

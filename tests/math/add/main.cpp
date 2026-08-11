@@ -36,7 +36,7 @@ TEST(run_time, 2) {
     std::cout << "out: " << md::to_string(out) << std::endl;
 
     ASSERT_TRUE(
-        md::array_equal(out, md::container<value_t, md::extents<index_t, 3, 3>>{
+        md::array_equal(out, md::tensor<value_t, md::extents<index_t, 3, 3>>{
                                  {0, 2, 4, 3, 5, 7, 6, 8, 10}}));
 }
 
@@ -60,6 +60,6 @@ TEST(compile_time, 2) {
     std::cout << "out: " << md::to_string(out) << std::endl;
 
     static_assert(
-        md::array_equal(out, md::container<value_t, md::extents<index_t, 3, 3>>{
+        md::array_equal(out, md::tensor<value_t, md::extents<index_t, 3, 3>>{
                                  {0, 2, 4, 3, 5, 7, 6, 8, 10}}));
 }

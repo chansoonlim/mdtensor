@@ -10,7 +10,7 @@
 #pragma once
 
 #include "broadcast.hpp"
-#include "container.hpp"
+#include "tensor.hpp"
 
 namespace mdtensor::core {
 namespace detail {
@@ -75,7 +75,7 @@ template <typename dtype = void, std::size_t... uranks, extents_c uout_exts_t>
     constexpr std::size_t ins_num = sizeof...(uranks);
 
     if constexpr (ins_num == 0) {
-        return make_container<dtype>(std::forward<uout_exts_t>(uout_exts));
+        return make_tensor<dtype>(std::forward<uout_exts_t>(uout_exts));
 
     } else {
         using value_t = output_value_t<dtype, decltype(ins)...>;
@@ -85,8 +85,7 @@ template <typename dtype = void, std::size_t... uranks, extents_c uout_exts_t>
             std::index_sequence<uranks...>{},
             to_const_mdspan(std::forward<decltype(ins)>(ins))...);
 
-        // make output container
-        return make_container<value_t>(
+        return make_tensor<value_t>(
             compose_extents(bexts, std::forward<uout_exts_t>(uout_exts)));
     }
 }
@@ -116,7 +115,7 @@ template <typename dtype = void, std::size_t... uranks,
     if constexpr (ins_num == 0) {
         return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
             return std::tuple{
-                make_container<dtype>(std::get<Is>(uout_exts_tuple))...};
+                make_tensor<dtype>(std::get<Is>(uout_exts_tuple))...};
         }(std::make_index_sequence<outs_num>{});
 
     } else {
@@ -127,9 +126,8 @@ template <typename dtype = void, std::size_t... uranks,
             std::index_sequence<uranks...>{},
             to_const_mdspan(std::forward<decltype(ins)>(ins))...);
 
-        // make output container
         return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-            return std::tuple{make_container<value_t>(
+            return std::tuple{make_tensor<value_t>(
                 compose_extents(bexts, std::get<Is>(uout_exts_tuple)))...};
         }(std::make_index_sequence<outs_num>{});
     }

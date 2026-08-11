@@ -22,16 +22,15 @@ TEST(broadcast, 1) {
     using index_t = std::size_t;
 
     constexpr auto x =
-        md::core::container<value_t, md::core::extents<index_t, 1, 3>>{
-            {1, 2, 3}};
+        md::core::tensor<value_t, md::core::extents<index_t, 1, 3>>{{1, 2, 3}};
     constexpr auto y =
-        md::core::container<value_t, md::core::extents<index_t, 2, 1>>{{4, 5}};
+        md::core::tensor<value_t, md::core::extents<index_t, 2, 1>>{{4, 5}};
 
     constexpr auto x_bcast_ref =
-        md::core::container<value_t, md::core::extents<index_t, 2, 3>>{
+        md::core::tensor<value_t, md::core::extents<index_t, 2, 3>>{
             {1, 2, 3, 1, 2, 3}};
     constexpr auto y_bcast_ref =
-        md::core::container<value_t, md::core::extents<index_t, 2, 3>>{
+        md::core::tensor<value_t, md::core::extents<index_t, 2, 3>>{
             {4, 4, 4, 5, 5, 5}};
 
     static_assert([&]() {
@@ -74,11 +73,10 @@ TEST(broadcast, 2) {
     using index_t = std::size_t;
 
     constexpr auto a =
-        md::core::container<value_t, md::core::extents<index_t, 2, 1, 2>>{};
+        md::core::tensor<value_t, md::core::extents<index_t, 2, 1, 2>>{};
     constexpr auto b =
-        md::core::container<value_t, md::core::extents<index_t, 2, 1>>{};
-    auto c =
-        md::core::container<value_t, md::core::extents<index_t, 2, 2, 2>>{};
+        md::core::tensor<value_t, md::core::extents<index_t, 2, 1>>{};
+    auto c = md::core::tensor<value_t, md::core::extents<index_t, 2, 2, 2>>{};
 
     const auto out = md::core::broadcast(
         std::index_sequence<0, 0, 0>{},

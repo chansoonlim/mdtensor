@@ -20,7 +20,7 @@ namespace md = mdtensor;
 TEST(stack, norm) {
     using T = double;
 
-    constexpr auto x = md::container<T, md::extents<std::size_t, 2>>{{3, 4}};
+    constexpr auto x = md::tensor<T, md::extents<std::size_t, 2>>{{3, 4}};
     constexpr auto x_norm = md::linalg::norm(x);
 
     constexpr auto x_norm_expect = 5;
@@ -33,7 +33,7 @@ TEST(stack, norm) {
 TEST(heap, norm) {
     using T = double;
 
-    const auto x = md::container<T, md::dims<1>>{{3, 4}, md::dims<1>{2}};
+    const auto x = md::tensor<T, md::dims<1>>{{3, 4}, md::dims<1>{2}};
     const auto x_norm = md::linalg::norm(x);
 
     const auto x_norm_expect = 5;
@@ -46,7 +46,7 @@ TEST(heap, norm) {
 TEST(stack, zero) {
     using T = double;
 
-    constexpr auto x = md::container<T, md::extents<std::size_t, 2>>{{0, 0}};
+    constexpr auto x = md::tensor<T, md::extents<std::size_t, 2>>{{0, 0}};
     constexpr auto x_norm = md::linalg::norm(x);
 
     constexpr auto x_norm_expect = 0;
@@ -59,7 +59,7 @@ TEST(stack, zero) {
 TEST(heap, zero) {
     using T = double;
 
-    const auto x = md::container<T, md::dims<1>>{{0, 0}, md::dims<1>{2}};
+    const auto x = md::tensor<T, md::dims<1>>{{0, 0}, md::dims<1>{2}};
     const auto x_norm = md::linalg::norm(x);
 
     const auto x_norm_expect = 0;

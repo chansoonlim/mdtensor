@@ -21,27 +21,26 @@ TEST(run_time, 1) {
     using value_t = double;
     using index_t = std::size_t;
 
-    const auto v = md::container<value_t, md::extents<index_t, 3>>{{0, 4, 2}};
-    const auto a = md::container<value_t, md::extents<index_t, 3, 3>>{
+    const auto v = md::tensor<value_t, md::extents<index_t, 3>>{{0, 4, 2}};
+    const auto a = md::tensor<value_t, md::extents<index_t, 3, 3>>{
         {1, 0, 0, 0, 1, 0, 0, 0, 0}};
 
     const auto c = md::linalg::vecmat(v, a);
 
     EXPECT_TRUE(md::allclose(
-        c, md::container<value_t, md::extents<index_t, 3>>{{0, 4, 0}}));
+        c, md::tensor<value_t, md::extents<index_t, 3>>{{0, 4, 0}}));
 }
 
 TEST(compile_time, 1) {
     using value_t = double;
     using index_t = std::size_t;
 
-    constexpr auto v =
-        md::container<value_t, md::extents<index_t, 3>>{{0, 4, 2}};
-    constexpr auto a = md::container<value_t, md::extents<index_t, 3, 3>>{
+    constexpr auto v = md::tensor<value_t, md::extents<index_t, 3>>{{0, 4, 2}};
+    constexpr auto a = md::tensor<value_t, md::extents<index_t, 3, 3>>{
         {1, 0, 0, 0, 1, 0, 0, 0, 0}};
 
     constexpr auto c = md::linalg::vecmat(v, a);
 
     static_assert(md::allclose(
-        c, md::container<value_t, md::extents<index_t, 3>>{{0, 4, 0}}));
+        c, md::tensor<value_t, md::extents<index_t, 3>>{{0, 4, 0}}));
 }

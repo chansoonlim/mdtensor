@@ -36,7 +36,7 @@ TEST(run_time, 2) {
     std::cout << "out: " << md::to_string(out) << std::endl;
 
     ASSERT_TRUE(
-        md::allclose(out, md::container<value_t, md::extents<index_t, 3, 3>>{
+        md::allclose(out, md::tensor<value_t, md::extents<index_t, 3, 3>>{
                               {0, 0, 0, 3, 3, 3, 6, 6, 6}}));
 }
 
@@ -60,6 +60,6 @@ TEST(compile_time, 2) {
     std::cout << "out: " << md::to_string(out) << std::endl;
 
     static_assert(
-        md::allclose(out, md::container<value_t, md::extents<index_t, 3, 3>>{
+        md::allclose(out, md::tensor<value_t, md::extents<index_t, 3, 3>>{
                               {0, 0, 0, 3, 3, 3, 6, 6, 6}}));
 }

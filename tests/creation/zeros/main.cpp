@@ -26,7 +26,7 @@ TEST(run_time, 1) {
     static_assert(std::is_same_v<typename decltype(out)::value_type, value_t>);
 
     EXPECT_TRUE(md::array_equal(
-        out, md::container<value_t, md::extents<index_t, 5>>{{0, 0, 0, 0, 0}}));
+        out, md::tensor<value_t, md::extents<index_t, 5>>{{0, 0, 0, 0, 0}}));
 }
 
 TEST(run_time, 2) {
@@ -38,7 +38,7 @@ TEST(run_time, 2) {
     static_assert(std::is_same_v<typename decltype(out)::value_type, value_t>);
 
     EXPECT_TRUE(md::array_equal(
-        out, md::container<value_t, md::extents<index_t, 5>>{{0, 0, 0, 0, 0}}));
+        out, md::tensor<value_t, md::extents<index_t, 5>>{{0, 0, 0, 0, 0}}));
 }
 
 TEST(run_time, 3) {
@@ -48,7 +48,7 @@ TEST(run_time, 3) {
     const auto out = md::zeros(md::dims<2>{2, 1});
 
     EXPECT_TRUE(md::array_equal(
-        out, md::container<value_t, md::extents<index_t, 2, 1>>{{0, 0}}));
+        out, md::tensor<value_t, md::extents<index_t, 2, 1>>{{0, 0}}));
 }
 
 TEST(run_time, 4) {
@@ -58,7 +58,7 @@ TEST(run_time, 4) {
     const auto out = md::zeros(md::dims<2>{2, 2});
 
     EXPECT_TRUE(md::array_equal(
-        out, md::container<value_t, md::extents<index_t, 2, 2>>{{0, 0, 0, 0}}));
+        out, md::tensor<value_t, md::extents<index_t, 2, 2>>{{0, 0, 0, 0}}));
 }
 
 TEST(compile_time, 1) {
@@ -70,7 +70,7 @@ TEST(compile_time, 1) {
     static_assert(std::is_same_v<typename decltype(out)::value_type, value_t>);
 
     static_assert(md::array_equal(
-        out, md::container<value_t, md::extents<index_t, 5>>{{0, 0, 0, 0, 0}}));
+        out, md::tensor<value_t, md::extents<index_t, 5>>{{0, 0, 0, 0, 0}}));
 }
 
 TEST(compile_time, 2) {
@@ -82,7 +82,7 @@ TEST(compile_time, 2) {
     static_assert(std::is_same_v<typename decltype(out)::value_type, value_t>);
 
     static_assert(md::array_equal(
-        out, md::container<value_t, md::extents<index_t, 5>>{{0, 0, 0, 0, 0}}));
+        out, md::tensor<value_t, md::extents<index_t, 5>>{{0, 0, 0, 0, 0}}));
 }
 
 TEST(compile_time, 3) {
@@ -92,7 +92,7 @@ TEST(compile_time, 3) {
     constexpr auto out = md::zeros(md::extents<index_t, 2, 1>{});
 
     static_assert(md::array_equal(
-        out, md::container<value_t, md::extents<index_t, 2, 1>>{{0, 0}}));
+        out, md::tensor<value_t, md::extents<index_t, 2, 1>>{{0, 0}}));
 }
 
 TEST(compile_time, 4) {
@@ -102,5 +102,5 @@ TEST(compile_time, 4) {
     constexpr auto out = md::zeros(md::extents<index_t, 2, 2>{2, 2});
 
     static_assert(md::array_equal(
-        out, md::container<value_t, md::extents<index_t, 2, 2>>{{0, 0, 0, 0}}));
+        out, md::tensor<value_t, md::extents<index_t, 2, 2>>{{0, 0, 0, 0}}));
 }

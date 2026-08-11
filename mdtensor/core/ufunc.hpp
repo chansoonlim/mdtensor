@@ -254,7 +254,7 @@ make_reduce_output(std::integer_sequence<axes_t, axes...>,
     // generate out
     using value_t = output_value_t<dtype, decltype(ins)...>;
 
-    return make_container<value_t>(
+    return make_tensor<value_t>(
         compose_extents(out_bexts, std::forward<uout_exts_t>(uout_exts)));
 }
 

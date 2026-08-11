@@ -17,15 +17,15 @@
 
 namespace md = mdtensor;
 
-TEST(make_container, 1) {
+TEST(make_tensor, 1) {
     using value_t = double;
     using index_t = std::size_t;
 
     constexpr auto a1 =
-        md::core::make_container<value_t>(md::core::extents<index_t, 2, 2>{});
+        md::core::make_tensor<value_t>(md::core::extents<index_t, 2, 2>{});
 
     constexpr auto a2 =
-        md::core::make_container(md::core::extents<index_t, 2, 2>{});
+        md::core::make_tensor(md::core::extents<index_t, 2, 2>{});
 
     std::cout << "a1: " << md::core::to_string(a1) << std::endl;
     std::cout << "a2: " << md::core::to_string(a2) << std::endl;

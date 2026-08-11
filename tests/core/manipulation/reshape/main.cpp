@@ -23,10 +23,10 @@ TEST(run_time, 1) {
 
     const auto a = md::arange(6);
 
-    EXPECT_TRUE(md::array_equal(
-        md::core::reshape(a, md::extents<index_t, 3, 2>{}),
-        md::core::container<value_t, md::extents<index_t, 3, 2>>{
-            {0, 1, 2, 3, 4, 5}}));
+    EXPECT_TRUE(
+        md::array_equal(md::core::reshape(a, md::extents<index_t, 3, 2>{}),
+                        md::core::tensor<value_t, md::extents<index_t, 3, 2>>{
+                            {0, 1, 2, 3, 4, 5}}));
 }
 
 TEST(run_time, 2) {
@@ -35,22 +35,22 @@ TEST(run_time, 2) {
 
     const auto a = md::arange(6);
 
-    EXPECT_TRUE(md::array_equal(
-        md::core::reshape(a, md::extents<index_t, 2, 3>{}),
-        md::core::container<value_t, md::extents<index_t, 2, 3>>{
-            {0, 1, 2, 3, 4, 5}}));
+    EXPECT_TRUE(
+        md::array_equal(md::core::reshape(a, md::extents<index_t, 2, 3>{}),
+                        md::core::tensor<value_t, md::extents<index_t, 2, 3>>{
+                            {0, 1, 2, 3, 4, 5}}));
 }
 
 TEST(run_time, 3) {
     using value_t = int;
     using index_t = std::size_t;
 
-    const auto a = md::core::container<value_t, md::extents<index_t, 2, 3>>{
+    const auto a = md::core::tensor<value_t, md::extents<index_t, 2, 3>>{
         {1, 2, 3, 4, 5, 6}};
 
     EXPECT_TRUE(
         md::array_equal(md::core::reshape(a, 6),
-                        md::core::container<value_t, md::extents<index_t, 6>>{
+                        md::core::tensor<value_t, md::extents<index_t, 6>>{
                             {1, 2, 3, 4, 5, 6}}));
 }
 
@@ -60,10 +60,10 @@ TEST(compile_time, 1) {
 
     constexpr auto a = md::arange<6>();
 
-    static_assert(md::array_equal(
-        md::core::reshape(a, md::extents<index_t, 3, 2>{}),
-        md::core::container<value_t, md::extents<index_t, 3, 2>>{
-            {0, 1, 2, 3, 4, 5}}));
+    static_assert(
+        md::array_equal(md::core::reshape(a, md::extents<index_t, 3, 2>{}),
+                        md::core::tensor<value_t, md::extents<index_t, 3, 2>>{
+                            {0, 1, 2, 3, 4, 5}}));
 }
 
 TEST(compile_time, 2) {
@@ -72,21 +72,21 @@ TEST(compile_time, 2) {
 
     constexpr auto a = md::arange<6>();
 
-    static_assert(md::array_equal(
-        md::core::reshape(a, md::extents<index_t, 2, 3>{}),
-        md::core::container<value_t, md::extents<index_t, 2, 3>>{
-            {0, 1, 2, 3, 4, 5}}));
+    static_assert(
+        md::array_equal(md::core::reshape(a, md::extents<index_t, 2, 3>{}),
+                        md::core::tensor<value_t, md::extents<index_t, 2, 3>>{
+                            {0, 1, 2, 3, 4, 5}}));
 }
 
 TEST(compile_time, 3) {
     using value_t = int;
     using index_t = std::size_t;
 
-    constexpr auto a = md::core::container<value_t, md::extents<index_t, 2, 3>>{
+    constexpr auto a = md::core::tensor<value_t, md::extents<index_t, 2, 3>>{
         {1, 2, 3, 4, 5, 6}};
 
     static_assert(
         md::array_equal(md::core::reshape(a, 6),
-                        md::core::container<value_t, md::extents<index_t, 6>>{
+                        md::core::tensor<value_t, md::extents<index_t, 6>>{
                             {1, 2, 3, 4, 5, 6}}));
 }

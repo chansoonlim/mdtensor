@@ -27,9 +27,9 @@ TEST(run_time, 1) {
     static_assert(std::is_same_v<typename decltype(x)::value_type,
                                  typename decltype(z)::value_type>);
 
-    EXPECT_TRUE(
-        md::array_equal(z, md::container<value_t, md::extents<index_t, 2, 3>>{
-                               {1, 1, 1, 1, 1, 1}}));
+    EXPECT_TRUE(md::array_equal(
+        z,
+        md::tensor<value_t, md::extents<index_t, 2, 3>>{{1, 1, 1, 1, 1, 1}}));
 }
 
 TEST(run_time, 2) {
@@ -43,7 +43,7 @@ TEST(run_time, 2) {
                                  typename decltype(z)::value_type>);
 
     EXPECT_TRUE(md::array_equal(
-        z, md::container<value_t, md::extents<index_t, 3>>{{1, 1, 1}}));
+        z, md::tensor<value_t, md::extents<index_t, 3>>{{1, 1, 1}}));
 }
 
 TEST(compile_time, 1) {
@@ -57,9 +57,9 @@ TEST(compile_time, 1) {
     static_assert(std::is_same_v<typename decltype(x)::value_type,
                                  typename decltype(z)::value_type>);
 
-    static_assert(
-        md::array_equal(z, md::container<value_t, md::extents<index_t, 2, 3>>{
-                               {1, 1, 1, 1, 1, 1}}));
+    static_assert(md::array_equal(
+        z,
+        md::tensor<value_t, md::extents<index_t, 2, 3>>{{1, 1, 1, 1, 1, 1}}));
 }
 
 TEST(compile_time, 2) {
@@ -73,5 +73,5 @@ TEST(compile_time, 2) {
                                  typename decltype(z)::value_type>);
 
     static_assert(md::array_equal(
-        z, md::container<value_t, md::extents<index_t, 3>>{{1, 1, 1}}));
+        z, md::tensor<value_t, md::extents<index_t, 3>>{{1, 1, 1}}));
 }

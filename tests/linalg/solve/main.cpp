@@ -22,12 +22,12 @@ TEST(run_time, 1) {
     using index_t = std::size_t;
 
     const auto a =
-        md::container<value_t, md::extents<index_t, 2, 2>>{{1, 2, 3, 5}};
-    const auto b = md::container<value_t, md::extents<index_t, 2>>{{1, 2}};
+        md::tensor<value_t, md::extents<index_t, 2, 2>>{{1, 2, 3, 5}};
+    const auto b = md::tensor<value_t, md::extents<index_t, 2>>{{1, 2}};
     const auto [x, valid] = md::linalg::solve(a, b);
 
-    EXPECT_TRUE(md::allclose(
-        x, md::container<value_t, md::extents<index_t, 2>>{{-1, 1}}));
+    EXPECT_TRUE(
+        md::allclose(x, md::tensor<value_t, md::extents<index_t, 2>>{{-1, 1}}));
 
     EXPECT_TRUE(md::allclose(md::linalg::matvec(a, x), b));
 }
@@ -37,12 +37,12 @@ TEST(compile_time, 1) {
     using index_t = std::size_t;
 
     constexpr auto a =
-        md::container<value_t, md::extents<index_t, 2, 2>>{{1, 2, 3, 5}};
-    constexpr auto b = md::container<value_t, md::extents<index_t, 2>>{{1, 2}};
+        md::tensor<value_t, md::extents<index_t, 2, 2>>{{1, 2, 3, 5}};
+    constexpr auto b = md::tensor<value_t, md::extents<index_t, 2>>{{1, 2}};
     constexpr auto x = std::get<0>(md::linalg::solve(a, b));
 
-    static_assert(md::allclose(
-        x, md::container<value_t, md::extents<index_t, 2>>{{-1, 1}}));
+    static_assert(
+        md::allclose(x, md::tensor<value_t, md::extents<index_t, 2>>{{-1, 1}}));
 
     static_assert(md::allclose(md::linalg::matvec(a, x), b));
 }

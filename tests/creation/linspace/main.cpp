@@ -21,7 +21,7 @@ TEST(run_time, 1) {
     const auto out = md::linspace(5, 2.0, 3.0, true);
 
     EXPECT_TRUE(
-        md::allclose(out, md::container<float, md::extents<std::size_t, 5>>{
+        md::allclose(out, md::tensor<float, md::extents<std::size_t, 5>>{
                               {2, 2.25, 2.5, 2.75, 3}}));
 
     std::cout << "out: " << md::to_string(out) << std::endl;
@@ -31,7 +31,7 @@ TEST(run_time, 2) {
     const auto out = md::linspace(5, 2.0, 3.0, false);
 
     EXPECT_TRUE(
-        md::allclose(out, md::container<float, md::extents<std::size_t, 5>>{
+        md::allclose(out, md::tensor<float, md::extents<std::size_t, 5>>{
                               {2, 2.2, 2.4, 2.6, 2.8}}));
 
     std::cout << "out: " << md::to_string(out) << std::endl;
@@ -41,7 +41,7 @@ TEST(compile_time, 1) {
     constexpr auto out = md::linspace<5>(2.0, 3.0, true);
 
     static_assert(
-        md::allclose(out, md::container<float, md::extents<std::size_t, 5>>{
+        md::allclose(out, md::tensor<float, md::extents<std::size_t, 5>>{
                               {2, 2.25, 2.5, 2.75, 3}}));
 
     std::cout << "out: " << md::to_string(out) << std::endl;
@@ -51,7 +51,7 @@ TEST(compile_time, 2) {
     constexpr auto out = md::linspace<5>(2.0, 3.0, false);
 
     static_assert(
-        md::allclose(out, md::container<float, md::extents<std::size_t, 5>>{
+        md::allclose(out, md::tensor<float, md::extents<std::size_t, 5>>{
                               {2, 2.2, 2.4, 2.6, 2.8}}));
 
     std::cout << "out: " << md::to_string(out) << std::endl;

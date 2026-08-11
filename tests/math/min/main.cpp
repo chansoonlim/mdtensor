@@ -36,18 +36,18 @@ TEST(run_time, 2) {
     const auto a_min2 = md::min<1>(a);
     const auto a_min3 = md::min<0>(
         a, std::nullopt, 10,
-        md::container<bool, md::dims<1>>{{false, true}, md::dims<1>{2}});
+        md::tensor<bool, md::dims<1>>{{false, true}, md::dims<1>{2}});
 
     std::cout << "a_min1: " << md::to_string(a_min1) << std::endl;
     std::cout << "a_min2: " << md::to_string(a_min2) << std::endl;
     std::cout << "a_min3: " << md::to_string(a_min3) << std::endl;
 
     ASSERT_TRUE(md::array_equal(
-        a_min1, md::container<value_t, md::extents<index_t, 2>>{{0, 1}}));
+        a_min1, md::tensor<value_t, md::extents<index_t, 2>>{{0, 1}}));
     ASSERT_TRUE(md::array_equal(
-        a_min2, md::container<value_t, md::extents<index_t, 2>>{{0, 2}}));
+        a_min2, md::tensor<value_t, md::extents<index_t, 2>>{{0, 2}}));
     ASSERT_TRUE(md::array_equal(
-        a_min3, md::container<value_t, md::extents<index_t, 2>>{{10, 1}}));
+        a_min3, md::tensor<value_t, md::extents<index_t, 2>>{{10, 1}}));
 }
 
 TEST(run_time, 3) {
@@ -76,14 +76,14 @@ TEST(run_time, 4) {
     using index_t = std::size_t;
 
     const auto a =
-        md::container<value_t, md::dims<2>>{{-50, 10}, md::dims<2>{2, 1}};
+        md::tensor<value_t, md::dims<2>>{{-50, 10}, md::dims<2>{2, 1}};
 
     const auto a_min = md::min<-1>(a, std::nullopt, 0);
 
     std::cout << "a_min: " << md::to_string(a_min) << std::endl;
 
     ASSERT_TRUE(md::array_equal(
-        a_min, md::container<value_t, md::extents<index_t, 2>>{{-50, 0}}));
+        a_min, md::tensor<value_t, md::extents<index_t, 2>>{{-50, 0}}));
 }
 
 TEST(run_time, 5) { ASSERT_EQ(md::min(6, std::nullopt, 5), 5); }
@@ -111,18 +111,18 @@ TEST(compile_time, 2) {
     constexpr auto a_min2 = md::min<1>(a);
     constexpr auto a_min3 =
         md::min<0>(a, std::nullopt, 10,
-                   md::container<bool, md::extents<index_t, 2>>{{false, true}});
+                   md::tensor<bool, md::extents<index_t, 2>>{{false, true}});
 
     std::cout << "a_min1: " << md::to_string(a_min1) << std::endl;
     std::cout << "a_min2: " << md::to_string(a_min2) << std::endl;
     std::cout << "a_min3: " << md::to_string(a_min3) << std::endl;
 
     static_assert(md::array_equal(
-        a_min1, md::container<value_t, md::extents<index_t, 2>>{{0, 1}}));
+        a_min1, md::tensor<value_t, md::extents<index_t, 2>>{{0, 1}}));
     static_assert(md::array_equal(
-        a_min2, md::container<value_t, md::extents<index_t, 2>>{{0, 2}}));
+        a_min2, md::tensor<value_t, md::extents<index_t, 2>>{{0, 2}}));
     static_assert(md::array_equal(
-        a_min3, md::container<value_t, md::extents<index_t, 2>>{{10, 1}}));
+        a_min3, md::tensor<value_t, md::extents<index_t, 2>>{{10, 1}}));
 }
 
 TEST(compile_time, 3) {
@@ -154,14 +154,14 @@ TEST(compile_time, 4) {
     using index_t = std::size_t;
 
     constexpr auto a =
-        md::container<value_t, md::extents<index_t, 2, 1>>{{-50, 10}};
+        md::tensor<value_t, md::extents<index_t, 2, 1>>{{-50, 10}};
 
     constexpr auto a_min = md::min<-1>(a, std::nullopt, 0);
 
     std::cout << "a_min: " << md::to_string(a_min) << std::endl;
 
     static_assert(md::array_equal(
-        a_min, md::container<value_t, md::extents<index_t, 2>>{{-50, 0}}));
+        a_min, md::tensor<value_t, md::extents<index_t, 2>>{{-50, 0}}));
 }
 
 TEST(compile_time, 5) { static_assert(md::min(6, std::nullopt, 5) == 5); }

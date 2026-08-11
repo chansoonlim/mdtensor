@@ -22,11 +22,11 @@ TEST(run_time, 1) {
     using index_t = std::size_t;
 
     const auto a =
-        md::container<value_t, md::dims<2>>{{1, 2, 3, 4}, md::dims<2>{2, 2}};
+        md::tensor<value_t, md::dims<2>>{{1, 2, 3, 4}, md::dims<2>{2, 2}};
 
     EXPECT_TRUE(md::array_equal(
         md::flatten(a),
-        md::container<value_t, md::extents<index_t, 4>>{{1, 2, 3, 4}}));
+        md::tensor<value_t, md::extents<index_t, 4>>{{1, 2, 3, 4}}));
 }
 
 TEST(compile_time, 1) {
@@ -34,9 +34,9 @@ TEST(compile_time, 1) {
     using index_t = std::size_t;
 
     constexpr auto a =
-        md::container<value_t, md::extents<index_t, 2, 2>>{{1, 2, 3, 4}};
+        md::tensor<value_t, md::extents<index_t, 2, 2>>{{1, 2, 3, 4}};
 
     static_assert(md::array_equal(
         md::flatten(a),
-        md::container<value_t, md::extents<index_t, 4>>{{1, 2, 3, 4}}));
+        md::tensor<value_t, md::extents<index_t, 4>>{{1, 2, 3, 4}}));
 }

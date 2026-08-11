@@ -10,8 +10,8 @@
 #pragma once
 
 #include "batch.hpp"
-#include "container.hpp"
 #include "mdspan.hpp"
+#include "tensor.hpp"
 
 namespace mdtensor::core {
 namespace detail {
@@ -85,7 +85,7 @@ template <extents_c exts_t>
     using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
     using value_t = typename in_mds_t::value_type;
 
-    auto out = make_container<value_t>(std::forward<exts_t>(exts));
+    auto out = make_tensor<value_t>(std::forward<exts_t>(exts));
 
     batch<Backend::NATIVE, in_mds.rank()>(
         [&](auto &&in, auto &&out) { out() = in(); }, in_mds,

@@ -27,14 +27,14 @@ TEST(run_time, 2) {
     using value_t = double;
     using index_t = std::size_t;
 
-    const auto x = md::deg2rad(md::container<value_t, md::dims<1>>{
-        {0, 30, 45, 60, 90}, md::dims<1>{5}});
+    const auto x = md::deg2rad(
+        md::tensor<value_t, md::dims<1>>{{0, 30, 45, 60, 90}, md::dims<1>{5}});
     const auto x_sin = md::sin(x);
 
     std::cout << "x_sin: " << md::to_string(x_sin) << std::endl;
 
     ASSERT_TRUE(
-        md::allclose(x_sin, md::container<value_t, md::extents<index_t, 5>>{
+        md::allclose(x_sin, md::tensor<value_t, md::extents<index_t, 5>>{
                                 {0, 0.5, 0.70710678, 0.8660254, 1}}));
 }
 
@@ -51,13 +51,13 @@ TEST(compile_time, 2) {
     using index_t = std::size_t;
 
     constexpr auto x = md::deg2rad(
-        md::container<value_t, md::extents<index_t, 5>>{{0, 30, 45, 60, 90}});
+        md::tensor<value_t, md::extents<index_t, 5>>{{0, 30, 45, 60, 90}});
     constexpr auto x_sin = md::sin(x);
 
     std::cout << "x_sin: " << md::to_string(x_sin) << std::endl;
 
     static_assert(
-        md::allclose(x_sin, md::container<value_t, md::extents<index_t, 5>>{
+        md::allclose(x_sin, md::tensor<value_t, md::extents<index_t, 5>>{
                                 {0, 0.5, 0.70710678, 0.8660254, 1}}));
 }
 

@@ -22,9 +22,9 @@ TEST(broadcast_to, 1) {
     using index_t = std::size_t;
 
     constexpr auto a =
-        md::core::container<value_t, md::core::extents<index_t, 3>>{{1, 2, 3}};
+        md::core::tensor<value_t, md::core::extents<index_t, 3>>{{1, 2, 3}};
     constexpr auto b =
-        md::core::container<value_t, md::core::extents<index_t, 3, 3>>{
+        md::core::tensor<value_t, md::core::extents<index_t, 3, 3>>{
             {1, 2, 3, 1, 2, 3, 1, 2, 3}};
 
     static_assert([&] {

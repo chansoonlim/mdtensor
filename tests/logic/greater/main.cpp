@@ -21,22 +21,22 @@ TEST(run_time, 1) {
     using value_t = int;
     using index_t = std::size_t;
 
-    const auto a = md::container<value_t, md::dims<1>>{{4, 2}, md::dims<1>{2}};
-    const auto b = md::container<value_t, md::dims<1>>{{2, 2}, md::dims<1>{2}};
+    const auto a = md::tensor<value_t, md::dims<1>>{{4, 2}, md::dims<1>{2}};
+    const auto b = md::tensor<value_t, md::dims<1>>{{2, 2}, md::dims<1>{2}};
     const auto c = md::greater(a, b);
 
     EXPECT_TRUE(md::array_equal(
-        c, md::container<bool, md::extents<index_t, 2>>{{true, false}}));
+        c, md::tensor<bool, md::extents<index_t, 2>>{{true, false}}));
 }
 
 TEST(compile_time, 1) {
     using value_t = int;
     using index_t = std::size_t;
 
-    constexpr auto a = md::container<value_t, md::extents<index_t, 2>>{{4, 2}};
-    constexpr auto b = md::container<value_t, md::extents<index_t, 2>>{{2, 2}};
+    constexpr auto a = md::tensor<value_t, md::extents<index_t, 2>>{{4, 2}};
+    constexpr auto b = md::tensor<value_t, md::extents<index_t, 2>>{{2, 2}};
     constexpr auto c = md::greater(a, b);
 
     static_assert(md::array_equal(
-        c, md::container<bool, md::extents<index_t, 2>>{{true, false}}));
+        c, md::tensor<bool, md::extents<index_t, 2>>{{true, false}}));
 }

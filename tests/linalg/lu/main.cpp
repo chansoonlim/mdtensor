@@ -21,7 +21,7 @@ TEST(compile_time, 1) {
     using value_t = double;
     using index_t = std::size_t;
 
-    constexpr auto a = md::container<value_t, md::extents<index_t, 4, 4>>{
+    constexpr auto a = md::tensor<value_t, md::extents<index_t, 4, 4>>{
         {2, 5, 8, 7, 5, 2, 2, 8, 7, 5, 6, 6, 5, 4, 4, 8}};
 
     constexpr auto out1 = md::linalg::lu(a);
@@ -30,17 +30,17 @@ TEST(compile_time, 1) {
     constexpr auto u1 = std::get<2>(out1);
 
     static_assert(md::array_equal(
-        p1, md::container<index_t, md::extents<index_t, 4, 4>>{
+        p1, md::tensor<index_t, md::extents<index_t, 4, 4>>{
                 {0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0}}));
 
     constexpr auto out2 = md::linalg::lu<false, true>(a);
     constexpr auto p2 = std::get<0>(out2);
 
     static_assert(md::array_equal(
-        p2, md::container<index_t, md::extents<index_t, 4>>{{1, 3, 0, 2}}));
+        p2, md::tensor<index_t, md::extents<index_t, 4>>{{1, 3, 0, 2}}));
 
     constexpr auto pl = [&] {
-        auto pl = md::container<value_t, md::extents<index_t, 4, 4>>{};
+        auto pl = md::tensor<value_t, md::extents<index_t, 4, 4>>{};
         for (index_t i = 0; i < pl.extent(0); i++) {
             for (index_t j = 0; j < pl.extent(1); j++) {
                 pl(i, j) = l1(p2(i), j);
