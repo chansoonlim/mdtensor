@@ -25,8 +25,6 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto val_mds =
         core::to_const_mdspan(std::forward<decltype(val)>(val));
 
-    using value_t = core::output_value_t<dtype, decltype(val_mds)>;
-
     auto out_md =
         core::resolve_output<core::output_value_t<dtype, decltype(val_mds)>>(
             std::forward<decltype(out)>(out),
