@@ -29,22 +29,6 @@ template <typename dtype = bool, bool keepdims = false,
         std::integer_sequence<axes_t, axes...>{}, core::extents<std::uint8_t>{},
         in_mds);
 
-#if true
-    static_cast<void>(full_like<void>(out_md, true, out_md));
-
-    core::reduce<keepdims>(
-        [](auto &&in_s, auto &&out_s, auto &&where_s) {
-            static_cast<void>(
-                logical_and(std::forward<decltype(in_s)>(in_s),
-                            std::forward<decltype(out_s)>(out_s),
-                            std::forward<decltype(out_s)>(out_s),
-                            std::forward<decltype(where_s)>(where_s)));
-        },
-        std::integer_sequence<axes_t, axes...>{},
-        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
-        std::forward<decltype(where)>(where));
-
-#else
     auto init = full_like<bool>(out_md, false);
 
     core::reduce<keepdims>(
@@ -73,11 +57,12 @@ template <typename dtype = bool, bool keepdims = false,
         std::integer_sequence<bool, true, false, false, true>{}, in_mds, out_md,
         init, std::forward<decltype(where)>(where));
 
-    if (!all(init)) {
+    if (!core::batch<core::Backend::NATIVE,
+                     core::to_mdspan_t<decltype(init)>::rank(), true>(
+            [](auto &&init_u) { return init_u; }, init)) {
         throw std::runtime_error(
             "mdtensor::all: cannot initialize output tensor.");
     }
-#endif
 
     return out_md;
 }
