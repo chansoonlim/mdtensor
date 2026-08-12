@@ -23,8 +23,8 @@ constexpr void atan2_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
         }
     }
 
-    using value_t =
-        core::common_data_type_t<decltype(in1), decltype(in2), decltype(out)>;
+    using value_t = core::common_arithmetic_type_t<decltype(in1), decltype(in2),
+                                                   decltype(out)>;
 
     out = std::atan2(static_cast<value_t>(in1), static_cast<value_t>(in2));
 }

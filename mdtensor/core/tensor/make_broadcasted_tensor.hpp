@@ -20,7 +20,7 @@ template <typename dtype, typename... Ts> struct output_value {
 };
 
 template <typename... Ts> struct output_value<void, Ts...> {
-    using type = common_data_type_t<
+    using type = common_arithmetic_type_t<
         typename std::remove_cvref_t<to_mdspan_t<Ts>>::value_type...>;
 };
 

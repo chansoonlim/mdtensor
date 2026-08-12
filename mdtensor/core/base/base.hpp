@@ -9,10 +9,9 @@
 
 #pragma once
 
-#include "common.hpp"
-#include "concept.hpp"
 #include "core.hpp"
 #include "extents.hpp"
 #include "mdarray.hpp"
 #include "mdspan.hpp"
 #include "submdspan.hpp"
+#include "type.hpp"

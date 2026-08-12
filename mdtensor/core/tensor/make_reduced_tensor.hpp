@@ -13,6 +13,21 @@
 #include "tensor.hpp"
 
 namespace mdtensor::core {
+namespace detail {
+
+template <typename value_t, std::size_t size>
+[[nodiscard]] constexpr bool contains(const std::array<value_t, size> &array,
+                                      const value_t &value) noexcept {
+    for (const auto element : array) {
+        if (element == value) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+} // namespace detail
 
 template <typename dtype = void, bool keepdims = false, std::integral axes_t,
           axes_t... axes, std::size_t... uranks, extents_c uout_exts_t>
@@ -57,10 +72,10 @@ make_reduced_tensor(std::integer_sequence<axes_t, axes...>,
         if constexpr (keepdims) {
             return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
                 return extents<index_t,
-                               (contains(axes_sorted, Is)
+                               (detail::contains(axes_sorted, Is)
                                     ? std::size_t{1}
                                     : ins_bexts_t::static_extent(Is))...>{
-                    (contains(axes_sorted, Is)
+                    (detail::contains(axes_sorted, Is)
                          ? index_t{1}
                          : static_cast<index_t>(ins_bexts.extent(Is)))...};
             }(std::make_index_sequence<ins_bexts_t::rank()>{});
@@ -72,7 +87,7 @@ make_reduced_tensor(std::integer_sequence<axes_t, axes...>,
 
                 std::size_t not_axes_idx = 0;
                 for (std::size_t i = 0; i < ins_bexts_t::rank(); i++) {
-                    if (!contains(axes_sorted, i)) {
+                    if (!detail::contains(axes_sorted, i)) {
                         not_axes_arr[not_axes_idx++] = i;
                     }
                 }

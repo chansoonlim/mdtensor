@@ -23,8 +23,8 @@ struct Target {
         benchmark::ClobberMemory();
 
         for (auto _ : state) {
-            static_cast<void>(
-                md::linspace<0, void, backend>(out.extents(), 0, 1, true, out));
+            static_cast<void>(md::linspace<0, void, backend>(
+                out.extents(), dtype{0}, dtype{1}, true, out));
             benchmark::ClobberMemory();
         }
 

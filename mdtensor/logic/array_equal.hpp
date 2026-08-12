@@ -25,7 +25,7 @@ constexpr bool array_equal_ufunc(auto &&in1, auto &&in2) {
         }
     }
 
-    using calc_t = core::common_data_type_t<decltype(in1), decltype(in2)>;
+    using calc_t = core::common_arithmetic_type_t<decltype(in1), decltype(in2)>;
 
     return static_cast<calc_t>(in1) == static_cast<calc_t>(in2);
 }

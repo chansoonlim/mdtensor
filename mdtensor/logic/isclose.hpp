@@ -43,8 +43,9 @@ constexpr void isclose_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&rtol,
     }
 
     using out_t = std::remove_cvref_t<decltype(out)>;
-    using calc_t = core::common_data_type_t<decltype(in1), decltype(in2),
-                                            decltype(rtol), decltype(atol)>;
+    using calc_t =
+        core::common_arithmetic_type_t<decltype(in1), decltype(in2),
+                                       decltype(rtol), decltype(atol)>;
 
     out = static_cast<out_t>(
         absolute(static_cast<calc_t>(in1) - static_cast<calc_t>(in2)) <=

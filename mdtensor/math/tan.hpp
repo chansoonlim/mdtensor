@@ -23,7 +23,7 @@ constexpr void tan_ufunc(auto &&in, auto &&out, auto &&where) {
         }
     }
 
-    using value_t = core::common_data_type_t<decltype(in), decltype(out)>;
+    using value_t = core::common_arithmetic_type_t<decltype(in), decltype(out)>;
 
     out = std::tan(static_cast<value_t>(in));
 }

@@ -23,7 +23,7 @@ sqrt_newton_raphson(const dtype &x, const dtype &curr, const dtype &prev) {
 }
 
 constexpr void sqrt_ufunc_native(auto &&in, auto &&out) {
-    using calc_t = core::common_data_type_t<decltype(in), float>;
+    using calc_t = core::common_arithmetic_type_t<decltype(in), float>;
 
     if constexpr (requires {
                       { std::isnan(in) } -> std::convertible_to<bool>;

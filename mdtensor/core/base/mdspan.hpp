@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "common.hpp"
+#include "base.hpp"
 
 namespace mdtensor::core {
 
@@ -131,7 +131,7 @@ template <typename T>
 concept nullopt_t_value_type_c = nullopt_t_c<value_type_t<T>>;
 
 template <typename... Ts>
-using common_value_type_t = common_data_type_t<
+using common_value_type_t = common_arithmetic_type_t<
     typename std::remove_cvref_t<to_mdspan_t<Ts>>::value_type...>;
 
 } // namespace mdtensor::core

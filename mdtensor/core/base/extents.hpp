@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "common.hpp"
+#include "type.hpp"
 
 namespace mdtensor::core {
 
@@ -161,8 +161,8 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
         return false;
     }
 
-    using index_t = common_integer_type_t<typename base1_t::index_type,
-                                          typename base2_t::index_type>;
+    using index_t = common_integral_type_t<typename base1_t::index_type,
+                                           typename base2_t::index_type>;
 
     for (std::size_t i = 0; i < base1_t::rank(); i++) {
         if (static_cast<index_t>(in1.extent(i)) !=
@@ -208,8 +208,8 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
                                              ins_t &&...ins) noexcept {
     using base1_t = std::remove_cvref_t<in1_t>;
     using base2_t = std::remove_cvref_t<in2_t>;
-    using index_t = common_integer_type_t<typename base1_t::index_type,
-                                          typename base2_t::index_type>;
+    using index_t = common_integral_type_t<typename base1_t::index_type,
+                                           typename base2_t::index_type>;
 
     const auto cexts =
         [&]<std::size_t... Is, std::size_t... Js>(std::index_sequence<Is...>,
@@ -253,6 +253,55 @@ expand_extents_dims_impl_(in_t &&in, std::index_sequence<axis, axes...>) {
 }
 
 } // namespace
+
+template <std::integral index_t>
+[[nodiscard]] constexpr index_t bounding_index(index_t index,
+                                               const std::size_t &bound) {
+    if constexpr (std::is_signed_v<index_t>) {
+        if (index < index_t{0}) {
+            index = static_cast<index_t>(bound + 1 -
+                                         static_cast<std::size_t>(-index));
+        }
+    }
+
+    if (index < index_t{0} || bound < static_cast<std::size_t>(index)) {
+        throw std::out_of_range(
+            "Index is out of bounds: " + std::to_string(index) +
+            " is not in [0, " + std::to_string(bound) + ").");
+    }
+
+    return index;
+}
+
+template <std::integral in_t, in_t... ins, typename compare_t>
+[[nodiscard]] consteval auto
+get_sorted_array(std::integer_sequence<in_t, ins...>,
+                 compare_t compare) noexcept {
+    auto arr = std::array{ins...};
+    std::sort(arr.begin(), arr.end(), compare);
+    return arr;
+}
+
+template <std::size_t rank, std::integral axes_t, axes_t... axes,
+          typename compare_t>
+[[nodiscard]] consteval auto
+get_sorted_axes(std::integer_sequence<axes_t, axes...>,
+                compare_t compare) noexcept {
+    constexpr auto arr =
+        get_sorted_array(std::index_sequence<static_cast<std::size_t>(
+                             bounding_index<axes_t>(axes, rank - 1))...>{},
+                         compare);
+
+    if constexpr (1 < arr.size()) {
+        static_assert(
+            [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                return ((arr[Is] != arr[Is + 1]) && ...);
+            }(std::make_index_sequence<arr.size() - 1>{}),
+            "Duplicate axes are not allowed.");
+    }
+
+    return arr;
+}
 
 template <extents_c in_t, std::integral axes_t, axes_t... axes>
 [[nodiscard]] constexpr auto

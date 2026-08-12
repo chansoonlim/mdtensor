@@ -29,7 +29,8 @@ constexpr void eye_ufunc(auto &&out, const int &k) {
 
 } // namespace ufunc
 
-template <typename dtype = double, core::Backend backend = core::Backend::AUTO,
+template <typename dtype = std::int8_t,
+          core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t>
 [[nodiscard]] constexpr auto eye(auto &&shape, const int &k = 0,
                                  out_t &&out = out_t{std::nullopt}) {
@@ -67,7 +68,7 @@ template <typename dtype = double, core::Backend backend = core::Backend::AUTO,
     }
 }
 
-template <std::size_t N, typename dtype = double,
+template <std::size_t N, typename dtype = std::int8_t,
           core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t>
 [[nodiscard]] constexpr auto eye(const int &k = 0,
