@@ -145,7 +145,12 @@ resolve_reduced_output(auto &&out, std::integer_sequence<axes_t, axes...>,
                 std::forward<decltype(ins)>(ins)...);
 
         } else {
-            return to_output_mdspan(std::forward<decltype(out)>(out));
+            const auto out_md =
+                to_output_mdspan(std::forward<decltype(out)>(out));
+
+            // TODO: check same extents with expected extents
+
+            return out_md;
         }
     }
 }

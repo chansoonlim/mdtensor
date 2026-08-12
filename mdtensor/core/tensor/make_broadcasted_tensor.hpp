@@ -176,7 +176,12 @@ resolve_broadcasted_output(auto &&out, std::index_sequence<uranks...>,
                 std::forward<decltype(ins)>(ins)...);
 
         } else {
-            return to_output_mdspan(std::forward<decltype(out)>(out));
+            const auto out_md =
+                to_output_mdspan(std::forward<decltype(out)>(out));
+
+            // TODO: check same extents with expected extents
+
+            return out_md;
         }
     }
 }

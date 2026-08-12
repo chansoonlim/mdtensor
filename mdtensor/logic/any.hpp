@@ -10,31 +10,10 @@
 #pragma once
 
 #include "../util/fill.hpp"
+#include "all.hpp"
 #include "logical_or.hpp"
 
 namespace mdtensor {
-namespace rfunc {
-
-template <core::Backend backend>
-constexpr void any_rfunc(auto &&in, auto &&out, auto &&where) {
-    const auto out_mds = core::to_mdspan(std::forward<decltype(out)>(out));
-
-    const auto mask = [&]() {
-        if constexpr (core::nullopt_t_value_type_c<decltype(where)>) {
-            return logical_not<bool, backend>(out_mds);
-
-        } else {
-            return logical_and<bool, backend>(
-                logical_not<bool, backend>(out_mds),
-                std::forward<decltype(where)>(where));
-        }
-    }();
-
-    static_cast<void>(logical_or<void, backend>(std::forward<decltype(in)>(in),
-                                                out_mds, out_mds, mask));
-}
-
-} // namespace rfunc
 
 template <typename dtype = bool, bool keepdims = false,
           core::Backend backend = core::Backend::AUTO, std::integral axes_t,
@@ -51,18 +30,55 @@ template <typename dtype = bool, bool keepdims = false,
         std::integer_sequence<axes_t, axes...>{}, core::extents<std::uint8_t>{},
         in_mds);
 
-    // TODO: move to reduce
-    fill<backend>(out_md, false);
+#if true
+    static_cast<void>(full_like<void>(out_md, false, out_md));
 
-    // TODO: use escape for each ufunc to remove mask calculation overhead
     core::reduce<keepdims>(
-        [&](auto &&...elems) {
-            rfunc::any_rfunc<backend>(std::forward<decltype(elems)>(elems)...);
+        [](auto &&in_s, auto &&out_s, auto &&where_s) {
+            static_cast<void>(
+                logical_or(std::forward<decltype(in_s)>(in_s),
+                           std::forward<decltype(out_s)>(out_s),
+                           std::forward<decltype(out_s)>(out_s),
+                           std::forward<decltype(where_s)>(where_s)));
         },
         std::integer_sequence<axes_t, axes...>{},
-        std::index_sequence<0, 0, 0>{},
         std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
+
+#else
+    auto init = full_like<bool>(out_md, false);
+
+    core::reduce<keepdims>(
+        [&](auto &&...elems) {
+            core::batch_with_broadcast<backend>(
+                [](auto &&in_u, auto &&out_u, auto &&init_u, auto &&where_u) {
+                    if (core::initialize_ufunc(
+                            std::forward<decltype(init_u)>(init_u),
+                            std::forward<decltype(where_u)>(where_u))) {
+                        ufunc::copy_ufunc<bool>(
+                            std::forward<decltype(in_u)>(in_u),
+                            std::forward<decltype(out_u)>(out_u));
+
+                    } else {
+                        ufunc::logical_or_ufunc(
+                            std::forward<decltype(in_u)>(in_u),
+                            std::forward<decltype(out_u)>(out_u),
+                            std::forward<decltype(out_u)>(out_u),
+                            std::forward<decltype(where_u)>(where_u));
+                    }
+                },
+                std::integer_sequence<bool, true, false, false, true>{},
+                std::forward<decltype(elems)>(elems)...);
+        },
+        std::integer_sequence<axes_t, axes...>{},
+        std::integer_sequence<bool, true, false, false, true>{}, in_mds, out_md,
+        init, std::forward<decltype(where)>(where));
+
+    if (!all(init)) {
+        throw std::runtime_error(
+            "mdtensor::any: cannot initialize output tensor.");
+    }
+#endif
 
     return out_md;
 }

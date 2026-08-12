@@ -13,9 +13,12 @@
 
 namespace mdtensor {
 
-template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto zeros_like(auto &&in) {
-    return full_like<dtype, backend>(std::forward<decltype(in)>(in), 0);
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto zeros_like(auto &&in,
+                                        out_t &&out = out_t{std::nullopt}) {
+    return full_like<dtype, backend>(std::forward<decltype(in)>(in), 0,
+                                     std::forward<decltype(out)>(out));
 }
 
 } // namespace mdtensor

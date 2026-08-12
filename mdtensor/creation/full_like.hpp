@@ -13,12 +13,17 @@
 
 namespace mdtensor {
 
-template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto full_like(auto &&in, auto &&val) {
-    using value_t = core::output_value_t<dtype, decltype(in)>;
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto full_like(auto &&in, auto &&val,
+                                       out_t &&out = out_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    return full<value_t, backend>(in.extents(),
-                                  std::forward<decltype(val)>(val));
+    using value_t = core::output_value_t<dtype, decltype(in_mds)>;
+
+    return full<value_t, backend>(in_mds.extents(),
+                                  std::forward<decltype(val)>(val),
+                                  std::forward<decltype(out)>(out));
 }
 
 } // namespace mdtensor

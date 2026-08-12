@@ -164,6 +164,8 @@ template <bool keepdims = false, bool has_escape = false, std::integral axes_t,
 reduce(auto &&func, std::integer_sequence<axes_t, axes...>,
        std::index_sequence<uranks...>, std::integer_sequence<bool, is_input...>,
        auto &&...ios) {
+    static_assert(sizeof...(is_input) == sizeof...(ios));
+
     // broadcast inputs only
     const auto [ios_bcast, ins_bexts] =
         detail::broadcast_only_input(std::index_sequence<uranks...>{},
@@ -199,6 +201,40 @@ reduce(auto &&func, std::integer_sequence<axes_t, axes...>,
                 std::get<Is>(ios_bcast)...);
         }(std::make_index_sequence<axes_sorted.size()>{});
     }(std::make_index_sequence<sizeof...(ios)>{});
+}
+
+template <bool keepdims = false, bool has_escape = false, std::integral axes_t,
+          axes_t... axes, bool... is_input>
+[[nodiscard]] constexpr decltype(auto)
+reduce(auto &&func, std::integer_sequence<axes_t, axes...>,
+       std::integer_sequence<bool, is_input...>, auto &&...ios) {
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return reduce<keepdims, has_escape>(
+            std::forward<decltype(func)>(func),
+            std::integer_sequence<axes_t, axes...>{},
+            std::index_sequence<((void)Is, 0)...>{},
+            std::integer_sequence<bool, is_input...>{},
+            std::forward<decltype(ios)>(ios)...);
+    }(std::make_index_sequence<sizeof...(ios)>{});
+}
+
+[[nodiscard]] constexpr bool initialize_ufunc(auto &&init, auto &&where) {
+    if constexpr (requires {
+                      { where == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where == false) {
+            // not targeted by where
+            return false;
+        }
+    }
+
+    if (init) {
+        // already initialized
+        return false;
+    }
+
+    init = true;
+    return true;
 }
 
 } // namespace mdtensor::core

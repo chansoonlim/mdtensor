@@ -14,7 +14,15 @@
 namespace mdtensor {
 namespace ufunc {
 
-constexpr void copy_ufunc(auto &&in, auto &&out) { out = in; }
+template <typename dtype = void>
+constexpr void copy_ufunc(auto &&in, auto &&out) {
+    if constexpr (std::is_void_v<dtype>) {
+        out = in;
+
+    } else {
+        out = static_cast<dtype>(in);
+    }
+}
 
 } // namespace ufunc
 
@@ -29,7 +37,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
 
     core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            ufunc::copy_ufunc(std::forward<decltype(elems)>(elems)...);
+            ufunc::copy_ufunc<dtype>(std::forward<decltype(elems)>(elems)...);
         },
         std::integer_sequence<bool, true, false>{}, in_mds, out_md);
 

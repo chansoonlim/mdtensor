@@ -58,7 +58,21 @@ template <typename dtype = void, bool floating = false, extents_c exts_t>
             return make_tensor<dtype>(std::forward<exts_t>(exts));
 
         } else {
-            return to_output_mdspan(std::forward<decltype(out)>(out));
+            const auto out_md =
+                to_output_mdspan(std::forward<decltype(out)>(out));
+
+            static_assert(
+                !is_always_different_extents<decltype(out_md.extents()),
+                                             exts_t>(),
+                "Output tensor extents must match the provided extents.");
+
+            if (!is_same_extents(out_md.extents(),
+                                 std::forward<exts_t>(exts))) {
+                throw std::invalid_argument("Provided output tensor extents do "
+                                            "not match the expected extents.");
+            }
+
+            return out_md;
         }
     }
 }
