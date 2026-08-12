@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
     settings.benchmark_name = "any";
     settings.defaults.dtype = "b";
     settings.defaults.backend = "auto";
-    settings.defaults.range_end = 10'000'000;
+    settings.defaults.range_end = 10'000;
 
     return benchmarking::run<Target>(argc, argv, std::move(settings));
 }
