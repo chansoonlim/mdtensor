@@ -1498,7 +1498,12 @@ resolve_broadcasted_output(auto &&out, std::index_sequence<uranks...>,
                 std::forward<decltype(ins)>(ins)...);
 
         } else {
-            return to_output_mdspan(std::forward<decltype(out)>(out));
+            const auto out_md =
+                to_output_mdspan(std::forward<decltype(out)>(out));
+
+            // TODO: check same extents with expected extents
+
+            return out_md;
         }
     }
 }
@@ -1664,7 +1669,12 @@ resolve_reduced_output(auto &&out, std::integer_sequence<axes_t, axes...>,
                 std::forward<decltype(ins)>(ins)...);
 
         } else {
-            return to_output_mdspan(std::forward<decltype(out)>(out));
+            const auto out_md =
+                to_output_mdspan(std::forward<decltype(out)>(out));
+
+            // TODO: check same extents with expected extents
+
+            return out_md;
         }
     }
 }
@@ -1747,7 +1757,21 @@ template <typename dtype = void, bool floating = false, extents_c exts_t>
             return make_tensor<dtype>(std::forward<exts_t>(exts));
 
         } else {
-            return to_output_mdspan(std::forward<decltype(out)>(out));
+            const auto out_md =
+                to_output_mdspan(std::forward<decltype(out)>(out));
+
+            static_assert(
+                !is_always_different_extents<decltype(out_md.extents()),
+                                             exts_t>(),
+                "Output tensor extents must match the provided extents.");
+
+            if (!is_same_extents(out_md.extents(),
+                                 std::forward<exts_t>(exts))) {
+                throw std::invalid_argument("Provided output tensor extents do "
+                                            "not match the expected extents.");
+            }
+
+            return out_md;
         }
     }
 }
@@ -2126,6 +2150,8 @@ template <bool keepdims = false, bool has_escape = false, std::integral axes_t,
 reduce(auto &&func, std::integer_sequence<axes_t, axes...>,
        std::index_sequence<uranks...>, std::integer_sequence<bool, is_input...>,
        auto &&...ios) {
+    static_assert(sizeof...(is_input) == sizeof...(ios));
+
     // broadcast inputs only
     const auto [ios_bcast, ins_bexts] =
         detail::broadcast_only_input(std::index_sequence<uranks...>{},
@@ -2161,6 +2187,40 @@ reduce(auto &&func, std::integer_sequence<axes_t, axes...>,
                 std::get<Is>(ios_bcast)...);
         }(std::make_index_sequence<axes_sorted.size()>{});
     }(std::make_index_sequence<sizeof...(ios)>{});
+}
+
+template <bool keepdims = false, bool has_escape = false, std::integral axes_t,
+          axes_t... axes, bool... is_input>
+[[nodiscard]] constexpr decltype(auto)
+reduce(auto &&func, std::integer_sequence<axes_t, axes...>,
+       std::integer_sequence<bool, is_input...>, auto &&...ios) {
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return reduce<keepdims, has_escape>(
+            std::forward<decltype(func)>(func),
+            std::integer_sequence<axes_t, axes...>{},
+            std::index_sequence<((void)Is, 0)...>{},
+            std::integer_sequence<bool, is_input...>{},
+            std::forward<decltype(ios)>(ios)...);
+    }(std::make_index_sequence<sizeof...(ios)>{});
+}
+
+[[nodiscard]] constexpr bool initialize_ufunc(auto &&init, auto &&where) {
+    if constexpr (requires {
+                      { where == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where == false) {
+            // not targeted by where
+            return false;
+        }
+    }
+
+    if (init) {
+        // already initialized
+        return false;
+    }
+
+    init = true;
+    return true;
 }
 
 } // namespace mdtensor::core
@@ -2807,7 +2867,15 @@ template <typename dtype = void>
 namespace mdtensor {
 namespace ufunc {
 
-constexpr void copy_ufunc(auto &&in, auto &&out) { out = in; }
+template <typename dtype = void>
+constexpr void copy_ufunc(auto &&in, auto &&out) {
+    if constexpr (std::is_void_v<dtype>) {
+        out = in;
+
+    } else {
+        out = static_cast<dtype>(in);
+    }
+}
 
 } // namespace ufunc
 
@@ -2822,7 +2890,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
 
     core::batch_with_broadcast<backend>(
         [](auto &&...elems) {
-            ufunc::copy_ufunc(std::forward<decltype(elems)>(elems)...);
+            ufunc::copy_ufunc<dtype>(std::forward<decltype(elems)>(elems)...);
         },
         std::integer_sequence<bool, true, false>{}, in_mds, out_md);
 
@@ -2966,12 +3034,17 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
 
 namespace mdtensor {
 
-template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto full_like(auto &&in, auto &&val) {
-    using value_t = core::output_value_t<dtype, decltype(in)>;
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto full_like(auto &&in, auto &&val,
+                                       out_t &&out = out_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    return full<value_t, backend>(in.extents(),
-                                  std::forward<decltype(val)>(val));
+    using value_t = core::output_value_t<dtype, decltype(in_mds)>;
+
+    return full<value_t, backend>(in_mds.extents(),
+                                  std::forward<decltype(val)>(val),
+                                  std::forward<decltype(out)>(out));
 }
 
 } // namespace mdtensor
@@ -3305,9 +3378,12 @@ template <typename dtype = double, core::Backend backend = core::Backend::AUTO,
 
 namespace mdtensor {
 
-template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto ones_like(auto &&in) {
-    return full_like<dtype, backend>(std::forward<decltype(in)>(in), 1);
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto ones_like(auto &&in,
+                                       out_t &&out = out_t{std::nullopt}) {
+    return full_like<dtype, backend>(std::forward<decltype(in)>(in), 1,
+                                     std::forward<decltype(out)>(out));
 }
 
 } // namespace mdtensor
@@ -3350,9 +3426,12 @@ template <typename dtype = double, core::Backend backend = core::Backend::AUTO,
 
 namespace mdtensor {
 
-template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto zeros_like(auto &&in) {
-    return full_like<dtype, backend>(std::forward<decltype(in)>(in), 0);
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto zeros_like(auto &&in,
+                                        out_t &&out = out_t{std::nullopt}) {
+    return full_like<dtype, backend>(std::forward<decltype(in)>(in), 0,
+                                     std::forward<decltype(out)>(out));
 }
 
 } // namespace mdtensor
@@ -4821,6 +4900,167 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
  */
 
 
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/all.hpp
+/**
+ * @file
+ * @brief Logical all-reduction utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/logical_and.hpp
+/**
+ * @file
+ * @brief Element-wise logical AND utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor {
+namespace ufunc {
+
+constexpr void logical_and_ufunc(auto &&in1, auto &&in2, auto &&out,
+                                 auto &&where) {
+    if constexpr (requires {
+                      { where == false } -> std::convertible_to<bool>;
+                  }) {
+        if (where == false) {
+            return;
+        }
+    }
+
+    out = (static_cast<bool>(in1) && static_cast<bool>(in2));
+}
+
+} // namespace ufunc
+
+template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+logical_and(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
+            where_t &&where = where_t{std::nullopt}) {
+    const auto in1_mds =
+        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
+    const auto in2_mds =
+        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
+
+    auto out_md = core::resolve_broadcasted_output<dtype>(
+        std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
+        in1_mds, in2_mds);
+
+    core::batch_with_broadcast<backend>(
+        [](auto &&...elems) {
+            ufunc::logical_and_ufunc(std::forward<decltype(elems)>(elems)...);
+        },
+        std::integer_sequence<bool, true, true, false, true>{}, in1_mds,
+        in2_mds, out_md, std::forward<decltype(where)>(where));
+
+    return out_md;
+}
+
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/logical_and.hpp
+
+namespace mdtensor {
+
+template <typename dtype = bool, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO, std::integral axes_t,
+          axes_t... axes, typename out_t = std::nullopt_t,
+          typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto all(auto &&in,
+                                 std::integer_sequence<axes_t, axes...>,
+                                 out_t &&out = out_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    auto out_md = core::resolve_reduced_output<dtype, keepdims>(
+        std::forward<decltype(out)>(out),
+        std::integer_sequence<axes_t, axes...>{}, core::extents<std::uint8_t>{},
+        in_mds);
+
+#if true
+    static_cast<void>(full_like<void>(out_md, true, out_md));
+
+    core::reduce<keepdims>(
+        [](auto &&in_s, auto &&out_s, auto &&where_s) {
+            static_cast<void>(
+                logical_and(std::forward<decltype(in_s)>(in_s),
+                            std::forward<decltype(out_s)>(out_s),
+                            std::forward<decltype(out_s)>(out_s),
+                            std::forward<decltype(where_s)>(where_s)));
+        },
+        std::integer_sequence<axes_t, axes...>{},
+        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
+        std::forward<decltype(where)>(where));
+
+#else
+    auto init = full_like<bool>(out_md, false);
+
+    core::reduce<keepdims>(
+        [&](auto &&...elems) {
+            core::batch_with_broadcast<backend>(
+                [](auto &&in_u, auto &&out_u, auto &&init_u, auto &&where_u) {
+                    if (core::initialize_ufunc(
+                            std::forward<decltype(init_u)>(init_u),
+                            std::forward<decltype(where_u)>(where_u))) {
+                        ufunc::copy_ufunc<bool>(
+                            std::forward<decltype(in_u)>(in_u),
+                            std::forward<decltype(out_u)>(out_u));
+
+                    } else {
+                        ufunc::logical_and_ufunc(
+                            std::forward<decltype(in_u)>(in_u),
+                            std::forward<decltype(out_u)>(out_u),
+                            std::forward<decltype(out_u)>(out_u),
+                            std::forward<decltype(where_u)>(where_u));
+                    }
+                },
+                std::integer_sequence<bool, true, false, false, true>{},
+                std::forward<decltype(elems)>(elems)...);
+        },
+        std::integer_sequence<axes_t, axes...>{},
+        std::integer_sequence<bool, true, false, false, true>{}, in_mds, out_md,
+        init, std::forward<decltype(where)>(where));
+
+    if (!all(init)) {
+        throw std::runtime_error(
+            "mdtensor::all: cannot initialize output tensor.");
+    }
+#endif
+
+    return out_md;
+}
+
+template <std::int64_t axis, typename dtype = void, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto all(auto &&in, out_t &&out = out_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    return all<dtype, keepdims, backend>(
+        std::forward<decltype(in)>(in),
+        std::integer_sequence<std::int64_t, axis>{},
+        std::forward<decltype(out)>(out), std::forward<decltype(where)>(where));
+}
+
+template <typename dtype = void, bool keepdims = false,
+          core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
+[[nodiscard]] constexpr auto all(auto &&in, out_t &&out = out_t{std::nullopt},
+                                 where_t &&where = where_t{std::nullopt}) {
+    return all<dtype, keepdims, backend>(
+        std::forward<decltype(in)>(in), std::index_sequence<>{},
+        std::forward<decltype(out)>(out), std::forward<decltype(where)>(where));
+}
+
+} // namespace mdtensor
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/all.hpp
 
 namespace mdtensor {
 
@@ -4841,26 +5081,43 @@ template <typename dtype = void, bool keepdims = false,
         std::integer_sequence<axes_t, axes...>{}, core::extents<std::uint8_t>{},
         in_mds);
 
-    // TODO: move to reduce
-    if constexpr (core::nullopt_t_c<decltype(initial)>) {
-        fill<backend>(out_md, 0);
+    auto init = full_like<bool>(out_md, false);
 
-    } else {
-        fill<backend>(out_md, std::forward<decltype(initial)>(initial));
+    if constexpr (!core::nullopt_t_c<decltype(initial)>) {
+        static_cast<void>(full_like<void>(
+            out_md, std::forward<decltype(initial)>(initial), out_md));
+        fill(init, true);
     }
 
     core::reduce<keepdims>(
-        [](auto &&in, auto &&out, auto &&where) {
-            static_cast<void>(
-                add<void, backend>(std::forward<decltype(in)>(in),
-                                   std::forward<decltype(out)>(out),
-                                   std::forward<decltype(out)>(out),
-                                   std::forward<decltype(where)>(where)));
+        [&](auto &&...elems) {
+            core::batch_with_broadcast<backend>(
+                [](auto &&in_u, auto &&out_u, auto &&init_u, auto &&where_u) {
+                    if (core::initialize_ufunc(
+                            std::forward<decltype(init_u)>(init_u),
+                            std::forward<decltype(where_u)>(where_u))) {
+                        ufunc::copy_ufunc(std::forward<decltype(in_u)>(in_u),
+                                          std::forward<decltype(out_u)>(out_u));
+
+                    } else {
+                        ufunc::add_ufunc(
+                            std::forward<decltype(in_u)>(in_u),
+                            std::forward<decltype(out_u)>(out_u),
+                            std::forward<decltype(out_u)>(out_u),
+                            std::forward<decltype(where_u)>(where_u));
+                    }
+                },
+                std::integer_sequence<bool, true, false, false, true>{},
+                std::forward<decltype(elems)>(elems)...);
         },
         std::integer_sequence<axes_t, axes...>{},
-        std::index_sequence<0, 0, 0>{},
-        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
-        std::forward<decltype(where)>(where));
+        std::integer_sequence<bool, true, false, false, true>{}, in_mds, out_md,
+        init, std::forward<decltype(where)>(where));
+
+    if (!all(init)) {
+        throw std::runtime_error(
+            "mdtensor::sum: cannot initialize output tensor.");
+    }
 
     return out_md;
 }
@@ -5140,151 +5397,6 @@ template <typename dtype = void>
  */
 
 
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/all.hpp
-/**
- * @file
- * @brief Logical all-reduction utilities for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/logical_and.hpp
-/**
- * @file
- * @brief Element-wise logical AND utilities for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
-
-namespace mdtensor {
-namespace ufunc {
-
-constexpr void logical_and_ufunc(auto &&in1, auto &&in2, auto &&out,
-                                 auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
-            return;
-        }
-    }
-
-    out = (static_cast<bool>(in1) && static_cast<bool>(in2));
-}
-
-} // namespace ufunc
-
-template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
-          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
-[[nodiscard]] constexpr auto
-logical_and(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
-            where_t &&where = where_t{std::nullopt}) {
-    const auto in1_mds =
-        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
-    const auto in2_mds =
-        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
-
-    auto out_md = core::resolve_broadcasted_output<dtype>(
-        std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
-        in1_mds, in2_mds);
-
-    core::batch_with_broadcast<backend>(
-        [](auto &&...elems) {
-            ufunc::logical_and_ufunc(std::forward<decltype(elems)>(elems)...);
-        },
-        std::integer_sequence<bool, true, true, false, true>{}, in1_mds,
-        in2_mds, out_md, std::forward<decltype(where)>(where));
-
-    return out_md;
-}
-
-} // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/logical_and.hpp
-
-namespace mdtensor {
-namespace rfunc {
-
-template <core::Backend backend>
-constexpr void all_rfunc(auto &&in, auto &&out, auto &&where) {
-    const auto out_mds = core::to_mdspan(std::forward<decltype(out)>(out));
-
-    const auto mask = [&]() {
-        if constexpr (core::nullopt_t_value_type_c<decltype(where)>) {
-            return out_mds;
-
-        } else {
-            return logical_and<bool, backend>(
-                out_mds, std::forward<decltype(where)>(where));
-        }
-    }();
-
-    static_cast<void>(logical_and<void, backend>(std::forward<decltype(in)>(in),
-                                                 out_mds, out_mds, mask));
-}
-
-} // namespace rfunc
-
-template <typename dtype = bool, bool keepdims = false,
-          core::Backend backend = core::Backend::AUTO, std::integral axes_t,
-          axes_t... axes, typename out_t = std::nullopt_t,
-          typename where_t = std::nullopt_t>
-[[nodiscard]] constexpr auto all(auto &&in,
-                                 std::integer_sequence<axes_t, axes...>,
-                                 out_t &&out = out_t{std::nullopt},
-                                 where_t &&where = where_t{std::nullopt}) {
-    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
-
-    auto out_md = core::resolve_reduced_output<dtype, keepdims>(
-        std::forward<decltype(out)>(out),
-        std::integer_sequence<axes_t, axes...>{}, core::extents<std::uint8_t>{},
-        in_mds);
-
-    // TODO: move to reduce
-    fill<backend>(out_md, true);
-
-    // TODO: use escape for each ufunc to remove mask calculation overhead
-    core::reduce<keepdims>(
-        [&](auto &&...elems) {
-            rfunc::all_rfunc<backend>(std::forward<decltype(elems)>(elems)...);
-        },
-        std::integer_sequence<axes_t, axes...>{},
-        std::index_sequence<0, 0, 0>{},
-        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
-        std::forward<decltype(where)>(where));
-
-    return out_md;
-}
-
-template <std::int64_t axis, typename dtype = void, bool keepdims = false,
-          core::Backend backend = core::Backend::AUTO,
-          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
-[[nodiscard]] constexpr auto all(auto &&in, out_t &&out = out_t{std::nullopt},
-                                 where_t &&where = where_t{std::nullopt}) {
-    return all<dtype, keepdims, backend>(
-        std::forward<decltype(in)>(in),
-        std::integer_sequence<std::int64_t, axis>{},
-        std::forward<decltype(out)>(out), std::forward<decltype(where)>(where));
-}
-
-template <typename dtype = void, bool keepdims = false,
-          core::Backend backend = core::Backend::AUTO,
-          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
-[[nodiscard]] constexpr auto all(auto &&in, out_t &&out = out_t{std::nullopt},
-                                 where_t &&where = where_t{std::nullopt}) {
-    return all<dtype, keepdims, backend>(
-        std::forward<decltype(in)>(in), std::index_sequence<>{},
-        std::forward<decltype(out)>(out), std::forward<decltype(where)>(where));
-}
-
-} // namespace mdtensor
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/all.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/allclose.hpp
 /**
  * @file
@@ -5468,28 +5580,6 @@ logical_or(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/logical_or.hpp
 
 namespace mdtensor {
-namespace rfunc {
-
-template <core::Backend backend>
-constexpr void any_rfunc(auto &&in, auto &&out, auto &&where) {
-    const auto out_mds = core::to_mdspan(std::forward<decltype(out)>(out));
-
-    const auto mask = [&]() {
-        if constexpr (core::nullopt_t_value_type_c<decltype(where)>) {
-            return logical_not<bool, backend>(out_mds);
-
-        } else {
-            return logical_and<bool, backend>(
-                logical_not<bool, backend>(out_mds),
-                std::forward<decltype(where)>(where));
-        }
-    }();
-
-    static_cast<void>(logical_or<void, backend>(std::forward<decltype(in)>(in),
-                                                out_mds, out_mds, mask));
-}
-
-} // namespace rfunc
 
 template <typename dtype = bool, bool keepdims = false,
           core::Backend backend = core::Backend::AUTO, std::integral axes_t,
@@ -5506,18 +5596,55 @@ template <typename dtype = bool, bool keepdims = false,
         std::integer_sequence<axes_t, axes...>{}, core::extents<std::uint8_t>{},
         in_mds);
 
-    // TODO: move to reduce
-    fill<backend>(out_md, false);
+#if true
+    static_cast<void>(full_like<void>(out_md, false, out_md));
 
-    // TODO: use escape for each ufunc to remove mask calculation overhead
     core::reduce<keepdims>(
-        [&](auto &&...elems) {
-            rfunc::any_rfunc<backend>(std::forward<decltype(elems)>(elems)...);
+        [](auto &&in_s, auto &&out_s, auto &&where_s) {
+            static_cast<void>(
+                logical_or(std::forward<decltype(in_s)>(in_s),
+                           std::forward<decltype(out_s)>(out_s),
+                           std::forward<decltype(out_s)>(out_s),
+                           std::forward<decltype(where_s)>(where_s)));
         },
         std::integer_sequence<axes_t, axes...>{},
-        std::index_sequence<0, 0, 0>{},
         std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
+
+#else
+    auto init = full_like<bool>(out_md, false);
+
+    core::reduce<keepdims>(
+        [&](auto &&...elems) {
+            core::batch_with_broadcast<backend>(
+                [](auto &&in_u, auto &&out_u, auto &&init_u, auto &&where_u) {
+                    if (core::initialize_ufunc(
+                            std::forward<decltype(init_u)>(init_u),
+                            std::forward<decltype(where_u)>(where_u))) {
+                        ufunc::copy_ufunc<bool>(
+                            std::forward<decltype(in_u)>(in_u),
+                            std::forward<decltype(out_u)>(out_u));
+
+                    } else {
+                        ufunc::logical_or_ufunc(
+                            std::forward<decltype(in_u)>(in_u),
+                            std::forward<decltype(out_u)>(out_u),
+                            std::forward<decltype(out_u)>(out_u),
+                            std::forward<decltype(where_u)>(where_u));
+                    }
+                },
+                std::integer_sequence<bool, true, false, false, true>{},
+                std::forward<decltype(elems)>(elems)...);
+        },
+        std::integer_sequence<axes_t, axes...>{},
+        std::integer_sequence<bool, true, false, false, true>{}, in_mds, out_md,
+        init, std::forward<decltype(where)>(where));
+
+    if (!all(init)) {
+        throw std::runtime_error(
+            "mdtensor::any: cannot initialize output tensor.");
+    }
+#endif
 
     return out_md;
 }
@@ -6964,29 +7091,43 @@ template <typename dtype = void, bool keepdims = false,
         std::integer_sequence<axes_t, axes...>{}, core::extents<std::uint8_t>{},
         in_mds);
 
-    // TODO: move to reduce
-    if constexpr (core::nullopt_t_c<decltype(initial)>) {
-        using value_t =
-            typename core::to_mdspan_t<decltype(out_md)>::value_type;
+    auto init = full_like<bool, backend>(out_md, false);
 
-        fill<backend>(out_md, std::numeric_limits<value_t>::lowest());
-
-    } else {
-        fill<backend>(out_md, std::forward<decltype(initial)>(initial));
+    if constexpr (!core::nullopt_t_c<decltype(initial)>) {
+        static_cast<void>(full_like<void>(
+            out_md, std::forward<decltype(initial)>(initial), out_md));
+        fill(init, true);
     }
 
     core::reduce<keepdims>(
-        [](auto &&in, auto &&out, auto &&where) {
-            static_cast<void>(
-                maximum<void, backend>(std::forward<decltype(in)>(in),
-                                       std::forward<decltype(out)>(out),
-                                       std::forward<decltype(out)>(out),
-                                       std::forward<decltype(where)>(where)));
+        [&](auto &&...elems) {
+            core::batch_with_broadcast<backend>(
+                [](auto &&in_u, auto &&out_u, auto &&init_u, auto &&where_u) {
+                    if (core::initialize_ufunc(
+                            std::forward<decltype(init_u)>(init_u),
+                            std::forward<decltype(where_u)>(where_u))) {
+                        ufunc::copy_ufunc(std::forward<decltype(in_u)>(in_u),
+                                          std::forward<decltype(out_u)>(out_u));
+
+                    } else {
+                        ufunc::maximum_ufunc(
+                            std::forward<decltype(in_u)>(in_u),
+                            std::forward<decltype(out_u)>(out_u),
+                            std::forward<decltype(out_u)>(out_u),
+                            std::forward<decltype(where_u)>(where_u));
+                    }
+                },
+                std::integer_sequence<bool, true, false, false, true>{},
+                std::forward<decltype(elems)>(elems)...);
         },
         std::integer_sequence<axes_t, axes...>{},
-        std::index_sequence<0, 0, 0>{},
-        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
-        std::forward<decltype(where)>(where));
+        std::integer_sequence<bool, true, false, false, true>{}, in_mds, out_md,
+        init, std::forward<decltype(where)>(where));
+
+    if (!all(init)) {
+        throw std::runtime_error(
+            "mdtensor::max: cannot initialize output tensor.");
+    }
 
     return out_md;
 }
@@ -7129,29 +7270,43 @@ template <typename dtype = void, bool keepdims = false,
         std::integer_sequence<axes_t, axes...>{}, core::extents<std::uint8_t>{},
         in_mds);
 
-    // TODO: move to reduce
-    if constexpr (core::nullopt_t_c<decltype(initial)>) {
-        using value_t =
-            typename core::to_mdspan_t<decltype(out_md)>::value_type;
+    auto init = full_like<bool, backend>(out_md, false);
 
-        fill<backend>(out_md, std::numeric_limits<value_t>::max());
-
-    } else {
-        fill<backend>(out_md, std::forward<decltype(initial)>(initial));
+    if constexpr (!core::nullopt_t_c<decltype(initial)>) {
+        static_cast<void>(full_like<void>(
+            out_md, std::forward<decltype(initial)>(initial), out_md));
+        fill(init, true);
     }
 
     core::reduce<keepdims>(
-        [](auto &&in, auto &&out, auto &&where) {
-            static_cast<void>(
-                minimum<void, backend>(std::forward<decltype(in)>(in),
-                                       std::forward<decltype(out)>(out),
-                                       std::forward<decltype(out)>(out),
-                                       std::forward<decltype(where)>(where)));
+        [&](auto &&...elems) {
+            core::batch_with_broadcast<backend>(
+                [](auto &&in_u, auto &&out_u, auto &&init_u, auto &&where_u) {
+                    if (core::initialize_ufunc(
+                            std::forward<decltype(init_u)>(init_u),
+                            std::forward<decltype(where_u)>(where_u))) {
+                        ufunc::copy_ufunc(std::forward<decltype(in_u)>(in_u),
+                                          std::forward<decltype(out_u)>(out_u));
+
+                    } else {
+                        ufunc::minimum_ufunc(
+                            std::forward<decltype(in_u)>(in_u),
+                            std::forward<decltype(out_u)>(out_u),
+                            std::forward<decltype(out_u)>(out_u),
+                            std::forward<decltype(where_u)>(where_u));
+                    }
+                },
+                std::integer_sequence<bool, true, false, false, true>{},
+                std::forward<decltype(elems)>(elems)...);
         },
         std::integer_sequence<axes_t, axes...>{},
-        std::index_sequence<0, 0, 0>{},
-        std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
-        std::forward<decltype(where)>(where));
+        std::integer_sequence<bool, true, false, false, true>{}, in_mds, out_md,
+        init, std::forward<decltype(where)>(where));
+
+    if (!all(init)) {
+        throw std::runtime_error(
+            "mdtensor::min: cannot initialize output tensor.");
+    }
 
     return out_md;
 }
