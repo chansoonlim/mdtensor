@@ -21,16 +21,16 @@ template <typename dtype = void, core::extents_c exts_t,
                                     out_t &&out = out_t{std::nullopt}) {
     static_assert(exts.rank() == 1, "arange only supports rank-1 extents");
 
-    auto out_md =
-        core::resolve_output<core::output_value_t<dtype, start_t, step_t>>(
-            std::forward<decltype(out)>(out),
-            std::forward<decltype(exts)>(exts));
+    using calc_t = core::output_value_t<dtype, start_t, step_t>;
 
-    using value_t = typename decltype(out_md)::value_type;
-    using index_t = typename decltype(out_md)::index_type;
+    auto out_md = core::resolve_output<calc_t>(
+        std::forward<decltype(out)>(out), std::forward<decltype(exts)>(exts));
 
-    const value_t actual_step =
-        static_cast<value_t>(start + step) - static_cast<value_t>(start);
+    using value_t = decltype(out_md)::value_type;
+    using index_t = decltype(out_md)::index_type;
+
+    const calc_t actual_step =
+        static_cast<calc_t>(start + step) - static_cast<calc_t>(start);
 
     out_md(0) = static_cast<value_t>(start);
 
