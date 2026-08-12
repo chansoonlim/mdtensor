@@ -46,7 +46,8 @@ namespace mdtensor::core {
     } else {
         using index_t = typename exts_t::index_type;
         using cindex_t =
-            common_integral_type_t<typename in_mds_t::index_type, index_t>;
+            core::common_integral_type_t<typename in_mds_t::index_type,
+                                         index_t>;
 
         // ni = new_rank - org_rank + oi
         const auto get_ni = [](std::size_t i) {

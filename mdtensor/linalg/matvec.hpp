@@ -133,7 +133,7 @@ constexpr void matvec_ufunc(auto &&in1, auto &&in2, auto &&out) {
 
 template <core::Backend backend = core::Backend::AUTO>
 constexpr void matvec_to(auto &&in1, auto &&in2, auto &&out) {
-    core::batch_with_broadcast<backend>(
+    core::batch<backend>(
         [](auto &&...elems) {
             ufunc::matvec_ufunc(std::forward<decltype(elems)>(elems)...);
         },

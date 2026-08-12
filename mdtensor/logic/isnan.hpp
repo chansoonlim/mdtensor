@@ -46,7 +46,7 @@ template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
     auto out_md = core::resolve_output_like<dtype>(
         std::forward<decltype(out)>(out), in_mds);
 
-    core::batch_with_broadcast<backend>(
+    core::batch<backend>(
         [](auto &&...elems) {
             ufunc::isnan_ufunc(std::forward<decltype(elems)>(elems)...);
         },

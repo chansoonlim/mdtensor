@@ -86,7 +86,7 @@ randint(shape_t &&shape = shape_t{}, low_t &&low = low_t{std::nullopt},
 
     auto engine = generator::EngineWrapper<EngineType>{seed.value};
 
-    core::batch_with_broadcast<core::Backend::NATIVE>(
+    core::batch<core::Backend::NATIVE>(
         [&](auto &&...elems) {
             ufunc::randint_ufunc(std::forward<decltype(elems)>(elems)...,
                                  engine);

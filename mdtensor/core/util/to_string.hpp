@@ -9,6 +9,15 @@
 
 #pragma once
 
+#include <charconv>
+#include <cmath>
+#include <concepts>
+#include <cstdint>
+#include <cstring>
+#include <optional>
+#include <stdexcept>
+#include <type_traits>
+
 #include "../base/base.hpp"
 
 namespace mdtensor::core {
@@ -123,7 +132,7 @@ template <std::floating_point value_t>
     return text;
 }
 
-template <arithmetic_c value_t>
+template <core::arithmetic_c value_t>
 [[nodiscard]] inline std::string value_to_string(const value_t &value) {
     using base_t = std::remove_cvref_t<value_t>;
 

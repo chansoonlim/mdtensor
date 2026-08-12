@@ -9,34 +9,9 @@
 
 #pragma once
 
-#include "base.hpp"
+#include "type/type.hpp"
 
 namespace mdtensor::core {
-
-template <typename ElementType, typename Extents,
-          typename LayoutPolicy = stdex::layout_right,
-          typename AccessorPolicy = stdex::default_accessor<ElementType>>
-using mdspan =
-    stdex::mdspan<ElementType, Extents, LayoutPolicy, AccessorPolicy>;
-
-namespace detail {
-
-template <typename T> struct is_mdspan_impl : std::false_type {};
-
-template <typename ElementType, typename ExtentsType, typename LayoutType,
-          typename AccessorType>
-struct is_mdspan_impl<
-    mdspan<ElementType, ExtentsType, LayoutType, AccessorType>>
-    : std::true_type {};
-
-} // namespace detail
-
-template <typename T> struct is_mdspan : detail::is_mdspan_impl<T> {};
-
-template <typename T> constexpr bool is_mdspan_v = is_mdspan<T>::value;
-
-template <typename T>
-concept mdspan_c = is_mdspan_v<std::remove_cvref_t<T>>;
 
 [[nodiscard]] constexpr auto to_mdspan(auto &&io) {
     if constexpr (mdspan_c<decltype(io)>) {
@@ -120,18 +95,5 @@ template <mdspan_c io_t>
         return std::forward<io_t>(io);
     }
 }
-
-template <typename T>
-using to_mdspan_t = decltype(to_mdspan(std::declval<T>()));
-
-template <typename T>
-using value_type_t = typename std::remove_cvref_t<to_mdspan_t<T>>::value_type;
-
-template <typename T>
-concept nullopt_t_value_type_c = nullopt_t_c<value_type_t<T>>;
-
-template <typename... Ts>
-using common_value_type_t = common_arithmetic_type_t<
-    typename std::remove_cvref_t<to_mdspan_t<Ts>>::value_type...>;
 
 } // namespace mdtensor::core

@@ -43,7 +43,7 @@ logical_and(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds);
 
-    core::batch_with_broadcast<backend>(
+    core::batch<backend>(
         [](auto &&...elems) {
             ufunc::logical_and_ufunc(std::forward<decltype(elems)>(elems)...);
         },

@@ -107,7 +107,7 @@ constexpr void solve_to(auto &&a, auto &&b, auto &&x, auto &&valid) {
 
     constexpr std::size_t rhs_rank = b_mds.rank() == 1 ? 1 : 2;
 
-    core::batch_with_broadcast<backend>(
+    core::batch<backend>(
         [](auto &&a, auto &&b, auto &&x, auto &&valid) {
             valid = ufunc::solve_ufunc(std::forward<decltype(a)>(a),
                                        std::forward<decltype(b)>(b),

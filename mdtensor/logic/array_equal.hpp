@@ -50,7 +50,7 @@ constexpr bool array_equal_ufunc(auto &&in1, auto &&in2) {
         }
 
         const auto run_batch = [&]<bool equal_nan_v>() {
-            return core::batch<core::Backend::NATIVE, in1_mds.rank(), true>(
+            return core::batch_while(
                 [](auto &&...elems) {
                     return ufunc::array_equal_ufunc<equal_nan_v>(
                         std::forward<decltype(elems)>(elems)...);

@@ -192,7 +192,7 @@ constexpr void lu_permute_l_ufunc(auto &&in, auto &&pl, auto &&u) {
 template <core::Backend backend = core::Backend::AUTO>
 constexpr void lu_p_indices_to(auto &&in, auto &&p_indices, auto &&l,
                                auto &&u) {
-    core::batch_with_broadcast<backend>(
+    core::batch<backend>(
         [](auto &&...elems) {
             ufunc::lu_p_indices_ufunc(std::forward<decltype(elems)>(elems)...);
         },
@@ -205,7 +205,7 @@ constexpr void lu_p_indices_to(auto &&in, auto &&p_indices, auto &&l,
 
 template <core::Backend backend = core::Backend::AUTO>
 constexpr void lu_full_to(auto &&in, auto &&p, auto &&l, auto &&u) {
-    core::batch_with_broadcast<backend>(
+    core::batch<backend>(
         [](auto &&...elems) {
             ufunc::lu_full_ufunc(std::forward<decltype(elems)>(elems)...);
         },
@@ -217,7 +217,7 @@ constexpr void lu_full_to(auto &&in, auto &&p, auto &&l, auto &&u) {
 
 template <core::Backend backend = core::Backend::AUTO>
 constexpr void lu_permute_l_to(auto &&in, auto &&pl, auto &&u) {
-    core::batch_with_broadcast<backend>(
+    core::batch<backend>(
         [](auto &&...elems) {
             ufunc::lu_permute_l_ufunc(std::forward<decltype(elems)>(elems)...);
         },

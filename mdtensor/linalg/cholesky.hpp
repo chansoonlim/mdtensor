@@ -122,7 +122,7 @@ template <core::Backend backend = core::Backend::AUTO>
 constexpr void cholesky_to(auto &&in, auto &&out, auto &&valid,
                            const bool upper = false) {
     const auto run_batch = [&]<bool upper_v>() {
-        core::batch_with_broadcast<backend>(
+        core::batch<backend>(
             [](auto &&in, auto &&out, auto &&valid) {
                 valid = ufunc::cholesky_ufunc<upper_v>(
                     std::forward<decltype(in)>(in),

@@ -9,40 +9,9 @@
 
 #pragma once
 
-#include "type.hpp"
+#include "type/type.hpp"
 
 namespace mdtensor::core {
-
-template <typename IndexType, std::size_t... Extents>
-using extents = stdex::extents<IndexType, Extents...>;
-
-template <typename IndexType, std::size_t Rank>
-using dextents = stdex::dextents<IndexType, Rank>;
-
-// NOTE: dims will be included in C++23
-// (https://en.cppreference.com/w/cpp/container/mdspan/extents)
-template <std::size_t Rank, class IndexType = std::size_t>
-using dims = dextents<IndexType, Rank>;
-
-namespace detail {
-
-template <typename T> struct is_extents_impl : std::false_type {};
-
-template <typename IndexType, std::size_t... Extents>
-struct is_extents_impl<extents<IndexType, Extents...>> : std::true_type {};
-
-} // namespace detail
-
-// NOTE: stdex::detail::__is_extents is not used for godbolt test compatibility
-template <typename T> struct is_extents : detail::is_extents_impl<T> {};
-
-template <typename T> constexpr bool is_extents_v = is_extents<T>::value;
-
-template <typename T>
-concept extents_c = is_extents_v<std::remove_cvref_t<T>>;
-
-constexpr auto dynamic_extent = stdex::dynamic_extent;
-constexpr auto dyn = dynamic_extent;
 
 [[nodiscard]] constexpr auto to_extents(auto &&shape) {
     using base_t = std::remove_cvref_t<decltype(shape)>;
@@ -51,7 +20,7 @@ constexpr auto dyn = dynamic_extent;
         // If the input is already an extents, just return it as-is
         return std::forward<decltype(shape)>(shape);
 
-    } else if constexpr (integral_c<base_t>) {
+    } else if constexpr (core::integral_c<base_t>) {
         if (shape < base_t{0}) {
             throw std::invalid_argument("shape must be non-negative");
         }
@@ -161,8 +130,8 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
         return false;
     }
 
-    using index_t = common_integral_type_t<typename base1_t::index_type,
-                                           typename base2_t::index_type>;
+    using index_t = core::common_integral_type_t<typename base1_t::index_type,
+                                                 typename base2_t::index_type>;
 
     for (std::size_t i = 0; i < base1_t::rank(); i++) {
         if (static_cast<index_t>(in1.extent(i)) !=
@@ -208,8 +177,8 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
                                              ins_t &&...ins) noexcept {
     using base1_t = std::remove_cvref_t<in1_t>;
     using base2_t = std::remove_cvref_t<in2_t>;
-    using index_t = common_integral_type_t<typename base1_t::index_type,
-                                           typename base2_t::index_type>;
+    using index_t = core::common_integral_type_t<typename base1_t::index_type,
+                                                 typename base2_t::index_type>;
 
     const auto cexts =
         [&]<std::size_t... Is, std::size_t... Js>(std::index_sequence<Is...>,

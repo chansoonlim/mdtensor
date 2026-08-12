@@ -133,7 +133,7 @@ constexpr void vecmat_ufunc(auto &&in1, auto &&in2, auto &&out) {
 
 template <core::Backend backend = core::Backend::AUTO>
 constexpr void vecmat_to(auto &&in1, auto &&in2, auto &&out) {
-    core::batch_with_broadcast<backend>(
+    core::batch<backend>(
         [](auto &&...elems) {
             ufunc::vecmat_ufunc(std::forward<decltype(elems)>(elems)...);
         },

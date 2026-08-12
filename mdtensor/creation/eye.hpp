@@ -46,10 +46,11 @@ template <typename dtype = std::int8_t,
             core::resolve_output<dtype>(std::forward<decltype(out)>(out),
                                         std::forward<decltype(exts)>(exts));
 
-        core::batch<backend, exts.rank() - 2>(
+        core::batch<backend>(
             [&](auto &&...elems) {
                 ufunc::eye_ufunc(std::forward<decltype(elems)>(elems)..., k);
             },
+            std::index_sequence<2>{}, std::integer_sequence<bool, false>{},
             out_md);
 
         return out_md;

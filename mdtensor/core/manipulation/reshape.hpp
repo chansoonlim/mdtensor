@@ -93,9 +93,8 @@ template <extents_c exts_t>
 
     auto out = make_tensor<value_t>(std::forward<exts_t>(exts));
 
-    batch<Backend::NATIVE, in_mds.rank()>(
-        [&](auto &&in, auto &&out) { out = in; }, in_mds,
-        make_reshape_view(out, in_mds.extents()));
+    batch([&](auto &&in, auto &&out) { out = in; }, in_mds,
+          make_reshape_view(out, in_mds.extents()));
 
     return out;
 }

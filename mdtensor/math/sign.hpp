@@ -38,7 +38,7 @@ template <typename dtype = std::int8_t,
     auto out_md = core::resolve_output_like<dtype>(
         std::forward<decltype(out)>(out), in_mds);
 
-    core::batch_with_broadcast<backend>(
+    core::batch<backend>(
         [](auto &&...elems) {
             ufunc::sign_ufunc(std::forward<decltype(elems)>(elems)...);
         },

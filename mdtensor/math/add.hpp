@@ -42,7 +42,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds);
 
-    core::batch_with_broadcast<backend>(
+    core::batch<backend>(
         [](auto &&...elems) {
             ufunc::add_ufunc(std::forward<decltype(elems)>(elems)...);
         },

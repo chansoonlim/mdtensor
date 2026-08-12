@@ -47,7 +47,7 @@ constexpr void norm_to(auto &&in, auto &&out) {
         static_cast<void>(sqrt<void, backend>(out_mds, out_mds));
 
     } else {
-        core::batch_with_broadcast<backend>(
+        core::batch<backend>(
             [](auto &&...elems) {
                 ufunc::norm_ufunc(std::forward<decltype(elems)>(elems)...);
             },

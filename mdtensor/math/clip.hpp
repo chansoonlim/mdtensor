@@ -50,7 +50,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{}, in_mds,
         min_mds, max_mds);
 
-    core::batch_with_broadcast<backend>(
+    core::batch<backend>(
         [](auto &&...elems) {
             ufunc::clip_ufunc(std::forward<decltype(elems)>(elems)...);
         },

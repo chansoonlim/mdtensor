@@ -20,7 +20,7 @@ template <typename dtype, typename... Ts> struct output_value {
 };
 
 template <typename... Ts> struct output_value<void, Ts...> {
-    using type = common_arithmetic_type_t<
+    using type = core::common_arithmetic_type_t<
         typename std::remove_cvref_t<to_mdspan_t<Ts>>::value_type...>;
 };
 
@@ -162,14 +162,14 @@ resolve_broadcasted_output(auto &&out, std::index_sequence<uranks...>,
             std::forward<decltype(ins)>(ins)...);
 
         // Check that resolved output type is at least float precision
-        static_assert(floating_point_c<
+        static_assert(core::floating_point_c<
                           typename to_mdspan_t<decltype(out_md)>::value_type>,
                       "Resolved output type must be at least float precision.");
 
         return out_md;
 
     } else {
-        if constexpr (nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return make_broadcasted_tensor<dtype>(
                 std::index_sequence<uranks...>{},
                 std::forward<uout_exts_t>(uout_exts),

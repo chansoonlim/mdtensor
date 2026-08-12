@@ -101,7 +101,7 @@ template <std::int64_t axis = 0, typename dtype = void,
             core::slice_extents_from_left<baxis>(bexts), exts,
             core::slice_extents_from_right<out_urank - 1>(bexts)));
 
-    core::batch_with_broadcast<backend>(
+    core::batch<backend>(
         [&](auto &&...elems) {
             ufunc::linspace_ufunc<core::Backend::NATIVE>(
                 std::forward<decltype(elems)>(elems)..., endpoint);

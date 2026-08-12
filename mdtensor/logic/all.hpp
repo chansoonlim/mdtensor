@@ -35,7 +35,7 @@ template <typename dtype = bool, bool keepdims = false,
     // and add escape when out is initialized and already false.
     core::reduce<keepdims>(
         [&](auto &&...elems) {
-            core::batch_with_broadcast<backend>(
+            core::batch<backend>(
                 [](auto &&in_u, auto &&out_u, auto &&init_u, auto &&where_u) {
                     if (core::initialize_ufunc(
                             std::forward<decltype(init_u)>(init_u),
@@ -59,9 +59,7 @@ template <typename dtype = bool, bool keepdims = false,
         std::integer_sequence<bool, true, false, false, true>{}, in_mds, out_md,
         init, std::forward<decltype(where)>(where));
 
-    if (!core::batch<core::Backend::NATIVE,
-                     core::to_mdspan_t<decltype(init)>::rank(), true>(
-            [](auto &&init_u) { return init_u; }, init)) {
+    if (!core::batch_while([](auto &&init_u) { return init_u; }, init)) {
         throw std::runtime_error(
             "mdtensor::all: cannot initialize output tensor.");
     }

@@ -23,7 +23,7 @@ constexpr void fill(auto &&out, auto &&val) {
     const auto out_mds =
         core::to_output_mdspan(std::forward<decltype(out)>(out));
 
-    core::batch<backend, out_mds.rank()>(
+    core::batch<backend>(
         [&](auto &&...elems) {
             ufunc::fill_ufunc(std::forward<decltype(elems)>(elems)...,
                               std::forward<decltype(val)>(val));

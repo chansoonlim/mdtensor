@@ -30,7 +30,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
             std::forward<decltype(out)>(out),
             core::to_extents(std::forward<decltype(shape)>(shape)));
 
-    core::batch_with_broadcast<backend>(
+    core::batch<backend>(
         [](auto &&...elems) {
             ufunc::full_ufunc(std::forward<decltype(elems)>(elems)...);
         },

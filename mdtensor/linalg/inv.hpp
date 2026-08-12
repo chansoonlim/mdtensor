@@ -114,7 +114,7 @@ namespace ufunc {
 
 template <core::Backend backend = core::Backend::AUTO>
 constexpr void inv_to(auto &&in, auto &&out, auto &&valid) {
-    core::batch_with_broadcast<backend>(
+    core::batch<backend>(
         [](auto &&in, auto &&out, auto &&valid) {
             valid = ufunc::inv_ufunc(std::forward<decltype(in)>(in),
                                      std::forward<decltype(out)>(out));

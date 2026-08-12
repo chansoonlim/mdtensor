@@ -81,8 +81,7 @@ template <typename dtype = double,
 
     auto engine = generator::EngineWrapper<EngineType>{seed.value};
 
-    core::batch<core::Backend::NATIVE,
-                core::to_mdspan_t<decltype(out_md)>::rank()>(
+    core::batch<core::Backend::NATIVE>(
         [&](auto &&...elems) {
             ufunc::rand_ufunc(std::forward<decltype(elems)>(elems)..., engine);
         },

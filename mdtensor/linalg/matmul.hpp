@@ -151,7 +151,7 @@ constexpr void matmul_to(auto &&in1, auto &&in2, auto &&out) {
 #endif
         ) {
 #ifdef MDTENSOR_USE_EIGEN
-            core::batch_with_broadcast<core::Backend::NATIVE>(
+            core::batch<core::Backend::NATIVE>(
                 [](auto &&...elems) {
                     ufunc::matmul_ufunc_eigen(
                         std::forward<decltype(elems)>(elems)...);
@@ -164,7 +164,7 @@ constexpr void matmul_to(auto &&in1, auto &&in2, auto &&out) {
 #endif
 
         } else if (be == core::Backend::NATIVE) {
-            core::batch_with_broadcast<core::Backend::NATIVE>(
+            core::batch<core::Backend::NATIVE>(
                 [](auto &&...elems) {
                     ufunc::matmul_ufunc_native(
                         std::forward<decltype(elems)>(elems)...);
@@ -176,7 +176,7 @@ constexpr void matmul_to(auto &&in1, auto &&in2, auto &&out) {
                 std::forward<decltype(out)>(out));
 
         } else {
-            core::batch_with_broadcast<core::Backend::NATIVE>(
+            core::batch<core::Backend::NATIVE>(
                 [](auto &&...elems) {
                     ufunc::matmul_ufunc_native(
                         std::forward<decltype(elems)>(elems)...);

@@ -42,7 +42,7 @@ template <typename dtype = void, bool keepdims = false,
 
     core::reduce<keepdims>(
         [&](auto &&...elems) {
-            core::batch_with_broadcast<backend>(
+            core::batch<backend>(
                 [](auto &&in_u, auto &&out_u, auto &&init_u, auto &&where_u) {
                     if (core::initialize_ufunc(
                             std::forward<decltype(init_u)>(init_u),

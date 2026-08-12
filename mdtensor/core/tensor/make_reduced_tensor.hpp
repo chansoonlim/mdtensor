@@ -145,14 +145,14 @@ resolve_reduced_output(auto &&out, std::integer_sequence<axes_t, axes...>,
             std::forward<decltype(ins)>(ins)...);
 
         // Check that resolved output type is at least float precision
-        static_assert(floating_point_c<
+        static_assert(core::floating_point_c<
                           typename to_mdspan_t<decltype(out_md)>::value_type>,
                       "Resolved output type must be at least float precision.");
 
         return out_md;
 
     } else {
-        if constexpr (nullopt_t_c<decltype(out)>) {
+        if constexpr (core::nullopt_t_c<decltype(out)>) {
             return make_reduced_tensor<dtype, keepdims>(
                 std::integer_sequence<axes_t, axes...>{},
                 std::index_sequence<uranks...>{},

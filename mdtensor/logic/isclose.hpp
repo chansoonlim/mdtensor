@@ -75,7 +75,7 @@ isclose(auto &&in1, auto &&in2, rtol_t &&rtol = rtol_t{1e-05},
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds, rtol_mds, atol_mds);
 
-    core::batch_with_broadcast<backend>(
+    core::batch<backend>(
         [&](auto &&...elems) {
             ufunc::isclose_ufunc(std::forward<decltype(elems)>(elems)...,
                                  equal_nan);

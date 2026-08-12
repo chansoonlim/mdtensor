@@ -95,10 +95,8 @@ constexpr void batch_impl_openmp(auto &&ufunc, io_t &&io, ios_t &&...ios) {
 
 #endif
 
-} // namespace detail
-
 template <Backend backend, std::size_t brank, bool has_escape = false>
-[[nodiscard]] constexpr decltype(auto) batch(auto &&ufunc, auto &&...ios) {
+[[nodiscard]] constexpr decltype(auto) batch_impl(auto &&ufunc, auto &&...ios) {
 #ifdef MDTENSOR_USE_OPENMP
     // TODO: assert when backend is not specified in each funciton call
     // assert(backend != Backend::AUTO);
@@ -122,23 +120,24 @@ template <Backend backend, std::size_t brank, bool has_escape = false>
 #ifdef MDTENSOR_USE_OPENMP
         static_assert(!has_escape,
                       "OpenMP backend does not support return value.");
-        detail::batch_impl_openmp<brank>(
+        batch_impl_openmp<brank>(
             std::forward<decltype(ufunc)>(ufunc),
             to_mdspan(std::forward<decltype(ios)>(ios))...);
         return;
 #endif
 
     } else {
-        return detail::batch_impl_native<brank, has_escape>(
+        return batch_impl_native<brank, has_escape>(
             std::forward<decltype(ufunc)>(ufunc),
             to_mdspan(std::forward<decltype(ios)>(ios))...);
     }
 }
 
-template <Backend backend, bool has_escape = false, std::size_t... uranks,
+} // namespace detail
+
+template <Backend backend = Backend::NATIVE, std::size_t... uranks,
           bool... bcast>
-[[nodiscard]] constexpr decltype(auto)
-batch_with_broadcast(auto &&ufunc, std::index_sequence<uranks...>,
+constexpr void batch(auto &&ufunc, std::index_sequence<uranks...>,
                      std::integer_sequence<bool, bcast...>, auto &&...ios) {
     // broadcast which bcast = true
     const auto [ios_bcast, bexts] =
@@ -147,22 +146,68 @@ batch_with_broadcast(auto &&ufunc, std::index_sequence<uranks...>,
                   std::forward<decltype(ios)>(ios)...);
 
     // batch
-    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        return batch<backend, bexts.rank(), has_escape>(
+    [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        detail::batch_impl<backend, bexts.rank(), false>(
             std::forward<decltype(ufunc)>(ufunc), std::get<Is>(ios_bcast)...);
     }(std::make_index_sequence<sizeof...(ios)>{});
 }
 
-template <Backend backend, bool has_escape = false, bool... bcast>
-[[nodiscard]] constexpr decltype(auto)
-batch_with_broadcast(auto &&ufunc, std::integer_sequence<bool, bcast...>,
+template <Backend backend = Backend::NATIVE, bool... bcast>
+constexpr void batch(auto &&ufunc, std::integer_sequence<bool, bcast...>,
                      auto &&...ios) {
+    [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        batch<backend>(std::forward<decltype(ufunc)>(ufunc),
+                       std::index_sequence<((void)Is, 0)...>{},
+                       std::integer_sequence<bool, bcast...>{},
+                       std::forward<decltype(ios)>(ios)...);
+    }(std::make_index_sequence<sizeof...(ios)>{});
+}
+
+template <Backend backend = Backend::NATIVE>
+constexpr void batch(auto &&ufunc, auto &&...ios) {
+    [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        batch<backend>(std::forward<decltype(ufunc)>(ufunc),
+                       std::index_sequence<((void)Is, 0)...>{},
+                       std::integer_sequence<bool, ((void)Is, false)...>{},
+                       std::forward<decltype(ios)>(ios)...);
+    }(std::make_index_sequence<sizeof...(ios)>{});
+}
+
+template <std::size_t... uranks, bool... bcast>
+[[nodiscard]] constexpr bool
+batch_while(auto &&ufunc, std::index_sequence<uranks...>,
+            std::integer_sequence<bool, bcast...>, auto &&...ios) {
+    // broadcast which bcast = true
+    const auto [ios_bcast, bexts] =
+        broadcast(std::index_sequence<uranks...>{},
+                  std::integer_sequence<bool, bcast...>{},
+                  std::forward<decltype(ios)>(ios)...);
+
+    // batch
     return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        return batch_with_broadcast<backend, has_escape>(
-            std::forward<decltype(ufunc)>(ufunc),
-            std::index_sequence<((void)Is, 0)...>{},
-            std::integer_sequence<bool, bcast...>{},
-            std::forward<decltype(ios)>(ios)...);
+        return detail::batch_impl<Backend::NATIVE, bexts.rank(), true>(
+            std::forward<decltype(ufunc)>(ufunc), std::get<Is>(ios_bcast)...);
+    }(std::make_index_sequence<sizeof...(ios)>{});
+}
+
+template <bool... bcast>
+[[nodiscard]] constexpr bool batch_while(auto &&ufunc,
+                                         std::integer_sequence<bool, bcast...>,
+                                         auto &&...ios) {
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return batch_while(std::forward<decltype(ufunc)>(ufunc),
+                           std::index_sequence<((void)Is, 0)...>{},
+                           std::integer_sequence<bool, bcast...>{},
+                           std::forward<decltype(ios)>(ios)...);
+    }(std::make_index_sequence<sizeof...(ios)>{});
+}
+
+[[nodiscard]] constexpr bool batch_while(auto &&ufunc, auto &&...ios) {
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return batch_while(std::forward<decltype(ufunc)>(ufunc),
+                           std::index_sequence<((void)Is, 0)...>{},
+                           std::integer_sequence<bool, ((void)Is, false)...>{},
+                           std::forward<decltype(ios)>(ios)...);
     }(std::make_index_sequence<sizeof...(ios)>{});
 }
 

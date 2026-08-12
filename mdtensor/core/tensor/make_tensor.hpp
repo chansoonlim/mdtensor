@@ -47,13 +47,13 @@ template <typename dtype = void, bool floating = false, extents_c exts_t>
             std::forward<decltype(out)>(out), std::forward<exts_t>(exts));
 
         // Check that resolved output type is at least float precision
-        static_assert(floating_point_c<
+        static_assert(core::floating_point_c<
                           typename to_mdspan_t<decltype(out_md)>::value_type>,
                       "Resolved output type must be at least float precision.");
 
         return out_md;
 
-    } else if constexpr (nullopt_t_c<decltype(out)>) {
+    } else if constexpr (core::nullopt_t_c<decltype(out)>) {
         return make_tensor<dtype>(std::forward<exts_t>(exts));
 
     } else {

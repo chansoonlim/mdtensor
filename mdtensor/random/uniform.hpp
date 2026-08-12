@@ -49,7 +49,7 @@ uniform(shape_t &&shape = shape_t{}, low_t &&low = low_t{0},
 
     auto engine = generator::EngineWrapper<EngineType>{seed.value};
 
-    core::batch_with_broadcast<core::Backend::NATIVE>(
+    core::batch<core::Backend::NATIVE>(
         [&](auto &&...elems) {
             ufunc::uniform_ufunc(std::forward<decltype(elems)>(elems)...,
                                  engine);

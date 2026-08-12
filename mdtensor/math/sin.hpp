@@ -39,7 +39,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     auto out_md = core::resolve_output_like<dtype, true>(
         std::forward<decltype(out)>(out), in_mds);
 
-    core::batch_with_broadcast<backend>(
+    core::batch<backend>(
         [](auto &&...elems) {
             ufunc::sin_ufunc(std::forward<decltype(elems)>(elems)...);
         },

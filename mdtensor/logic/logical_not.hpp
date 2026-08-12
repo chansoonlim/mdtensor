@@ -38,7 +38,7 @@ logical_not(auto &&in, out_t &&out = out_t{std::nullopt},
     auto out_md = core::resolve_output_like<dtype>(
         std::forward<decltype(out)>(out), in_mds);
 
-    core::batch_with_broadcast<backend>(
+    core::batch<backend>(
         [](auto &&...elems) {
             ufunc::logical_not_ufunc(std::forward<decltype(elems)>(elems)...);
         },
