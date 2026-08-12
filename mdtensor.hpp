@@ -4987,7 +4987,9 @@ template <typename dtype = bool, bool keepdims = false,
 
     auto init = full_like<bool>(out_md, false);
 
-    core::reduce<keepdims>(
+    // TODO: move batch outside of reduce,
+    // and add escape when out is initialized and already false.
+    .core::reduce<keepdims>(
         [&](auto &&...elems) {
             core::batch_with_broadcast<backend>(
                 [](auto &&in_u, auto &&out_u, auto &&init_u, auto &&where_u) {
@@ -5583,6 +5585,8 @@ template <typename dtype = bool, bool keepdims = false,
 
     auto init = full_like<bool>(out_md, false);
 
+    // TODO: move batch outside of reduce,
+    // and add escape when out is initialized and already true.
     core::reduce<keepdims>(
         [&](auto &&...elems) {
             core::batch_with_broadcast<backend>(
