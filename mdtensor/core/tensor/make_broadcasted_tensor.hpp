@@ -176,7 +176,7 @@ resolve_broadcasted_output(auto &&out, std::index_sequence<uranks...>,
                 std::forward<decltype(ins)>(ins)...);
 
         } else {
-            const auto out_md =
+            const auto out_mds =
                 to_output_mdspan(std::forward<decltype(out)>(out));
 
             // TODO: check same extents with expected extents
@@ -184,7 +184,7 @@ resolve_broadcasted_output(auto &&out, std::index_sequence<uranks...>,
             // is not void
             // TODO: use resolve_output.
 
-            return out_md;
+            return out_mds;
         }
     }
 }
