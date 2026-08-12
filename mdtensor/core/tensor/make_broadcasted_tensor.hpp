@@ -180,6 +180,9 @@ resolve_broadcasted_output(auto &&out, std::index_sequence<uranks...>,
                 to_output_mdspan(std::forward<decltype(out)>(out));
 
             // TODO: check same extents with expected extents
+            // TODO: check out_md type is enough precision for dtype, if dtype
+            // is not void
+            // TODO: use resolve_output.
 
             return out_md;
         }

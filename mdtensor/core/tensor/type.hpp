@@ -15,6 +15,7 @@ namespace mdtensor::core {
 
 using bool_value_t = std::int8_t;
 
+// TODO: develop tensor to wrapping class and support operations, iostream, etc.
 template <typename value_t, extents_c extent_t>
 using tensor = std::conditional_t<
     extent_t::rank() == 0, value_t,
