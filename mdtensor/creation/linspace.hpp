@@ -37,26 +37,26 @@ constexpr void linspace_ufunc(auto &&start, auto &&stop, auto &&out,
 
     } else if (num == 1) {
         if (!endpoint) {
-            static_cast<void>(
-                copy(start_mds, core::submdspan_from_left(out_mds)));
+            static_cast<void>(copy<value_t, backend>(
+                start_mds, core::submdspan_from_left(out_mds, 0)));
 
         } else {
-            static_cast<void>(
-                copy(stop_mds, core::submdspan_from_left(out_mds)));
+            static_cast<void>(copy<value_t, backend>(
+                stop_mds, core::submdspan_from_left(out_mds, 0)));
         }
 
     } else {
         const value_t scale = value_t{1} / (endpoint ? num - 1 : num);
 
-        const auto step = multiply<value_t, backend>(
+        const auto actual_step = multiply<value_t, backend>(
             subtract<value_t, backend>(stop_mds, start_mds), scale);
 
-        static_cast<void>(copy(start_mds, out_mds));
+        static_cast<void>(
+            copy(start_mds, core::submdspan_from_left(out_mds, 0)));
 
         for (index_t i = 1; i < num; i++) {
             static_cast<void>(add<void, backend>(
-                core::submdspan_from_left(out_mds, i),
-                multiply<value_t, backend>(step, static_cast<value_t>(i)),
+                core::submdspan_from_left(out_mds, i - 1), actual_step,
                 core::submdspan_from_left(out_mds, i)));
         }
 
@@ -92,13 +92,14 @@ template <std::int64_t axis = 0, typename dtype = void,
         static_cast<std::size_t>(core::bounding_index(axis, bexts.rank()));
     constexpr std::size_t out_urank = bexts.rank() + 1 - baxis;
 
-    auto out_md =
-        core::resolve_output<core::output_value_t<dtype, decltype(start_bcast),
-                                                  decltype(stop_bcast)>>(
-            std::forward<decltype(out)>(out),
-            core::compose_extents(
-                core::slice_extents_from_left<baxis>(bexts), exts,
-                core::slice_extents_from_right<out_urank - 1>(bexts)));
+    using value_t = core::output_value_t<dtype, decltype(start_bcast),
+                                         decltype(stop_bcast)>;
+
+    auto out_md = core::resolve_output<value_t>(
+        std::forward<decltype(out)>(out),
+        core::compose_extents(
+            core::slice_extents_from_left<baxis>(bexts), exts,
+            core::slice_extents_from_right<out_urank - 1>(bexts)));
 
     core::batch_with_broadcast<backend>(
         [&](auto &&...elems) {
