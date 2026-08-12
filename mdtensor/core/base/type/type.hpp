@@ -29,9 +29,8 @@
 #include <vector>
 
 #include "arithmetic.hpp"
-#include "common_arithmetic_type.hpp"
-#include "common_integral_type.hpp"
+#include "common_arithmetic.hpp"
+#include "common_integral.hpp"
 #include "concept.hpp"
-#include "filtered_common_arithmetic_type.hpp"
 #include "kokkos.hpp"
 #include "null.hpp"

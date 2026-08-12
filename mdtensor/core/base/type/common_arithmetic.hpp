@@ -12,7 +12,7 @@
 #include <cstdint>
 #include <type_traits>
 
-#include "common_integral_type.hpp"
+#include "common_integral.hpp"
 
 namespace mdtensor::core {
 namespace detail {

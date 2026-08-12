@@ -10,63 +10,10 @@
 #pragma once
 
 #include "../broadcast/broadcast.hpp"
-#include "type.hpp"
+#include "make_tensor.hpp"
+#include "output_value_type.hpp"
 
 namespace mdtensor::core {
-namespace detail {
-
-template <typename dtype, typename... Ts> struct output_value {
-    using type = dtype;
-};
-
-template <typename... Ts> struct output_value<void, Ts...> {
-    using type = core::common_arithmetic_type_t<
-        typename std::remove_cvref_t<to_mdspan_t<Ts>>::value_type...>;
-};
-
-template <typename dtype, typename Tuple> struct output_value_from_tuple;
-
-template <typename dtype, typename... Ts>
-struct output_value_from_tuple<dtype, std::tuple<Ts...>>
-    : output_value<dtype, Ts...> {};
-} // namespace detail
-
-template <typename dtype, typename... Ts>
-using output_value_t = typename detail::output_value<dtype, Ts...>::type;
-
-namespace detail {
-
-template <typename T> struct unwrap_optional {
-    using type = std::remove_cvref_t<T>;
-};
-
-template <typename T> struct unwrap_optional<std::optional<T>> {
-    using type = std::remove_cvref_t<T>;
-};
-
-template <typename... Ts> struct filter_nullopt;
-
-template <> struct filter_nullopt<> {
-    using type = std::tuple<>;
-};
-
-template <typename T, typename... Ts> struct filter_nullopt<T, Ts...> {
-  private:
-    using arg_t = typename unwrap_optional<std::remove_cvref_t<T>>::type;
-    using tail_t = typename filter_nullopt<Ts...>::type;
-
-  public:
-    using type = std::conditional_t<
-        std::same_as<std::remove_cvref_t<T>, std::nullopt_t>, tail_t,
-        decltype(std::tuple_cat(std::declval<std::tuple<arg_t>>(),
-                                std::declval<tail_t>()))>;
-};
-
-} // namespace detail
-
-template <typename dtype, typename... Ts>
-using output_value_with_nullopt_t = typename detail::output_value_from_tuple<
-    dtype, typename detail::filter_nullopt<Ts...>::type>::type;
 
 template <typename dtype = void, std::size_t... uranks, extents_c uout_exts_t>
 [[nodiscard]] constexpr auto
@@ -146,61 +93,5 @@ template <typename dtype = void>
             std::forward<decltype(ins)>(ins)...);
     }(std::make_index_sequence<sizeof...(ins)>{});
 }
-
-template <typename dtype = void, bool floating = false, std::size_t... uranks,
-          extents_c uout_exts_t>
-[[nodiscard]] constexpr auto
-resolve_broadcasted_output(auto &&out, std::index_sequence<uranks...>,
-                           uout_exts_t &&uout_exts, auto &&...ins) {
-    if constexpr (floating) {
-        // Ensure that the output type is at least float precision
-        using value_t = core::output_value_t<dtype, float, decltype(ins)...>;
-
-        const auto out_md = resolve_broadcasted_output<value_t, false>(
-            std::forward<decltype(out)>(out), std::index_sequence<uranks...>{},
-            std::forward<uout_exts_t>(uout_exts),
-            std::forward<decltype(ins)>(ins)...);
-
-        // Check that resolved output type is at least float precision
-        static_assert(core::floating_point_c<
-                          typename to_mdspan_t<decltype(out_md)>::value_type>,
-                      "Resolved output type must be at least float precision.");
-
-        return out_md;
-
-    } else {
-        if constexpr (core::nullopt_t_c<decltype(out)>) {
-            return make_broadcasted_tensor<dtype>(
-                std::index_sequence<uranks...>{},
-                std::forward<uout_exts_t>(uout_exts),
-                std::forward<decltype(ins)>(ins)...);
-
-        } else {
-            const auto out_mds =
-                to_output_mdspan(std::forward<decltype(out)>(out));
-
-            // TODO: check same extents with expected extents
-            // TODO: check out_md type is enough precision for dtype, if dtype
-            // is not void
-            // TODO: use resolve_output.
-
-            return out_mds;
-        }
-    }
-}
-
-template <typename dtype = void, bool floating = false, extents_c uout_exts_t>
-[[nodiscard]] constexpr auto
-resolve_broadcasted_output(auto &&out, uout_exts_t &&uout_exts, auto &&...ins) {
-    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        return resolve_broadcasted_output<dtype, floating>(
-            std::forward<decltype(out)>(out),
-            std::index_sequence<((void)Is, 0)...>{},
-            std::forward<uout_exts_t>(uout_exts),
-            std::forward<decltype(ins)>(ins)...);
-    }(std::make_index_sequence<sizeof...(ins)>{});
-}
-
-// TODO: develop resolve_broadcasted_outputs
 
 } // namespace mdtensor::core
