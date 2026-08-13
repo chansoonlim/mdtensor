@@ -22,15 +22,13 @@ constexpr void clip_ufunc(auto &&in, auto &&min, auto &&max, auto &&out) {
     out = in;
 
     if constexpr (!core::nullopt_t_c<decltype(min)>) {
-        using common_t =
-            core::common_arithmetic_type_t<decltype(out), decltype(min)>;
+        using common_t = core::promote_type_t<decltype(out), decltype(min)>;
 
         out = std::max(static_cast<common_t>(out), static_cast<common_t>(min));
     }
 
     if constexpr (!core::nullopt_t_c<decltype(max)>) {
-        using common_t =
-            core::common_arithmetic_type_t<decltype(out), decltype(max)>;
+        using common_t = core::promote_type_t<decltype(out), decltype(max)>;
 
         out = std::min(static_cast<common_t>(out), static_cast<common_t>(max));
     }

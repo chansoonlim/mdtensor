@@ -11,11 +11,10 @@
 
 #include <concepts>
 #include <cstdint>
+#include <optional>
 #include <type_traits>
 
-#include "arithmetic.hpp"
 #include "kokkos.hpp"
-#include "null.hpp"
 
 namespace mdtensor::core {
 
@@ -24,7 +23,7 @@ namespace mdtensor::core {
 ///////////////////////////////////////////////////////////////////////
 
 template <typename T>
-concept bool_c = is_bool_v<std::remove_cvref_t<T>>;
+concept bool_c = std::is_same_v<std::remove_cvref_t<T>, bool>;
 
 template <typename T>
 concept integral_c = std::is_integral_v<std::remove_cvref_t<T>>;
@@ -42,8 +41,20 @@ concept arithmetic_c = arithmetic<std::remove_cvref_t<T>>;
 ///////// nullopt_t concept ///////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////
 
+namespace detail {
+
+template <typename T> struct is_nullopt_impl : std::false_type {};
+
+template <> struct is_nullopt_impl<std::nullopt_t> : std::true_type {};
+
+template <typename T> struct is_nullopt_t : is_nullopt_impl<T> {};
+
+template <typename T> constexpr bool is_nullopt_t_v = is_nullopt_t<T>::value;
+
+} // namespace detail
+
 template <typename T>
-concept nullopt_t_c = is_nullopt_t_v<std::remove_cvref_t<T>>;
+concept nullopt_t_c = detail::is_nullopt_t_v<std::remove_cvref_t<T>>;
 
 ///////////////////////////////////////////////////////////////////////
 ///////// integer_sequence concept ////////////////////////////////////

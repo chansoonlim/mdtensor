@@ -40,8 +40,7 @@ template <typename dtype = void, bool floating = false, extents_c exts_t>
         using calc_t = core::calc_type_t<dtype, value_t>;
 
         static_assert(
-            std::same_as<core::common_arithmetic_type_t<calc_t, value_t>,
-                         value_t>,
+            std::same_as<core::promote_type_t<calc_t, value_t>, value_t>,
             "Resolved output type must not be less precise than desired.");
 
         static_assert(

@@ -83,8 +83,8 @@ template <core::mdspan_c in1_t, core::mdspan_c in2_t, core::mdspan_c out_t>
              core::eigen::eigen_mappable_c<out_t>)
 inline void matmul_ufunc_eigen(const in1_t &in1, const in2_t &in2,
                                const out_t &out) {
-    using value_t = core::common_arithmetic_type_t<typename in1_t::value_type,
-                                                   typename in2_t::value_type>;
+    using value_t = core::promote_type_t<typename in1_t::value_type,
+                                         typename in2_t::value_type>;
 
     const auto ein1 = core::eigen::to_eigen(in1);
     const auto ein2 = core::eigen::to_eigen(in2);

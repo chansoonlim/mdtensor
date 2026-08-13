@@ -42,8 +42,7 @@ constexpr void minimum_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
         }
     }
 
-    using common_t =
-        core::common_arithmetic_type_t<decltype(in1), decltype(in2)>;
+    using common_t = core::promote_type_t<decltype(in1), decltype(in2)>;
 
     out = std::min(static_cast<common_t>(in1), static_cast<common_t>(in2));
 }

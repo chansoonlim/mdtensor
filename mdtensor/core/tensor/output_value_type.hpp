@@ -86,7 +86,7 @@ template <typename... Ts>
     requires(sizeof...(Ts) > 0 &&
              (std::is_arithmetic_v<std::remove_cvref_t<Ts>> && ...))
 struct choose_dtype_or<void, Ts...> {
-    using type = core::common_arithmetic_type_t<std::remove_cvref_t<Ts>...>;
+    using type = core::promote_type_t<std::remove_cvref_t<Ts>...>;
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -111,10 +111,9 @@ using calc_type_t = typename detail::get_value_from_filter<
 
 template <typename dtype, typename... Ts>
 using signed_calc_type_t =
-    common_arithmetic_type_t<calc_type_t<dtype, Ts...>, std::int8_t>;
+    promote_type_t<calc_type_t<dtype, Ts...>, std::int8_t>;
 
 template <typename dtype, typename... Ts>
-using floating_calc_type_t =
-    common_arithmetic_type_t<calc_type_t<dtype, Ts...>, float>;
+using floating_calc_type_t = promote_type_t<calc_type_t<dtype, Ts...>, float>;
 
 } // namespace mdtensor::core

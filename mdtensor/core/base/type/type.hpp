@@ -28,9 +28,6 @@
 #include <utility>
 #include <vector>
 
-#include "arithmetic.hpp"
-#include "common_arithmetic.hpp"
-#include "common_integral.hpp"
 #include "concept.hpp"
 #include "kokkos.hpp"
-#include "null.hpp"
+#include "promote.hpp"

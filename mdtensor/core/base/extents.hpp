@@ -130,8 +130,8 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
         return false;
     }
 
-    using index_t = core::common_integral_type_t<typename base1_t::index_type,
-                                                 typename base2_t::index_type>;
+    using index_t = std::common_type_t<typename base1_t::index_type,
+                                       typename base2_t::index_type>;
 
     for (std::size_t i = 0; i < base1_t::rank(); i++) {
         if (static_cast<index_t>(in1.extent(i)) !=
@@ -177,8 +177,8 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
                                              ins_t &&...ins) noexcept {
     using base1_t = std::remove_cvref_t<in1_t>;
     using base2_t = std::remove_cvref_t<in2_t>;
-    using index_t = core::common_integral_type_t<typename base1_t::index_type,
-                                                 typename base2_t::index_type>;
+    using index_t = std::common_type_t<typename base1_t::index_type,
+                                       typename base2_t::index_type>;
 
     const auto cexts =
         [&]<std::size_t... Is, std::size_t... Js>(std::index_sequence<Is...>,
