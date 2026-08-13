@@ -76,7 +76,7 @@ template <std::floating_point value_t = double,
 [[nodiscard]] constexpr auto rand(shape_t &&shape = shape_t{},
                                   out_t &&out = out_t{std::nullopt},
                                   const seed_t seed = make_random_seed()) {
-    auto out_md = core::resolve_output<value_t, true>(
+    auto out_md = core::resolve_output<value_t>(
         std::forward<decltype(out)>(out),
         core::to_extents(std::forward<decltype(shape)>(shape)));
 

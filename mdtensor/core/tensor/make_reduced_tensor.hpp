@@ -29,12 +29,12 @@ template <typename value_t, std::size_t size>
 
 } // namespace detail
 
-template <typename dtype = void, bool keepdims = false, std::integral axes_t,
-          axes_t... axes, std::size_t... uranks, extents_c uout_exts_t>
+template <bool keepdims = false, std::integral axes_t, axes_t... axes,
+          std::size_t... uranks, extents_c uout_exts_t>
 [[nodiscard]] constexpr auto
-make_reduced_tensor(std::integer_sequence<axes_t, axes...>,
-                    std::index_sequence<uranks...>, uout_exts_t &&uout_exts,
-                    auto &&...ins) {
+make_reduced_extents(std::integer_sequence<axes_t, axes...>,
+                     std::index_sequence<uranks...>, uout_exts_t &&uout_exts,
+                     auto &&...ins) {
     static_assert(sizeof...(ins) > 0, "At least one input must be provided.");
     static_assert(sizeof...(uranks) == sizeof...(ins),
                   "Number of uranks must match number of inputs.");
@@ -103,11 +103,23 @@ make_reduced_tensor(std::integer_sequence<axes_t, axes...>,
         }
     }();
 
-    // generate out
+    return compose_extents(out_bexts, std::forward<uout_exts_t>(uout_exts));
+}
+
+template <typename dtype = void, bool keepdims = false, std::integral axes_t,
+          axes_t... axes, std::size_t... uranks, extents_c uout_exts_t>
+[[nodiscard]] constexpr auto
+make_reduced_tensor(std::integer_sequence<axes_t, axes...>,
+                    std::index_sequence<uranks...>, uout_exts_t &&uout_exts,
+                    auto &&...ins) {
     using value_t = calc_type_t<dtype, decltype(ins)...>;
 
-    return make_tensor<value_t>(
-        compose_extents(out_bexts, std::forward<uout_exts_t>(uout_exts)));
+    const auto out_exts = make_reduced_extents<keepdims>(
+        std::integer_sequence<axes_t, axes...>{},
+        std::index_sequence<uranks...>{}, std::forward<uout_exts_t>(uout_exts),
+        std::forward<decltype(ins)>(ins)...);
+
+    return make_tensor<value_t>(out_exts);
 }
 
 template <typename dtype = void, bool keepdims = false, std::integral axes_t,

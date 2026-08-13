@@ -44,7 +44,7 @@ uniform(shape_t &&shape = shape_t{}, low_t &&low = low_t{0},
     const auto high_mds =
         core::to_const_mdspan(std::forward<decltype(high)>(high));
 
-    auto out_md = core::resolve_output<value_t, true>(
+    auto out_md = core::resolve_output<value_t>(
         std::forward<decltype(out)>(out),
         core::get_broadcast_extents(
             std::index_sequence<0, 0, 0>{},

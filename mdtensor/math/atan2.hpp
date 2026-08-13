@@ -45,7 +45,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     using calc_t =
         core::floating_calc_type_t<dtype, decltype(in1_mds), decltype(in2_mds)>;
 
-    auto out_md = core::resolve_broadcasted_output<calc_t, true>(
+    auto out_md = core::resolve_broadcasted_output<calc_t>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds);
 

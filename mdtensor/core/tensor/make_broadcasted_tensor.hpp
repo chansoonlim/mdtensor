@@ -15,6 +15,28 @@
 
 namespace mdtensor::core {
 
+template <std::size_t... uranks, extents_c uout_exts_t>
+[[nodiscard]] constexpr auto
+make_broadcasted_extents(std::index_sequence<uranks...>,
+                         uout_exts_t &&uout_exts, auto &&...ins) {
+    static_assert(sizeof...(uranks) == sizeof...(ins),
+                  "Number of uranks must match number of inputs.");
+
+    constexpr std::size_t ins_num = sizeof...(uranks);
+
+    if constexpr (ins_num == 0) {
+        return std::forward<uout_exts_t>(uout_exts);
+
+    } else {
+        // calculate broadcasted extents
+        const auto bexts = get_broadcast_extents(
+            std::index_sequence<uranks...>{},
+            to_const_mdspan(std::forward<decltype(ins)>(ins))...);
+
+        return compose_extents(bexts, std::forward<uout_exts_t>(uout_exts));
+    }
+}
+
 template <typename dtype = void, std::size_t... uranks, extents_c uout_exts_t>
 [[nodiscard]] constexpr auto
 make_broadcasted_tensor(std::index_sequence<uranks...>, uout_exts_t &&uout_exts,
@@ -30,13 +52,12 @@ make_broadcasted_tensor(std::index_sequence<uranks...>, uout_exts_t &&uout_exts,
     } else {
         using value_t = calc_type_t<dtype, decltype(ins)...>;
 
-        // calculate broadcasted extents
-        const auto bexts = get_broadcast_extents(
-            std::index_sequence<uranks...>{},
-            to_const_mdspan(std::forward<decltype(ins)>(ins))...);
+        const auto out_exts =
+            make_broadcasted_extents(std::index_sequence<uranks...>{},
+                                     std::forward<uout_exts_t>(uout_exts),
+                                     std::forward<decltype(ins)>(ins)...);
 
-        return make_tensor<value_t>(
-            compose_extents(bexts, std::forward<uout_exts_t>(uout_exts)));
+        return make_tensor<value_t>(out_exts);
     }
 }
 

@@ -22,7 +22,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
 
     using calc_t = core::floating_calc_type_t<dtype, decltype(in_mds)>;
 
-    auto out_md = core::resolve_output_like<calc_t, true>(
+    auto out_md = core::resolve_output_like<calc_t>(
         std::forward<decltype(out)>(out), in_mds);
 
     constexpr calc_t D2R = std::numbers::pi_v<calc_t> / calc_t{180};

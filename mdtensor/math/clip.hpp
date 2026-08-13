@@ -48,9 +48,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto max_mds =
         core::to_const_mdspan(std::forward<decltype(max)>(max));
 
-    using calc_t =
-        core::floating_calc_type_t<dtype, decltype(in_mds), decltype(min_mds),
-                                   decltype(max_mds)>;
+    using calc_t = core::calc_type_t<dtype, decltype(in_mds), decltype(min_mds),
+                                     decltype(max_mds)>;
 
     auto out_md = core::resolve_broadcasted_output<calc_t>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{}, in_mds,
