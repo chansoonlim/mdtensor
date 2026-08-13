@@ -67,216 +67,6 @@ namespace std::experimental {
 #include <utility>
 #include <vector>
 
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/arithmetic.hpp
-/**
- * @file
- * @brief Arithmetic type utilities for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
-#include <type_traits>
-
-namespace mdtensor::core {
-
-template <typename T> constexpr bool is_bool_v = std::is_same_v<T, bool>;
-
-template <typename T>
-constexpr bool is_non_bool_integral_v = std::is_integral_v<T> && !is_bool_v<T>;
-
-template <typename T>
-constexpr bool is_non_bool_unsigned_integral_v =
-    is_non_bool_integral_v<T> && std::is_unsigned_v<T>;
-
-template <typename T>
-constexpr bool is_non_bool_signed_integral_v =
-    is_non_bool_integral_v<T> && std::is_signed_v<T>;
-
-} // namespace mdtensor::core
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/arithmetic.hpp
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/common_arithmetic_type.hpp
-/**
- * @file
- * @brief Type utilities for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
-#include <cstdint>
-#include <type_traits>
-
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/common_integral_type.hpp
-/**
- * @file
- * @brief Common integral type utilities for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
-#include <cstdint>
-#include <type_traits>
-
-
-namespace mdtensor::core {
-namespace detail {
-
-template <std::size_t size> struct signed_by_size;
-
-template <> struct signed_by_size<1> {
-    using type = std::int8_t;
-};
-
-template <> struct signed_by_size<2> {
-    using type = std::int16_t;
-};
-
-template <> struct signed_by_size<4> {
-    using type = std::int32_t;
-};
-
-template <> struct signed_by_size<8> {
-    using type = std::int64_t;
-};
-
-template <typename... Ts> struct common_integral_type_impl {
-    // no type defined
-};
-
-template <typename T>
-    requires(std::is_integral_v<T>)
-struct common_integral_type_impl<T> {
-    // when one type is provided, use the type itself
-    using type = T;
-};
-
-template <typename B1, typename B2>
-    requires(is_bool_v<B1> && is_bool_v<B2>)
-struct common_integral_type_impl<B1, B2> {
-    // when two bool types are provided, use bool
-    using type = bool;
-};
-
-template <typename B, typename I>
-    requires(is_bool_v<B> && is_non_bool_integral_v<I>)
-struct common_integral_type_impl<B, I> {
-    // when one bool and one non-bool integral type are provided,
-    // use the non-bool integral type
-    using type = I;
-};
-
-template <typename I, typename B>
-    requires(is_non_bool_integral_v<I> && is_bool_v<B>)
-struct common_integral_type_impl<I, B> : common_integral_type_impl<B, I> {};
-
-template <typename I1, typename I2>
-    requires(is_non_bool_integral_v<I1> && is_non_bool_integral_v<I2> &&
-             std::is_signed_v<I1> == std::is_signed_v<I2>)
-struct common_integral_type_impl<I1, I2> {
-    // when two types with same signedness are provided,
-    // use the type with larger size
-    using type = std::conditional_t<(sizeof(I1) >= sizeof(I2)), I1, I2>;
-};
-
-template <typename S, typename U>
-    requires(is_non_bool_signed_integral_v<S> &&
-             is_non_bool_unsigned_integral_v<U> && sizeof(U) <= 4)
-struct common_integral_type_impl<S, U> {
-    // when one signed and one unsigned type are provided,
-    // use a signed type with size at least twice the size of the unsigned type
-    using type =
-        std::conditional_t<(sizeof(S) >= sizeof(U) * 2), S,
-                           typename signed_by_size<sizeof(U) * 2>::type>;
-};
-
-template <typename U, typename S>
-    requires(is_non_bool_unsigned_integral_v<U> &&
-             is_non_bool_signed_integral_v<S> && sizeof(U) <= 4)
-struct common_integral_type_impl<U, S> : common_integral_type_impl<S, U> {};
-
-template <typename T1, typename T2, typename... Ts>
-    requires(sizeof...(Ts) > 0 && (std::is_integral_v<Ts> && ...))
-struct common_integral_type_impl<T1, T2, Ts...> {
-    using type = typename common_integral_type_impl<
-        typename common_integral_type_impl<T1, T2>::type, Ts...>::type;
-};
-
-} // namespace detail
-
-template <typename... Ts>
-    requires(sizeof...(Ts) > 0 &&
-             (std::is_integral_v<std::remove_cvref_t<Ts>> && ...))
-using common_integral_type_t = typename detail::common_integral_type_impl<
-    std::remove_cvref_t<Ts>...>::type;
-
-} // namespace mdtensor::core
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/common_integral_type.hpp
-
-namespace mdtensor::core {
-namespace detail {
-
-template <typename... Ts> struct common_arithmetic_type_impl {
-    // no type defined
-};
-
-template <typename T>
-    requires(std::is_arithmetic_v<T>)
-struct common_arithmetic_type_impl<T> {
-    using type = T;
-};
-
-template <typename I1, typename I2>
-    requires(requires { typename common_integral_type_t<I1, I2>; })
-struct common_arithmetic_type_impl<I1, I2> {
-    // when two integral types are provided, use common_integral_type_t
-    using type = common_integral_type_t<I1, I2>;
-};
-
-template <typename I, typename F>
-    requires(std::is_integral_v<I> && std::is_floating_point_v<F>)
-struct common_arithmetic_type_impl<I, F> {
-    // when one integral and one floating-point type are provided,
-    // use the floating-point type
-    using type = F;
-};
-
-template <typename F, typename I>
-    requires(std::is_floating_point_v<F> && std::is_integral_v<I>)
-struct common_arithmetic_type_impl<F, I> : common_arithmetic_type_impl<I, F> {};
-
-template <typename F1, typename F2>
-    requires(std::is_floating_point_v<F1> && std::is_floating_point_v<F2>)
-struct common_arithmetic_type_impl<F1, F2> {
-    // when two floating-point types are provided, use the type with larger size
-    using type = std::conditional_t<(sizeof(F1) >= sizeof(F2)), F1, F2>;
-};
-
-template <typename T1, typename T2, typename... Ts>
-    requires(sizeof...(Ts) > 0 && std::is_arithmetic_v<T1> &&
-             std::is_arithmetic_v<T2> && (std::is_arithmetic_v<Ts> && ...))
-struct common_arithmetic_type_impl<T1, T2, Ts...> {
-    using type = typename common_arithmetic_type_impl<
-        typename common_arithmetic_type_impl<T1, T2>::type, Ts...>::type;
-};
-
-} // namespace detail
-
-template <typename... Ts>
-    requires(sizeof...(Ts) > 0 &&
-             (std::is_arithmetic_v<std::remove_cvref_t<Ts>> && ...))
-using common_arithmetic_type_t = typename detail::common_arithmetic_type_impl<
-    std::remove_cvref_t<Ts>...>::type;
-
-} // namespace mdtensor::core
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/common_arithmetic_type.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/concept.hpp
 /**
  * @file
@@ -290,6 +80,7 @@ using common_arithmetic_type_t = typename detail::common_arithmetic_type_impl<
 
 #include <concepts>
 #include <cstdint>
+#include <optional>
 #include <type_traits>
 
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/kokkos.hpp
@@ -354,36 +145,6 @@ using mdarray = stdex::mdarray<ElementType, Extents, LayoutPolicy, Container>;
 } // namespace core
 } // namespace mdtensor
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/kokkos.hpp
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/null.hpp
-/**
- * @file
- * @brief Nullopt type utilities for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
-#include <optional>
-#include <type_traits>
-
-namespace mdtensor::core {
-
-namespace detail {
-
-template <typename T> struct is_nullopt_impl : std::false_type {};
-
-template <> struct is_nullopt_impl<std::nullopt_t> : std::true_type {};
-
-} // namespace detail
-
-template <typename T> struct is_nullopt_t : detail::is_nullopt_impl<T> {};
-
-template <typename T> constexpr bool is_nullopt_t_v = is_nullopt_t<T>::value;
-
-} // namespace mdtensor::core
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/null.hpp
 
 namespace mdtensor::core {
 
@@ -392,20 +153,62 @@ namespace mdtensor::core {
 ///////////////////////////////////////////////////////////////////////
 
 template <typename T>
+concept bool_c = std::is_same_v<std::remove_cvref_t<T>, bool>;
+
+template <typename T>
 concept integral_c = std::is_integral_v<std::remove_cvref_t<T>>;
 
 template <typename T>
 concept floating_point_c = std::is_floating_point_v<std::remove_cvref_t<T>>;
 
 template <typename T>
-concept arithmetic_c = integral_c<T> || floating_point_c<T>;
+concept arithmetic = std::is_arithmetic_v<T>;
+
+template <typename T>
+concept arithmetic_c = arithmetic<std::remove_cvref_t<T>>;
 
 ///////////////////////////////////////////////////////////////////////
 ///////// nullopt_t concept ///////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////
 
+namespace detail {
+
+template <typename T> struct is_nullopt_impl : std::false_type {};
+
+template <> struct is_nullopt_impl<std::nullopt_t> : std::true_type {};
+
+template <typename T> struct is_nullopt_t : is_nullopt_impl<T> {};
+
+template <typename T> constexpr bool is_nullopt_t_v = is_nullopt_t<T>::value;
+
+} // namespace detail
+
 template <typename T>
-concept nullopt_t_c = is_nullopt_t_v<std::remove_cvref_t<T>>;
+concept nullopt_t_c = detail::is_nullopt_t_v<std::remove_cvref_t<T>>;
+
+///////////////////////////////////////////////////////////////////////
+///////// integer_sequence concept ////////////////////////////////////
+///////////////////////////////////////////////////////////////////////
+
+namespace detail {
+
+template <typename T> struct is_integer_sequence_impl : std::false_type {};
+
+template <typename T, T... Ints>
+struct is_integer_sequence_impl<std::integer_sequence<T, Ints...>>
+    : std::true_type {};
+
+template <typename T>
+struct is_integer_sequence : is_integer_sequence_impl<T> {};
+
+template <typename T>
+constexpr bool is_integer_sequence_v = is_integer_sequence<T>::value;
+
+} // namespace detail
+
+template <typename T>
+concept integer_sequence_c =
+    detail::is_integer_sequence_v<std::remove_cvref_t<T>>;
 
 ///////////////////////////////////////////////////////////////////////
 ///////// extents concept /////////////////////////////////////////////
@@ -419,7 +222,7 @@ template <typename IndexType, std::size_t... Extents>
 struct is_extents_impl<extents<IndexType, Extents...>> : std::true_type {};
 
 // NOTE: stdex::detail::__is_extents is not used for godbolt test compatibility
-template <typename T> struct is_extents : detail::is_extents_impl<T> {};
+template <typename T> struct is_extents : is_extents_impl<T> {};
 
 template <typename T> constexpr bool is_extents_v = is_extents<T>::value;
 
@@ -442,7 +245,7 @@ struct is_mdspan_impl<
     mdspan<ElementType, ExtentsType, LayoutType, AccessorType>>
     : std::true_type {};
 
-template <typename T> struct is_mdspan : detail::is_mdspan_impl<T> {};
+template <typename T> struct is_mdspan : is_mdspan_impl<T> {};
 
 template <typename T> constexpr bool is_mdspan_v = is_mdspan<T>::value;
 
@@ -476,10 +279,10 @@ concept mdarray_c = detail::is_mdarray_v<std::remove_cvref_t<T>>;
 
 } // namespace mdtensor::core
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/concept.hpp
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/filtered_common_arithmetic_type.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/promote.hpp
 /**
  * @file
- * @brief Type utilities for mdtensor.
+ * @brief Numpy-like type promotion for arithmetic types
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -487,182 +290,147 @@ concept mdarray_c = detail::is_mdarray_v<std::remove_cvref_t<T>>;
  */
 
 
-#include <tuple>
+#include <cstdint>
 #include <type_traits>
-
 
 namespace mdtensor::core {
 namespace detail {
 
-template <typename Tuple> struct common_arithmetic_type_from_tuple_impl;
-
-template <typename... Ts>
-    requires(sizeof...(Ts) > 0 &&
-             (std::is_arithmetic_v<std::remove_cvref_t<Ts>> && ...))
-struct common_arithmetic_type_from_tuple_impl<std::tuple<Ts...>>
-    : common_arithmetic_type_impl<Ts...> {};
-
-template <typename... Ts> struct nullopt_filter_impl {
-    // no type defined
-};
-
-template <> struct nullopt_filter_impl<> {
-    using type = std::tuple<>;
-};
-
-template <typename T, typename... Ts> struct nullopt_filter_impl<T, Ts...> {
-  private:
-    using arg_t = T;
-    using tail_t = typename nullopt_filter_impl<Ts...>::type;
-
-  public:
-    using type = std::conditional_t<is_nullopt_t_v<T>, tail_t,
-                                    decltype(std::tuple_cat(
-                                        std::declval<std::tuple<arg_t>>(),
-                                        std::declval<tail_t>()))>;
-};
+template <typename T> constexpr bool is_bool_v = std::is_same_v<T, bool>;
 
 template <typename T>
-constexpr bool is_arithmetic_or_nullopt_v =
-    std::is_arithmetic_v<T> || is_nullopt_t_v<T>;
+constexpr bool is_non_bool_integral_v = std::is_integral_v<T> && !is_bool_v<T>;
+
+template <typename T>
+constexpr bool is_non_bool_unsigned_integral_v =
+    is_non_bool_integral_v<T> && std::is_unsigned_v<T>;
+
+template <typename T>
+constexpr bool is_non_bool_signed_integral_v =
+    is_non_bool_integral_v<T> && std::is_signed_v<T>;
+
+template <std::size_t size> struct signed_by_size;
+
+template <> struct signed_by_size<1> {
+    using type = std::int8_t;
+};
+
+template <> struct signed_by_size<2> {
+    using type = std::int16_t;
+};
+
+template <> struct signed_by_size<4> {
+    using type = std::int32_t;
+};
+
+template <> struct signed_by_size<8> {
+    using type = std::int64_t;
+};
+
+template <typename... Ts> struct promote_type_impl;
+
+template <typename T>
+    requires(std::is_arithmetic_v<T>)
+struct promote_type_impl<T> {
+    using type = T;
+};
+
+template <typename B1, typename B2>
+    requires(is_bool_v<B1> && is_bool_v<B2>)
+struct promote_type_impl<B1, B2> {
+    // bool + bool -> bool
+    using type = bool;
+};
+
+template <typename B, typename I>
+    requires(is_bool_v<B> && is_non_bool_integral_v<I>)
+struct promote_type_impl<B, I> {
+    // any integral + bool -> long double
+    using type = I;
+};
+
+template <typename I, typename B>
+    requires(is_non_bool_integral_v<I> && is_bool_v<B>)
+struct promote_type_impl<I, B> : promote_type_impl<B, I> {};
+
+template <typename I1, typename I2>
+    requires(is_non_bool_integral_v<I1> && is_non_bool_integral_v<I2> &&
+             std::is_signed_v<I1> == std::is_signed_v<I2>)
+struct promote_type_impl<I1, I2> {
+    using type = std::common_type_t<I1, I2>;
+};
+
+template <typename S, typename U>
+    requires(is_non_bool_signed_integral_v<S> &&
+             is_non_bool_unsigned_integral_v<U> && sizeof(U) <= 4)
+struct promote_type_impl<S, U> {
+    // when one signed and one unsigned type are provided,
+    // use a signed type with size at least twice the size of the unsigned type
+    using type =
+        std::conditional_t<(sizeof(S) >= sizeof(U) * 2), S,
+                           typename signed_by_size<sizeof(U) * 2>::type>;
+};
+
+template <typename S, typename U>
+    requires(is_non_bool_signed_integral_v<S> &&
+             is_non_bool_unsigned_integral_v<U> && sizeof(U) > 4)
+struct promote_type_impl<S, U> {
+    // promote to double when unsigned is 32-bit and signed is less than 64-bit
+    using type = double;
+};
+
+template <typename U, typename S>
+    requires(is_non_bool_unsigned_integral_v<U> &&
+             is_non_bool_signed_integral_v<S>)
+struct promote_type_impl<U, S> : promote_type_impl<S, U> {};
+
+template <typename I, typename F>
+    requires(std::is_integral_v<I> && std::is_floating_point_v<F>)
+struct promote_type_impl<I, F> {
+    // bool/int8/uint8/int16/uint16 + float       -> float
+    // int32/uint32/int64/uint64    + float       -> double
+    // any integral                 + double      -> double
+    // any integral                 + long double -> long double
+    static constexpr bool promote_float_to_double =
+        std::is_same_v<F, float> &&
+        (std::numeric_limits<I>::digits > std::numeric_limits<float>::digits);
+
+  public:
+    using type = std::conditional_t<promote_float_to_double, double, F>;
+};
+
+template <typename F, typename I>
+    requires(std::is_floating_point_v<F> && std::is_integral_v<I>)
+struct promote_type_impl<F, I> : promote_type_impl<I, F> {};
+
+template <typename F1, typename F2>
+    requires(std::is_floating_point_v<F1> && std::is_floating_point_v<F2>)
+struct promote_type_impl<F1, F2> {
+    using type = std::common_type_t<F1, F2>;
+};
+
+template <typename T1, typename T2, typename... Ts>
+    requires(sizeof...(Ts) > 0 && std::is_arithmetic_v<T1> &&
+             std::is_arithmetic_v<T2> && (std::is_arithmetic_v<Ts> && ...))
+struct promote_type_impl<T1, T2, Ts...> {
+    using type =
+        typename promote_type_impl<typename promote_type_impl<T1, T2>::type,
+                                   Ts...>::type;
+};
 
 } // namespace detail
 
+// NOTE: promote_type_t follows numpy's type promotion rules
 template <typename... Ts>
     requires(sizeof...(Ts) > 0 &&
-             (detail::is_arithmetic_or_nullopt_v<std::remove_cvref_t<Ts>> &&
-              ...))
-using filtered_common_arithmetic_type_t =
-    typename detail::common_arithmetic_type_from_tuple_impl<
-        typename detail::nullopt_filter_impl<
-            std::remove_cvref_t<Ts>...>::type>::type;
+             (std::is_arithmetic_v<std::remove_cvref_t<Ts>> && ...))
+using promote_type_t =
+    typename detail::promote_type_impl<std::remove_cvref_t<Ts>...>::type;
 
 } // namespace mdtensor::core
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/filtered_common_arithmetic_type.hpp
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/promote.hpp
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/type.hpp
 
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/expect.hpp
-/**
- * @file
- * @brief Expect type traits for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/mdspan.hpp
-/**
- * @file
- * @brief Mdspan utilities for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
-
-namespace mdtensor::core {
-
-[[nodiscard]] constexpr auto to_mdspan(auto &&io) {
-    if constexpr (mdspan_c<decltype(io)>) {
-        // If the input is already an mdspan, just return it as-is
-        return std::forward<decltype(io)>(io);
-
-    } else if constexpr (requires { io.to_mdspan(); }) {
-        // If the input has a to_mdspan() member function, call it
-        return io.to_mdspan();
-
-    } else {
-        // If the input is not an mdspan,
-        // create a new mdspan that points to the input data
-        using element_t = std::remove_reference_t<decltype(io)>;
-        using extents_t = extents<std::uint8_t>;
-
-        return mdspan<element_t, extents_t>{std::addressof(io), extents_t{}};
-    }
-}
-
-[[nodiscard]] constexpr auto to_const_mdspan(auto &&in) {
-    if constexpr (mdspan_c<decltype(in)>) {
-        if constexpr (std::is_const_v<typename std::remove_reference_t<
-                          decltype(in)>::element_type>) {
-            // If the input is already a const mdspan, just return it as-is
-            return std::forward<decltype(in)>(in);
-
-        } else {
-            // If the input is a non-const mdspan,
-            // create a new const mdspan with the same data handle and mapping
-            using in_t = std::remove_cvref_t<decltype(in)>;
-
-            return mdspan<
-                const typename in_t::value_type, typename in_t::extents_type,
-                typename in_t::layout_type,
-                stdex::default_accessor<const typename in_t::value_type>>(
-                in.data_handle(), in.mapping(), {});
-        }
-
-    } else {
-        // If the input is not an mdspan,
-        // create a new const mdspan with the same data handle and mapping
-        auto mds = to_mdspan(std::forward<decltype(in)>(in));
-
-        using mds_t = std::remove_cvref_t<decltype(mds)>;
-
-        return mdspan<
-            const typename mds_t::value_type, typename mds_t::extents_type,
-            typename mds_t::layout_type,
-            stdex::default_accessor<const typename mds_t::value_type>>(
-            mds.data_handle(), mds.mapping(), {});
-    }
-}
-
-[[nodiscard]] constexpr auto to_output_mdspan(auto &&out) {
-    if constexpr (mdspan_c<decltype(out)>) {
-        static_assert(
-            !std::is_const_v<
-                typename std::remove_reference_t<decltype(out)>::element_type>,
-            "Output mdspan must not be const");
-
-        // If the output is already an mdspan, just return it as-is
-        return std::forward<decltype(out)>(out);
-
-    } else {
-        static_assert(std::is_lvalue_reference_v<decltype(out)>,
-                      "Output owners and scalars must be passed as lvalues.");
-
-        return to_mdspan(std::forward<decltype(out)>(out));
-    }
-}
-
-template <mdspan_c io_t>
-[[nodiscard]] constexpr decltype(auto) unwrap_scalar(io_t &&io) {
-    using base_t = std::remove_cvref_t<io_t>;
-
-    if constexpr (base_t::rank() == 0) {
-        return std::forward<io_t>(io)();
-
-    } else {
-        return std::forward<io_t>(io);
-    }
-}
-
-} // namespace mdtensor::core
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/mdspan.hpp
-
-namespace mdtensor::core {
-
-template <typename T>
-using to_mdspan_t = decltype(to_mdspan(std::declval<T>()));
-
-template <typename... Ts>
-using common_value_type_t = core::common_arithmetic_type_t<
-    typename std::remove_cvref_t<to_mdspan_t<Ts>>::value_type...>;
-
-} // namespace mdtensor::core
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/expect.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/extents.hpp
 /**
  * @file
@@ -794,8 +562,8 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
         return false;
     }
 
-    using index_t = core::common_integral_type_t<typename base1_t::index_type,
-                                                 typename base2_t::index_type>;
+    using index_t = std::common_type_t<typename base1_t::index_type,
+                                       typename base2_t::index_type>;
 
     for (std::size_t i = 0; i < base1_t::rank(); i++) {
         if (static_cast<index_t>(in1.extent(i)) !=
@@ -841,8 +609,8 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
                                              ins_t &&...ins) noexcept {
     using base1_t = std::remove_cvref_t<in1_t>;
     using base2_t = std::remove_cvref_t<in2_t>;
-    using index_t = core::common_integral_type_t<typename base1_t::index_type,
-                                                 typename base2_t::index_type>;
+    using index_t = std::common_type_t<typename base1_t::index_type,
+                                       typename base2_t::index_type>;
 
     const auto cexts =
         [&]<std::size_t... Is, std::size_t... Js>(std::index_sequence<Is...>,
@@ -950,6 +718,105 @@ expand_extents_dims(in_t &&in, std::integer_sequence<axes_t, axes...>) {
 
 } // namespace mdtensor::core
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/extents.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/mdspan.hpp
+/**
+ * @file
+ * @brief Mdspan utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor::core {
+
+[[nodiscard]] constexpr auto to_mdspan(auto &&io) {
+    if constexpr (mdspan_c<decltype(io)>) {
+        // If the input is already an mdspan, just return it as-is
+        return std::forward<decltype(io)>(io);
+
+    } else if constexpr (requires { io.to_mdspan(); }) {
+        // If the input has a to_mdspan() member function, call it
+        return io.to_mdspan();
+
+    } else {
+        // If the input is not an mdspan,
+        // create a new mdspan that points to the input data
+        using element_t = std::remove_reference_t<decltype(io)>;
+        using extents_t = extents<std::uint8_t>;
+
+        return mdspan<element_t, extents_t>{std::addressof(io), extents_t{}};
+    }
+}
+
+[[nodiscard]] constexpr auto to_const_mdspan(auto &&in) {
+    if constexpr (mdspan_c<decltype(in)>) {
+        if constexpr (std::is_const_v<typename std::remove_reference_t<
+                          decltype(in)>::element_type>) {
+            // If the input is already a const mdspan, just return it as-is
+            return std::forward<decltype(in)>(in);
+
+        } else {
+            // If the input is a non-const mdspan,
+            // create a new const mdspan with the same data handle and mapping
+            using in_t = std::remove_cvref_t<decltype(in)>;
+
+            return mdspan<
+                const typename in_t::value_type, typename in_t::extents_type,
+                typename in_t::layout_type,
+                stdex::default_accessor<const typename in_t::value_type>>(
+                in.data_handle(), in.mapping(), {});
+        }
+
+    } else {
+        // If the input is not an mdspan,
+        // create a new const mdspan with the same data handle and mapping
+        auto mds = to_mdspan(std::forward<decltype(in)>(in));
+
+        using mds_t = std::remove_cvref_t<decltype(mds)>;
+
+        return mdspan<
+            const typename mds_t::value_type, typename mds_t::extents_type,
+            typename mds_t::layout_type,
+            stdex::default_accessor<const typename mds_t::value_type>>(
+            mds.data_handle(), mds.mapping(), {});
+    }
+}
+
+[[nodiscard]] constexpr auto to_output_mdspan(auto &&out) {
+    if constexpr (mdspan_c<decltype(out)>) {
+        static_assert(
+            !std::is_const_v<
+                typename std::remove_reference_t<decltype(out)>::element_type>,
+            "Output mdspan must not be const");
+
+        // If the output is already an mdspan, just return it as-is
+        return std::forward<decltype(out)>(out);
+
+    } else {
+        static_assert(std::is_lvalue_reference_v<decltype(out)>,
+                      "Output owners and scalars must be passed as lvalues.");
+
+        return to_mdspan(std::forward<decltype(out)>(out));
+    }
+}
+
+template <mdspan_c io_t>
+[[nodiscard]] constexpr decltype(auto) unwrap_scalar(io_t &&io) {
+    using base_t = std::remove_cvref_t<io_t>;
+
+    if constexpr (base_t::rank() == 0) {
+        return std::forward<io_t>(io)();
+
+    } else {
+        return std::forward<io_t>(io);
+    }
+}
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/mdspan.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/submdspan.hpp
 /**
  * @file
@@ -1011,6 +878,51 @@ template <std::size_t rspace = 0>
 
 } // namespace mdtensor::core
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/submdspan.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/tensor.hpp
+/**
+ * @file
+ * @brief Make tensor utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor::core {
+
+using bool_value_t = std::int8_t;
+
+// TODO: develop tensor to wrapping class and support operations, iostream, etc.
+template <typename value_t, extents_c extent_t>
+using tensor = std::conditional_t<
+    extent_t::rank() == 0, value_t,
+    std::conditional_t<
+        extent_t::rank_dynamic() == 0,
+        core::mdarray<value_t, extent_t, stdex::layout_right,
+                      std::array<value_t, core::extents_size(extent_t{})>>,
+        std::conditional_t<
+            std::is_same_v<value_t, bool>,
+            core::mdarray<bool_value_t, extent_t, stdex::layout_right,
+                          std::vector<bool_value_t>>,
+            core::mdarray<value_t, extent_t, stdex::layout_right,
+                          std::vector<value_t>>>>>;
+
+template <typename value_t = double, extents_c exts_t>
+[[nodiscard]] constexpr auto make_tensor(exts_t &&exts) {
+    using base_t = std::remove_cvref_t<decltype(exts)>;
+
+    if constexpr (base_t::rank() == 0) {
+        return tensor<value_t, base_t>{};
+
+    } else {
+        return tensor<value_t, base_t>{std::forward<exts_t>(exts)};
+    }
+}
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/tensor.hpp
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/base.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/broadcast/broadcast.hpp
 /**
@@ -1137,8 +1049,8 @@ template <extents_c... ins_t>
     static_assert(sizeof...(ins) > 0,
                   "At least one extents must be provided for broadcasting.");
 
-    using index_t = core::common_integral_type_t<
-        typename std::remove_cvref_t<ins_t>::index_type...>;
+    using index_t =
+        std::common_type_t<typename std::remove_cvref_t<ins_t>::index_type...>;
 
     constexpr std::size_t brank = std::max({ins.rank()...});
 
@@ -1215,8 +1127,7 @@ namespace mdtensor::core {
     } else {
         using index_t = typename exts_t::index_type;
         using cindex_t =
-            core::common_integral_type_t<typename in_mds_t::index_type,
-                                         index_t>;
+            std::common_type_t<typename in_mds_t::index_type, index_t>;
 
         // ni = new_rank - org_rank + oi
         const auto get_ni = [](std::size_t i) {
@@ -1344,6 +1255,21 @@ template <std::size_t... uranks, bool... bcast>
         bexts);
 }
 
+template <std::size_t... uranks, bool... bcast>
+[[nodiscard]] constexpr bool
+can_broadcast(std::index_sequence<uranks...>,
+              std::integer_sequence<bool, bcast...>, auto &&...ios) {
+    try {
+        static_cast<void>(broadcast(std::index_sequence<uranks...>{},
+                                    std::integer_sequence<bool, bcast...>{},
+                                    std::forward<decltype(ios)>(ios)...));
+        return true;
+
+    } catch (const std::exception &e) {
+        return false;
+    }
+}
+
 } // namespace mdtensor::core
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/broadcast/bcast.hpp
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/broadcast/broadcast.hpp
@@ -1402,10 +1328,10 @@ template <std::size_t... uranks, bool... bcast>
  */
 
 
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/type.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/output_value_type.hpp
 /**
  * @file
- * @brief Tensor type utilities for mdtensor.
+ * @brief Make tensor utilities for mdtensor.
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -1416,81 +1342,135 @@ template <std::size_t... uranks, bool... bcast>
 
 namespace mdtensor::core {
 
-using bool_value_t = std::int8_t;
-
-// TODO: develop tensor to wrapping class and support operations, iostream, etc.
-template <typename value_t, extents_c extent_t>
-using tensor = std::conditional_t<
-    extent_t::rank() == 0, value_t,
-    std::conditional_t<
-        extent_t::rank_dynamic() == 0,
-        core::mdarray<value_t, extent_t, stdex::layout_right,
-                      std::array<value_t, core::extents_size(extent_t{})>>,
-        std::conditional_t<
-            std::is_same_v<value_t, bool>,
-            core::mdarray<bool_value_t, extent_t, stdex::layout_right,
-                          std::vector<bool_value_t>>,
-            core::mdarray<value_t, extent_t, stdex::layout_right,
-                          std::vector<value_t>>>>>;
-
-} // namespace mdtensor::core
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/type.hpp
-
-namespace mdtensor::core {
-namespace detail {
-
-template <typename dtype, typename... Ts> struct output_value {
-    using type = dtype;
-};
-
-template <typename... Ts> struct output_value<void, Ts...> {
-    using type = core::common_arithmetic_type_t<
-        typename std::remove_cvref_t<to_mdspan_t<Ts>>::value_type...>;
-};
-
-template <typename dtype, typename Tuple> struct output_value_from_tuple;
-
-template <typename dtype, typename... Ts>
-struct output_value_from_tuple<dtype, std::tuple<Ts...>>
-    : output_value<dtype, Ts...> {};
-} // namespace detail
-
-template <typename dtype, typename... Ts>
-using output_value_t = typename detail::output_value<dtype, Ts...>::type;
+template <typename T>
+using to_mdspan_t = decltype(to_mdspan(std::declval<T>())); // TODO: remove
 
 namespace detail {
 
-template <typename T> struct unwrap_optional {
-    using type = std::remove_cvref_t<T>;
+//////////////////////////////////////////////////////////////////////
+///////// unwrap_all /////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+template <typename T> struct unwrap_all;
+
+template <typename T> struct unwrap_all_impl {
+    using type = T;
 };
 
-template <typename T> struct unwrap_optional<std::optional<T>> {
-    using type = std::remove_cvref_t<T>;
-};
+template <typename T>
+struct unwrap_all_impl<std::optional<T>> : unwrap_all<T> {};
 
-template <typename... Ts> struct filter_nullopt;
+template <typename ElementType, typename ExtentsType, typename LayoutType,
+          typename AccessorType>
+struct unwrap_all_impl<
+    mdspan<ElementType, ExtentsType, LayoutType, AccessorType>>
+    : unwrap_all<typename mdspan<ElementType, ExtentsType, LayoutType,
+                                 AccessorType>::value_type> {};
 
-template <> struct filter_nullopt<> {
+template <typename ElementType, typename ExtentsType, typename LayoutType,
+          typename ContainerType>
+struct unwrap_all_impl<
+    mdarray<ElementType, ExtentsType, LayoutType, ContainerType>>
+    : unwrap_all<typename mdarray<ElementType, ExtentsType, LayoutType,
+                                  ContainerType>::value_type> {};
+
+template <typename T>
+struct unwrap_all : unwrap_all_impl<std::remove_cvref_t<T>> {};
+
+//////////////////////////////////////////////////////////////////////
+/////////////// value_type_filter ////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+template <typename... Ts> struct value_type_filter {};
+
+template <> struct value_type_filter<> {
     using type = std::tuple<>;
 };
 
-template <typename T, typename... Ts> struct filter_nullopt<T, Ts...> {
+template <typename T, typename... Ts> struct value_type_filter<T, Ts...> {
   private:
-    using arg_t = typename unwrap_optional<std::remove_cvref_t<T>>::type;
-    using tail_t = typename filter_nullopt<Ts...>::type;
+    using arg_t = typename unwrap_all<T>::type;
+    using tail_t = typename value_type_filter<Ts...>::type;
 
   public:
-    using type = std::conditional_t<
-        std::same_as<std::remove_cvref_t<T>, std::nullopt_t>, tail_t,
-        decltype(std::tuple_cat(std::declval<std::tuple<arg_t>>(),
-                                std::declval<tail_t>()))>;
+    using type = std::conditional_t<nullopt_t_c<arg_t>, tail_t,
+                                    decltype(std::tuple_cat(
+                                        std::declval<std::tuple<arg_t>>(),
+                                        std::declval<tail_t>()))>;
 };
+
+//////////////////////////////////////////////////////////////////////
+/////////////// choose_dtype_or //////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+template <typename dtype, typename... Ts> struct choose_dtype_or;
+
+template <typename dtype, typename... Ts>
+    requires(!std::is_void_v<std::remove_cvref_t<dtype>>)
+struct choose_dtype_or<dtype, Ts...> {
+    using type = std::remove_cvref_t<dtype>;
+};
+
+template <typename... Ts>
+    requires(sizeof...(Ts) > 0 &&
+             (std::is_arithmetic_v<std::remove_cvref_t<Ts>> && ...))
+struct choose_dtype_or<void, Ts...> {
+    using type = core::promote_type_t<std::remove_cvref_t<Ts>...>;
+};
+
+//////////////////////////////////////////////////////////////////////
+/////////////// get_value_from_filter ////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+template <typename dtype, typename Tuple> struct get_value_from_filter {};
+
+template <typename dtype, typename... Ts>
+struct get_value_from_filter<dtype, std::tuple<Ts...>>
+    : choose_dtype_or<dtype, Ts...> {};
 
 } // namespace detail
 
+//////////////////////////////////////////////////////////////////////
+/////////////// calc_type_t //////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
 template <typename dtype, typename... Ts>
-using output_value_with_nullopt_t = typename detail::output_value_from_tuple<
-    dtype, typename detail::filter_nullopt<Ts...>::type>::type;
+using calc_type_t = typename detail::get_value_from_filter<
+    dtype, typename detail::value_type_filter<Ts...>::type>::type;
+
+template <typename dtype, typename... Ts>
+using signed_calc_type_t =
+    promote_type_t<calc_type_t<dtype, Ts...>, std::int8_t>;
+
+template <typename dtype, typename... Ts>
+using floating_calc_type_t = promote_type_t<calc_type_t<dtype, Ts...>, float>;
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/output_value_type.hpp
+
+namespace mdtensor::core {
+
+template <std::size_t... uranks, extents_c uout_exts_t>
+[[nodiscard]] constexpr auto
+make_broadcasted_extents(std::index_sequence<uranks...>,
+                         uout_exts_t &&uout_exts, auto &&...ins) {
+    static_assert(sizeof...(uranks) == sizeof...(ins),
+                  "Number of uranks must match number of inputs.");
+
+    constexpr std::size_t ins_num = sizeof...(uranks);
+
+    if constexpr (ins_num == 0) {
+        return std::forward<uout_exts_t>(uout_exts);
+
+    } else {
+        // calculate broadcasted extents
+        const auto bexts = get_broadcast_extents(
+            std::index_sequence<uranks...>{},
+            to_const_mdspan(std::forward<decltype(ins)>(ins))...);
+
+        return compose_extents(bexts, std::forward<uout_exts_t>(uout_exts));
+    }
+}
 
 template <typename dtype = void, std::size_t... uranks, extents_c uout_exts_t>
 [[nodiscard]] constexpr auto
@@ -1505,15 +1485,14 @@ make_broadcasted_tensor(std::index_sequence<uranks...>, uout_exts_t &&uout_exts,
         return make_tensor<dtype>(std::forward<uout_exts_t>(uout_exts));
 
     } else {
-        using value_t = output_value_t<dtype, decltype(ins)...>;
+        using value_t = calc_type_t<dtype, decltype(ins)...>;
 
-        // calculate broadcasted extents
-        const auto bexts = get_broadcast_extents(
-            std::index_sequence<uranks...>{},
-            to_const_mdspan(std::forward<decltype(ins)>(ins))...);
+        const auto out_exts =
+            make_broadcasted_extents(std::index_sequence<uranks...>{},
+                                     std::forward<uout_exts_t>(uout_exts),
+                                     std::forward<decltype(ins)>(ins)...);
 
-        return make_tensor<value_t>(
-            compose_extents(bexts, std::forward<uout_exts_t>(uout_exts)));
+        return make_tensor<value_t>(out_exts);
     }
 }
 
@@ -1546,7 +1525,7 @@ make_broadcasted_tensors(std::index_sequence<uranks...>, auto &&uout_exts_tuple,
         }(std::make_index_sequence<outs_num>{});
 
     } else {
-        using value_t = output_value_t<dtype, decltype(ins)...>;
+        using value_t = calc_type_t<dtype, decltype(ins)...>;
 
         // calculate broadcasted extents
         const auto bexts = get_broadcast_extents(
@@ -1571,62 +1550,6 @@ template <typename dtype = void>
     }(std::make_index_sequence<sizeof...(ins)>{});
 }
 
-template <typename dtype = void, bool floating = false, std::size_t... uranks,
-          extents_c uout_exts_t>
-[[nodiscard]] constexpr auto
-resolve_broadcasted_output(auto &&out, std::index_sequence<uranks...>,
-                           uout_exts_t &&uout_exts, auto &&...ins) {
-    if constexpr (floating) {
-        // Ensure that the output type is at least float precision
-        using value_t = core::output_value_t<dtype, float, decltype(ins)...>;
-
-        const auto out_md = resolve_broadcasted_output<value_t, false>(
-            std::forward<decltype(out)>(out), std::index_sequence<uranks...>{},
-            std::forward<uout_exts_t>(uout_exts),
-            std::forward<decltype(ins)>(ins)...);
-
-        // Check that resolved output type is at least float precision
-        static_assert(core::floating_point_c<
-                          typename to_mdspan_t<decltype(out_md)>::value_type>,
-                      "Resolved output type must be at least float precision.");
-
-        return out_md;
-
-    } else {
-        if constexpr (core::nullopt_t_c<decltype(out)>) {
-            return make_broadcasted_tensor<dtype>(
-                std::index_sequence<uranks...>{},
-                std::forward<uout_exts_t>(uout_exts),
-                std::forward<decltype(ins)>(ins)...);
-
-        } else {
-            const auto out_mds =
-                to_output_mdspan(std::forward<decltype(out)>(out));
-
-            // TODO: check same extents with expected extents
-            // TODO: check out_md type is enough precision for dtype, if dtype
-            // is not void
-            // TODO: use resolve_output.
-
-            return out_mds;
-        }
-    }
-}
-
-template <typename dtype = void, bool floating = false, extents_c uout_exts_t>
-[[nodiscard]] constexpr auto
-resolve_broadcasted_output(auto &&out, uout_exts_t &&uout_exts, auto &&...ins) {
-    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        return resolve_broadcasted_output<dtype, floating>(
-            std::forward<decltype(out)>(out),
-            std::index_sequence<((void)Is, 0)...>{},
-            std::forward<uout_exts_t>(uout_exts),
-            std::forward<decltype(ins)>(ins)...);
-    }(std::make_index_sequence<sizeof...(ins)>{});
-}
-
-// TODO: develop resolve_broadcasted_outputs
-
 } // namespace mdtensor::core
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/make_broadcasted_tensor.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/make_reduced_tensor.hpp
@@ -1640,289 +1563,6 @@ resolve_broadcasted_output(auto &&out, uout_exts_t &&uout_exts, auto &&...ins) {
  */
 
 
-
-namespace mdtensor::core {
-namespace detail {
-
-template <typename value_t, std::size_t size>
-[[nodiscard]] constexpr bool contains(const std::array<value_t, size> &array,
-                                      const value_t &value) noexcept {
-    for (const auto element : array) {
-        if (element == value) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-} // namespace detail
-
-template <typename dtype = void, bool keepdims = false, std::integral axes_t,
-          axes_t... axes, std::size_t... uranks, extents_c uout_exts_t>
-[[nodiscard]] constexpr auto
-make_reduced_tensor(std::integer_sequence<axes_t, axes...>,
-                    std::index_sequence<uranks...>, uout_exts_t &&uout_exts,
-                    auto &&...ins) {
-    static_assert(sizeof...(ins) > 0, "At least one input must be provided.");
-    static_assert(sizeof...(uranks) == sizeof...(ins),
-                  "Number of uranks must match number of inputs.");
-
-    // calculate input broadcasted extents
-    const auto ins_bexts = get_broadcast_extents(
-        std::index_sequence<uranks...>{},
-        to_const_mdspan(std::forward<decltype(ins)>(ins))...);
-
-    using ins_bexts_t = decltype(ins_bexts);
-
-    // get sorted array
-    constexpr auto axes_sorted = [&]() {
-        if constexpr (ins_bexts_t::rank() == 0) {
-            return std::array<std::size_t, 0>{};
-
-        } else if constexpr (sizeof...(axes) == 0) {
-            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                return std::array{(ins_bexts_t::rank() - 1 - Is)...};
-            }(std::make_index_sequence<ins_bexts_t::rank()>{});
-
-        } else {
-            return get_sorted_axes<ins_bexts_t::rank()>(
-                std::integer_sequence<axes_t, axes...>{},
-                std::greater<std::size_t>{});
-        }
-    }();
-
-    // generate out_bexts
-    constexpr auto not_axes_size = ins_bexts_t::rank() - axes_sorted.size();
-
-    const auto out_bexts = [&]() {
-        using index_t = typename ins_bexts_t::index_type;
-
-        if constexpr (keepdims) {
-            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                return extents<index_t,
-                               (detail::contains(axes_sorted, Is)
-                                    ? std::size_t{1}
-                                    : ins_bexts_t::static_extent(Is))...>{
-                    (detail::contains(axes_sorted, Is)
-                         ? index_t{1}
-                         : static_cast<index_t>(ins_bexts.extent(Is)))...};
-            }(std::make_index_sequence<ins_bexts_t::rank()>{});
-
-        } else {
-            // generate unselected axes sequence
-            constexpr auto not_axes_arr = [&]() {
-                auto not_axes_arr = std::array<std::size_t, not_axes_size>{};
-
-                std::size_t not_axes_idx = 0;
-                for (std::size_t i = 0; i < ins_bexts_t::rank(); i++) {
-                    if (!detail::contains(axes_sorted, i)) {
-                        not_axes_arr[not_axes_idx++] = i;
-                    }
-                }
-
-                return not_axes_arr;
-            }();
-
-            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                return extents<index_t,
-                               ins_bexts_t::static_extent(not_axes_arr[Is])...>{
-                    ins_bexts.extent(not_axes_arr[Is])...};
-            }(std::make_index_sequence<not_axes_arr.size()>{});
-        }
-    }();
-
-    // generate out
-    using value_t = output_value_t<dtype, decltype(ins)...>;
-
-    return make_tensor<value_t>(
-        compose_extents(out_bexts, std::forward<uout_exts_t>(uout_exts)));
-}
-
-template <typename dtype = void, bool keepdims = false, std::integral axes_t,
-          axes_t... axes, extents_c uout_exts_t>
-[[nodiscard]] constexpr auto
-make_reduced_tensor(std::integer_sequence<axes_t, axes...>,
-                    uout_exts_t &&uout_exts, auto &&...ins) {
-    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        return make_reduced_tensor<dtype, keepdims>(
-            std::integer_sequence<axes_t, axes...>{},
-            std::index_sequence<((void)Is, 0)...>{},
-            std::forward<uout_exts_t>(uout_exts),
-            std::forward<decltype(ins)>(ins)...);
-    }(std::make_index_sequence<sizeof...(ins)>{});
-}
-
-// TODO: develop make_reduce_outputs
-
-template <typename dtype = void, bool keepdims = false, bool floating = false,
-          std::integral axes_t, axes_t... axes, std::size_t... uranks,
-          extents_c uout_exts_t>
-[[nodiscard]] constexpr auto
-resolve_reduced_output(auto &&out, std::integer_sequence<axes_t, axes...>,
-                       std::index_sequence<uranks...>, uout_exts_t &&uout_exts,
-                       auto &&...ins) {
-    if constexpr (floating) {
-        // Ensure that the output type is at least float precision
-        using value_t = output_value_t<dtype, float, decltype(ins)...>;
-
-        const auto out_md = resolve_reduced_output<value_t, keepdims, false>(
-            std::forward<decltype(out)>(out),
-            std::integer_sequence<axes_t, axes...>{},
-            std::index_sequence<uranks...>{},
-            std::forward<uout_exts_t>(uout_exts),
-            std::forward<decltype(ins)>(ins)...);
-
-        // Check that resolved output type is at least float precision
-        static_assert(core::floating_point_c<
-                          typename to_mdspan_t<decltype(out_md)>::value_type>,
-                      "Resolved output type must be at least float precision.");
-
-        return out_md;
-
-    } else {
-        if constexpr (core::nullopt_t_c<decltype(out)>) {
-            return make_reduced_tensor<dtype, keepdims>(
-                std::integer_sequence<axes_t, axes...>{},
-                std::index_sequence<uranks...>{},
-                std::forward<uout_exts_t>(uout_exts),
-                std::forward<decltype(ins)>(ins)...);
-
-        } else {
-            const auto out_mds =
-                to_output_mdspan(std::forward<decltype(out)>(out));
-
-            // TODO: check same extents with expected extents
-            // TODO: check out_md type is enough precision for dtype, if dtype
-            // is not void
-            // TODO: use resolve_output.
-
-            return out_mds;
-        }
-    }
-}
-
-template <typename dtype = void, bool keepdims = false, bool floating = false,
-          std::integral axes_t, axes_t... axes, extents_c uout_exts_t>
-[[nodiscard]] constexpr auto
-resolve_reduced_output(auto &&out, std::integer_sequence<axes_t, axes...>,
-                       uout_exts_t &&uout_exts, auto &&...ins) {
-    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        return resolve_reduced_output<dtype, keepdims, floating>(
-            std::forward<decltype(out)>(out),
-            std::integer_sequence<axes_t, axes...>{},
-            std::index_sequence<((void)Is, 0)...>{},
-            std::forward<uout_exts_t>(uout_exts),
-            std::forward<decltype(ins)>(ins)...);
-    }(std::make_index_sequence<sizeof...(ins)>{});
-}
-
-// TODO: develop resolve_reduced_outputs
-
-} // namespace mdtensor::core
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/make_reduced_tensor.hpp
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/make_tensor.hpp
-/**
- * @file
- * @brief Make tensor utilities for mdtensor.
- *
- * @copyright
- * SPDX-License-Identifier: Apache-2.0
- * See README and LICENSE files for full attribution details.
- */
-
-
-
-namespace mdtensor::core {
-
-template <typename value_t = double, extents_c exts_t>
-[[nodiscard]] constexpr auto make_tensor(exts_t &&exts) {
-    using base_t = std::remove_cvref_t<decltype(exts)>;
-
-    if constexpr (base_t::rank() == 0) {
-        return tensor<value_t, base_t>{};
-
-    } else {
-        return tensor<value_t, base_t>{std::forward<exts_t>(exts)};
-    }
-}
-
-template <typename dtype = void>
-[[nodiscard]] constexpr auto make_tensor_like(auto &&in) {
-    const auto in_mds = to_const_mdspan(std::forward<decltype(in)>(in));
-
-    using value_t = output_value_t<dtype, decltype(in_mds)>;
-
-    return make_tensor<value_t>(in_mds.extents());
-}
-
-template <typename T>
-using make_tensor_like_t = decltype(make_tensor_like(std::declval<T>()));
-
-template <typename dtype = void, bool floating = false, extents_c exts_t>
-[[nodiscard]] constexpr auto resolve_output(auto &&out, exts_t &&exts) {
-    if constexpr (floating) {
-        // Ensure that the output type is at least float precision
-        using value_t = core::output_value_t<dtype, float>;
-
-        const auto out_md = resolve_output<value_t, false>(
-            std::forward<decltype(out)>(out), std::forward<exts_t>(exts));
-
-        // Check that resolved output type is at least float precision
-        static_assert(core::floating_point_c<
-                          typename to_mdspan_t<decltype(out_md)>::value_type>,
-                      "Resolved output type must be at least float precision.");
-
-        return out_md;
-
-    } else if constexpr (core::nullopt_t_c<decltype(out)>) {
-        return make_tensor<dtype>(std::forward<exts_t>(exts));
-
-    } else {
-        const auto out_mds = to_output_mdspan(std::forward<decltype(out)>(out));
-
-        using value_t = typename decltype(out_mds)::value_type;
-        using calc_t = core::output_value_t<dtype, value_t>;
-
-        static_assert(
-            std::same_as<core::common_value_type_t<calc_t, value_t>, value_t>,
-            "Resolved output type must not be less precise than desired.");
-
-        static_assert(
-            !is_always_different_extents<decltype(out_mds.extents()), exts_t>(),
-            "Output tensor extents must match the provided extents.");
-
-        if (!is_same_extents(out_mds.extents(), std::forward<exts_t>(exts))) {
-            throw std::invalid_argument("Provided output tensor extents do "
-                                        "not match the expected extents.");
-        }
-
-        return out_mds;
-    }
-}
-
-template <typename dtype = void, bool floating = false>
-[[nodiscard]] constexpr auto resolve_output_like(auto &&out, auto &&in) {
-    const auto in_mds = to_const_mdspan(std::forward<decltype(in)>(in));
-
-    if constexpr (floating) {
-        // Ensure that the output type is at least float precision
-        using value_t = core::output_value_t<dtype, decltype(in_mds), float>;
-
-        return resolve_output<value_t, floating>(
-            std::forward<decltype(out)>(out), in_mds.extents());
-
-    } else {
-        using value_t = core::output_value_t<dtype, decltype(in_mds)>;
-
-        return resolve_output<value_t, floating>(
-            std::forward<decltype(out)>(out), in_mds.extents());
-    }
-}
-
-} // namespace mdtensor::core
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/make_tensor.hpp
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/tensor.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/ufunc/ufunc.hpp
 /**
  * @file
@@ -2368,11 +2008,8 @@ reduce(auto &&func, std::integer_sequence<axes_t, axes...>,
 }
 
 [[nodiscard]] constexpr bool initialize_ufunc(auto &&init, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
-            // not targeted by where
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return false;
         }
     }
@@ -2389,6 +2026,303 @@ reduce(auto &&func, std::integer_sequence<axes_t, axes...>,
 } // namespace mdtensor::core
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/ufunc/reduce.hpp
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/ufunc/ufunc.hpp
+
+namespace mdtensor::core {
+namespace detail {
+
+template <typename value_t, std::size_t size>
+[[nodiscard]] constexpr bool contains(const std::array<value_t, size> &array,
+                                      const value_t &value) noexcept {
+    for (const auto element : array) {
+        if (element == value) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+} // namespace detail
+
+template <bool keepdims = false, std::integral axes_t, axes_t... axes,
+          std::size_t... uranks, extents_c uout_exts_t>
+[[nodiscard]] constexpr auto
+make_reduced_extents(std::integer_sequence<axes_t, axes...>,
+                     std::index_sequence<uranks...>, uout_exts_t &&uout_exts,
+                     auto &&...ins) {
+    static_assert(sizeof...(ins) > 0, "At least one input must be provided.");
+    static_assert(sizeof...(uranks) == sizeof...(ins),
+                  "Number of uranks must match number of inputs.");
+
+    // calculate input broadcasted extents
+    const auto ins_bexts = get_broadcast_extents(
+        std::index_sequence<uranks...>{},
+        to_const_mdspan(std::forward<decltype(ins)>(ins))...);
+
+    using ins_bexts_t = decltype(ins_bexts);
+
+    // get sorted array
+    constexpr auto axes_sorted = [&]() {
+        if constexpr (ins_bexts_t::rank() == 0) {
+            return std::array<std::size_t, 0>{};
+
+        } else if constexpr (sizeof...(axes) == 0) {
+            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                return std::array{(ins_bexts_t::rank() - 1 - Is)...};
+            }(std::make_index_sequence<ins_bexts_t::rank()>{});
+
+        } else {
+            return get_sorted_axes<ins_bexts_t::rank()>(
+                std::integer_sequence<axes_t, axes...>{},
+                std::greater<std::size_t>{});
+        }
+    }();
+
+    // generate out_bexts
+    constexpr auto not_axes_size = ins_bexts_t::rank() - axes_sorted.size();
+
+    const auto out_bexts = [&]() {
+        using index_t = typename ins_bexts_t::index_type;
+
+        if constexpr (keepdims) {
+            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                return extents<index_t,
+                               (detail::contains(axes_sorted, Is)
+                                    ? std::size_t{1}
+                                    : ins_bexts_t::static_extent(Is))...>{
+                    (detail::contains(axes_sorted, Is)
+                         ? index_t{1}
+                         : static_cast<index_t>(ins_bexts.extent(Is)))...};
+            }(std::make_index_sequence<ins_bexts_t::rank()>{});
+
+        } else {
+            // generate unselected axes sequence
+            constexpr auto not_axes_arr = [&]() {
+                auto not_axes_arr = std::array<std::size_t, not_axes_size>{};
+
+                std::size_t not_axes_idx = 0;
+                for (std::size_t i = 0; i < ins_bexts_t::rank(); i++) {
+                    if (!detail::contains(axes_sorted, i)) {
+                        not_axes_arr[not_axes_idx++] = i;
+                    }
+                }
+
+                return not_axes_arr;
+            }();
+
+            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                return extents<index_t,
+                               ins_bexts_t::static_extent(not_axes_arr[Is])...>{
+                    ins_bexts.extent(not_axes_arr[Is])...};
+            }(std::make_index_sequence<not_axes_arr.size()>{});
+        }
+    }();
+
+    return compose_extents(out_bexts, std::forward<uout_exts_t>(uout_exts));
+}
+
+template <typename dtype = void, bool keepdims = false, std::integral axes_t,
+          axes_t... axes, std::size_t... uranks, extents_c uout_exts_t>
+[[nodiscard]] constexpr auto
+make_reduced_tensor(std::integer_sequence<axes_t, axes...>,
+                    std::index_sequence<uranks...>, uout_exts_t &&uout_exts,
+                    auto &&...ins) {
+    using value_t = calc_type_t<dtype, decltype(ins)...>;
+
+    const auto out_exts = make_reduced_extents<keepdims>(
+        std::integer_sequence<axes_t, axes...>{},
+        std::index_sequence<uranks...>{}, std::forward<uout_exts_t>(uout_exts),
+        std::forward<decltype(ins)>(ins)...);
+
+    return make_tensor<value_t>(out_exts);
+}
+
+template <typename dtype = void, bool keepdims = false, std::integral axes_t,
+          axes_t... axes, extents_c uout_exts_t>
+[[nodiscard]] constexpr auto
+make_reduced_tensor(std::integer_sequence<axes_t, axes...>,
+                    uout_exts_t &&uout_exts, auto &&...ins) {
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return make_reduced_tensor<dtype, keepdims>(
+            std::integer_sequence<axes_t, axes...>{},
+            std::index_sequence<((void)Is, 0)...>{},
+            std::forward<uout_exts_t>(uout_exts),
+            std::forward<decltype(ins)>(ins)...);
+    }(std::make_index_sequence<sizeof...(ins)>{});
+}
+
+// TODO: develop make_reduce_outputs
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/make_reduced_tensor.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/resolve_broadcasted_output.hpp
+/**
+ * @file
+ * @brief Output utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/resolve_output.hpp
+/**
+ * @file
+ * @brief Make tensor utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor::core {
+
+template <typename value_t, extents_c exts_t>
+[[nodiscard]] constexpr auto resolve_output(auto &&out, exts_t &&exts) {
+    if constexpr (core::nullopt_t_c<decltype(out)>) {
+        return make_tensor<value_t>(std::forward<exts_t>(exts));
+
+    } else {
+        const auto out_mds = to_output_mdspan(std::forward<decltype(out)>(out));
+
+        using out_value_t = typename decltype(out_mds)::value_type;
+
+        static_assert(
+            std::same_as<core::promote_type_t<value_t, out_value_t>, //
+                         out_value_t>,
+            "Resolved output must not be less precise than desired.");
+
+        static_assert(
+            !is_always_different_extents<decltype(out_mds.extents()), exts_t>(),
+            "Resolved output extents must match the provided extents.");
+
+        if (!is_same_extents(out_mds.extents(), std::forward<exts_t>(exts))) {
+            throw std::invalid_argument(
+                "Resolved output extents must match the provided extents.");
+        }
+
+        return out_mds;
+    }
+}
+
+template <typename dtype = void>
+[[nodiscard]] constexpr auto resolve_output_like(auto &&out, auto &&in) {
+    const auto in_mds = to_const_mdspan(std::forward<decltype(in)>(in));
+
+    using value_t = core::calc_type_t<dtype, decltype(in_mds)>;
+
+    return resolve_output<value_t>(std::forward<decltype(out)>(out),
+                                   in_mds.extents());
+}
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/resolve_output.hpp
+
+namespace mdtensor::core {
+
+template <typename dtype = void, std::size_t... uranks, extents_c uout_exts_t>
+[[nodiscard]] constexpr auto
+resolve_broadcasted_output(auto &&out, std::index_sequence<uranks...>,
+                           uout_exts_t &&uout_exts, auto &&...ins) {
+    if constexpr (core::nullopt_t_c<decltype(out)>) {
+        return make_broadcasted_tensor<dtype>(
+            std::index_sequence<uranks...>{},
+            std::forward<uout_exts_t>(uout_exts),
+            std::forward<decltype(ins)>(ins)...);
+
+    } else {
+        using value_t = calc_type_t<dtype, decltype(ins)...>;
+
+        const auto out_exts =
+            make_broadcasted_extents(std::index_sequence<uranks...>{},
+                                     std::forward<uout_exts_t>(uout_exts),
+                                     std::forward<decltype(ins)>(ins)...);
+
+        return resolve_output<value_t>(std::forward<decltype(out)>(out),
+                                       out_exts);
+    }
+}
+
+template <typename dtype = void, extents_c uout_exts_t>
+[[nodiscard]] constexpr auto
+resolve_broadcasted_output(auto &&out, uout_exts_t &&uout_exts, auto &&...ins) {
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return resolve_broadcasted_output<dtype>(
+            std::forward<decltype(out)>(out),
+            std::index_sequence<((void)Is, 0)...>{},
+            std::forward<uout_exts_t>(uout_exts),
+            std::forward<decltype(ins)>(ins)...);
+    }(std::make_index_sequence<sizeof...(ins)>{});
+}
+
+// TODO: develop resolve_broadcasted_outputs
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/resolve_broadcasted_output.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/resolve_reduced_output.hpp
+/**
+ * @file
+ * @brief Output utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor::core {
+
+template <typename dtype = void, bool keepdims = false, std::integral axes_t,
+          axes_t... axes, std::size_t... uranks, extents_c uout_exts_t>
+[[nodiscard]] constexpr auto
+resolve_reduced_output(auto &&out, std::integer_sequence<axes_t, axes...>,
+                       std::index_sequence<uranks...>, uout_exts_t &&uout_exts,
+                       auto &&...ins) {
+    if constexpr (core::nullopt_t_c<decltype(out)>) {
+        return make_reduced_tensor<dtype, keepdims>(
+            std::integer_sequence<axes_t, axes...>{},
+            std::index_sequence<uranks...>{},
+            std::forward<uout_exts_t>(uout_exts),
+            std::forward<decltype(ins)>(ins)...);
+
+    } else {
+        using value_t = calc_type_t<dtype, decltype(ins)...>;
+
+        const auto out_exts = make_reduced_extents<keepdims>(
+            std::integer_sequence<axes_t, axes...>{},
+            std::index_sequence<uranks...>{},
+            std::forward<uout_exts_t>(uout_exts),
+            std::forward<decltype(ins)>(ins)...);
+
+        return resolve_output<value_t>(std::forward<decltype(out)>(out),
+                                       out_exts);
+    }
+}
+
+template <typename dtype = void, bool keepdims = false, std::integral axes_t,
+          axes_t... axes, extents_c uout_exts_t>
+[[nodiscard]] constexpr auto
+resolve_reduced_output(auto &&out, std::integer_sequence<axes_t, axes...>,
+                       uout_exts_t &&uout_exts, auto &&...ins) {
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return resolve_reduced_output<dtype, keepdims>(
+            std::forward<decltype(out)>(out),
+            std::integer_sequence<axes_t, axes...>{},
+            std::index_sequence<((void)Is, 0)...>{},
+            std::forward<uout_exts_t>(uout_exts),
+            std::forward<decltype(ins)>(ins)...);
+    }(std::make_index_sequence<sizeof...(ins)>{});
+}
+
+// TODO: develop resolve_reduced_outputs
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/resolve_reduced_output.hpp
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/tensor.hpp
 
 namespace mdtensor::core {
 
@@ -2921,9 +2855,9 @@ template <typename in_t>
 
 namespace mdtensor {
 
-template <typename dtype = double>
+template <typename value_t = double>
 [[nodiscard]] constexpr auto empty(auto &&shape) {
-    return core::make_tensor<dtype>(
+    return core::make_tensor<value_t>(
         core::to_extents(std::forward<decltype(shape)>(shape)));
 }
 
@@ -2940,21 +2874,19 @@ template <typename dtype = void, core::extents_c exts_t,
                                     out_t &&out = out_t{std::nullopt}) {
     static_assert(exts.rank() == 1, "arange only supports rank-1 extents");
 
-    using calc_t = core::output_value_t<dtype, start_t, step_t>;
+    using calc_t = core::calc_type_t<dtype, start_t, step_t>;
 
     auto out_md = core::resolve_output<calc_t>(
         std::forward<decltype(out)>(out), std::forward<decltype(exts)>(exts));
 
-    using value_t = decltype(out_md)::value_type;
-    using index_t = decltype(out_md)::index_type;
-
     const calc_t actual_step =
         static_cast<calc_t>(start + step) - static_cast<calc_t>(start);
 
-    out_md(0) = static_cast<value_t>(start);
+    out_md(0) = start;
 
+    using index_t = decltype(out_md)::index_type;
     for (index_t i = 1; i < out_md.extent(0); i++) {
-        out_md(i) = out_md(i - 1) + static_cast<value_t>(actual_step);
+        out_md(i) = out_md(i - 1) + actual_step;
     }
 
     return out_md;
@@ -2966,6 +2898,7 @@ template <typename dtype = void, core::arithmetic_c start_t,
 [[nodiscard]] constexpr auto arange(start_t &&start, stop_t &&stop,
                                     step_t &&step = step_t{1},
                                     out_t &&out = out_t{std::nullopt}) {
+
     const std::int64_t num = std::ceil((stop - start) / step);
 
     if (num < 0) {
@@ -3027,7 +2960,7 @@ template <typename dtype = void>
 [[nodiscard]] constexpr auto empty_like(auto &&in) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    using value_t = core::output_value_t<dtype, decltype(in_mds)>;
+    using value_t = core::calc_type_t<dtype, decltype(in_mds)>;
 
     return empty<value_t>(in_mds.extents());
 }
@@ -3056,12 +2989,14 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
                                   out_t &&out = out_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = core::resolve_output_like<dtype>(
+    using calc_t = core::calc_type_t<dtype, decltype(in_mds)>;
+
+    auto out_md = core::resolve_output_like<calc_t>(
         std::forward<decltype(out)>(out), in_mds);
 
     core::batch<backend>(
         [](auto &&...elems) {
-            ufunc::copy_ufunc<dtype>(std::forward<decltype(elems)>(elems)...);
+            ufunc::copy_ufunc<calc_t>(std::forward<decltype(elems)>(elems)...);
         },
         std::integer_sequence<bool, true, false>{}, in_mds, out_md);
 
@@ -3100,7 +3035,7 @@ constexpr void eye_ufunc(auto &&out, const int &k) {
 
 } // namespace ufunc
 
-template <typename dtype = std::int8_t,
+template <core::arithmetic value_t = std::int8_t,
           core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t>
 [[nodiscard]] constexpr auto eye(auto &&shape, const int &k = 0,
@@ -3114,8 +3049,8 @@ template <typename dtype = std::int8_t,
         static_assert(exts.rank() >= 2, "eye requires rank >= 2");
 
         auto out_md =
-            core::resolve_output<dtype>(std::forward<decltype(out)>(out),
-                                        std::forward<decltype(exts)>(exts));
+            core::resolve_output<value_t>(std::forward<decltype(out)>(out),
+                                          std::forward<decltype(exts)>(exts));
 
         core::batch<backend>(
             [&](auto &&...elems) {
@@ -3133,20 +3068,20 @@ template <typename dtype = std::int8_t,
 
         using index_t = std::make_unsigned_t<shape_t>;
 
-        return eye<dtype, backend>(
+        return eye<value_t, backend>(
             core::dextents<index_t, 2>{static_cast<index_t>(shape),
                                        static_cast<index_t>(shape)},
             k);
     }
 }
 
-template <std::size_t N, typename dtype = std::int8_t,
+template <std::size_t N, core::arithmetic value_t = std::int8_t,
           core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t>
 [[nodiscard]] constexpr auto eye(const int &k = 0,
                                  out_t &&out = out_t{std::nullopt}) {
-    return eye<dtype, backend>(core::extents<std::size_t, N, N>{}, k,
-                               std::forward<out_t>(out));
+    return eye<value_t, backend>(core::extents<std::size_t, N, N>{}, k,
+                                 std::forward<out_t>(out));
 }
 
 } // namespace mdtensor
@@ -3177,10 +3112,11 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto val_mds =
         core::to_const_mdspan(std::forward<decltype(val)>(val));
 
-    auto out_md =
-        core::resolve_output<core::output_value_t<dtype, decltype(val_mds)>>(
-            std::forward<decltype(out)>(out),
-            core::to_extents(std::forward<decltype(shape)>(shape)));
+    using value_t = core::calc_type_t<dtype, decltype(val_mds)>;
+
+    auto out_md = core::resolve_output<value_t>(
+        std::forward<decltype(out)>(out),
+        core::to_extents(std::forward<decltype(shape)>(shape)));
 
     core::batch<backend>(
         [](auto &&...elems) {
@@ -3213,7 +3149,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
                                        out_t &&out = out_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    using value_t = core::output_value_t<dtype, decltype(in_mds)>;
+    using value_t = core::calc_type_t<dtype, decltype(in_mds)>;
 
     return full<value_t, backend>(in_mds.extents(),
                                   std::forward<decltype(val)>(val),
@@ -3249,10 +3185,8 @@ namespace mdtensor {
 namespace ufunc {
 
 constexpr void add_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
@@ -3272,7 +3206,10 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    auto out_md = core::resolve_broadcasted_output<dtype>(
+    using calc_t =
+        core::calc_type_t<dtype, decltype(in1_mds), decltype(in2_mds)>;
+
+    auto out_md = core::resolve_broadcasted_output<calc_t>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds);
 
@@ -3305,10 +3242,8 @@ namespace ufunc {
 
 constexpr void multiply_ufunc(auto &&in1, auto &&in2, auto &&out,
                               auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
@@ -3328,7 +3263,10 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    auto out_md = core::resolve_broadcasted_output<dtype>(
+    using calc_t =
+        core::calc_type_t<dtype, decltype(in1_mds), decltype(in2_mds)>;
+
+    auto out_md = core::resolve_broadcasted_output<calc_t>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds);
 
@@ -3361,10 +3299,8 @@ namespace ufunc {
 
 constexpr void subtract_ufunc(auto &&in1, auto &&in2, auto &&out,
                               auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
@@ -3384,7 +3320,10 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    auto out_md = core::resolve_broadcasted_output<dtype>(
+    using calc_t =
+        core::calc_type_t<dtype, decltype(in1_mds), decltype(in2_mds)>;
+
+    auto out_md = core::resolve_broadcasted_output<calc_t>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds);
 
@@ -3402,11 +3341,11 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/subtract.hpp
 
 namespace mdtensor {
-namespace ufunc {
+namespace detail {
 
-template <core::Backend backend = core::Backend::AUTO>
-constexpr void linspace_ufunc(auto &&start, auto &&stop, auto &&out,
-                              const bool endpoint = true) {
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+constexpr void linspace_impl(auto &&start, auto &&stop, auto &&out,
+                             const bool endpoint = true) {
     const auto start_mds =
         core::to_const_mdspan(std::forward<decltype(start)>(start));
     const auto stop_mds =
@@ -3414,7 +3353,6 @@ constexpr void linspace_ufunc(auto &&start, auto &&stop, auto &&out,
     const auto out_mds =
         core::to_output_mdspan(std::forward<decltype(out)>(out));
 
-    using value_t = typename decltype(out_mds)::value_type;
     using index_t = typename decltype(out_mds)::index_type;
 
     const index_t num = out_mds.extent(0);
@@ -3424,38 +3362,42 @@ constexpr void linspace_ufunc(auto &&start, auto &&stop, auto &&out,
 
     } else if (num == 1) {
         if (!endpoint) {
-            static_cast<void>(copy<value_t, backend>(
+            static_cast<void>(copy<void, backend>(
                 start_mds, core::submdspan_from_left(out_mds, 0)));
 
         } else {
-            static_cast<void>(copy<value_t, backend>(
+            static_cast<void>(copy<void, backend>(
                 stop_mds, core::submdspan_from_left(out_mds, 0)));
         }
 
     } else {
-        const value_t scale = value_t{1} / (endpoint ? num - 1 : num);
+        using calc_t = core::floating_calc_type_t<dtype, decltype(start_mds),
+                                                  decltype(stop_mds)>;
 
-        const auto actual_step = multiply<value_t, backend>(
-            subtract<value_t, backend>(stop_mds, start_mds), scale);
+        const calc_t scale =
+            calc_t{1} / static_cast<calc_t>(endpoint ? num - 1 : num);
 
-        static_cast<void>(
-            copy(start_mds, core::submdspan_from_left(out_mds, 0)));
+        const auto actual_step = multiply<calc_t, backend>(
+            subtract<calc_t, backend>(stop_mds, start_mds), scale);
+
+        static_cast<void>(copy<void, backend>(
+            start_mds, core::submdspan_from_left(out_mds, 0)));
 
         for (index_t i = 1; i < num; i++) {
-            static_cast<void>(add<void, backend>(
+            static_cast<void>(add<calc_t, backend>(
                 core::submdspan_from_left(out_mds, i - 1), actual_step,
                 core::submdspan_from_left(out_mds, i)));
         }
 
         if (endpoint) {
             // Ensure that the last element is exactly equal to the stop value
-            static_cast<void>(
-                copy(stop_mds, core::submdspan_from_left(out_mds, num - 1)));
+            static_cast<void>(copy<void, backend>(
+                stop_mds, core::submdspan_from_left(out_mds, num - 1)));
         }
     }
 }
 
-} // namespace ufunc
+} // namespace detail
 
 template <std::int64_t axis = 0, typename dtype = void,
           core::Backend backend = core::Backend::AUTO,
@@ -3463,6 +3405,7 @@ template <std::int64_t axis = 0, typename dtype = void,
 [[nodiscard]] constexpr auto linspace(auto &&shape, auto &&start, auto &&stop,
                                       const bool endpoint = true,
                                       out_t &&out = out_t{std::nullopt}) {
+    // TODO: modify batch and use linspace_impl.
     const auto exts = core::to_extents(std::forward<decltype(shape)>(shape));
 
     static_assert(exts.rank() == 1,
@@ -3479,10 +3422,10 @@ template <std::int64_t axis = 0, typename dtype = void,
         static_cast<std::size_t>(core::bounding_index(axis, bexts.rank()));
     constexpr std::size_t out_urank = bexts.rank() + 1 - baxis;
 
-    using value_t = core::output_value_t<dtype, decltype(start_bcast),
-                                         decltype(stop_bcast)>;
+    using calc_t = core::floating_calc_type_t<dtype, decltype(start_bcast),
+                                              decltype(stop_bcast)>;
 
-    auto out_md = core::resolve_output<value_t>(
+    auto out_md = core::resolve_output<calc_t>(
         std::forward<decltype(out)>(out),
         core::compose_extents(
             core::slice_extents_from_left<baxis>(bexts), exts,
@@ -3490,7 +3433,7 @@ template <std::int64_t axis = 0, typename dtype = void,
 
     core::batch<backend>(
         [&](auto &&...elems) {
-            ufunc::linspace_ufunc<core::Backend::NATIVE>(
+            detail::linspace_impl<calc_t, core::Backend::NATIVE>(
                 std::forward<decltype(elems)>(elems)..., endpoint);
         },
         std::index_sequence<out_urank - 1, out_urank - 1, out_urank>{},
@@ -3528,14 +3471,13 @@ template <std::size_t num, std::int64_t axis = 0, typename dtype = void,
 
 namespace mdtensor {
 
-template <typename dtype = double, core::Backend backend = core::Backend::AUTO,
+template <core::arithmetic value_t = double,
+          core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t>
 [[nodiscard]] constexpr auto ones(auto &&shape,
                                   out_t &&out = out_t{std::nullopt}) {
-    using calc_t = core::output_value_with_nullopt_t<dtype, decltype(out)>;
-
-    return full<calc_t, backend>(std::forward<decltype(shape)>(shape),
-                                 calc_t{1}, std::forward<decltype(out)>(out));
+    return full<value_t, backend>(std::forward<decltype(shape)>(shape),
+                                  value_t{1}, std::forward<decltype(out)>(out));
 }
 
 } // namespace mdtensor
@@ -3558,8 +3500,13 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t>
 [[nodiscard]] constexpr auto ones_like(auto &&in,
                                        out_t &&out = out_t{std::nullopt}) {
-    return full_like<dtype, backend>(std::forward<decltype(in)>(in), 1,
-                                     std::forward<decltype(out)>(out));
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    using value_t = core::calc_type_t<dtype, decltype(in_mds)>;
+
+    return full_like<value_t, backend>(std::forward<decltype(in)>(in),
+                                       value_t{1},
+                                       std::forward<decltype(out)>(out));
 }
 
 } // namespace mdtensor
@@ -3578,12 +3525,13 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
 
 namespace mdtensor {
 
-template <typename dtype = double, core::Backend backend = core::Backend::AUTO,
+template <core::arithmetic value_t = double,
+          core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t>
 [[nodiscard]] constexpr auto zeros(auto &&shape,
                                    out_t &&out = out_t{std::nullopt}) {
-    return full<dtype, backend>(std::forward<decltype(shape)>(shape), 0,
-                                std::forward<decltype(out)>(out));
+    return full<value_t, backend>(std::forward<decltype(shape)>(shape),
+                                  value_t{0}, std::forward<decltype(out)>(out));
 }
 
 } // namespace mdtensor
@@ -3606,8 +3554,13 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t>
 [[nodiscard]] constexpr auto zeros_like(auto &&in,
                                         out_t &&out = out_t{std::nullopt}) {
-    return full_like<dtype, backend>(std::forward<decltype(in)>(in), 0,
-                                     std::forward<decltype(out)>(out));
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    using value_t = core::calc_type_t<dtype, decltype(in_mds)>;
+
+    return full_like<value_t, backend>(std::forward<decltype(in)>(in),
+                                       value_t{0},
+                                       std::forward<decltype(out)>(out));
 }
 
 } // namespace mdtensor
@@ -3649,17 +3602,25 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
 
 namespace mdtensor {
 namespace ufunc {
+namespace detail {
 
-template <std::floating_point dtype>
-[[nodiscard]] constexpr dtype
-sqrt_newton_raphson(const dtype &x, const dtype &curr, const dtype &prev) {
+template <std::floating_point calc_t>
+[[nodiscard]] constexpr calc_t
+sqrt_newton_raphson(const calc_t &x, const calc_t &curr, const calc_t &prev) {
     return (curr == prev)
                ? curr
-               : sqrt_newton_raphson(x, (curr + x / curr) / (dtype)2, curr);
+               : sqrt_newton_raphson(x, (curr + x / curr) / (calc_t)2, curr);
 }
 
-constexpr void sqrt_ufunc_native(auto &&in, auto &&out) {
-    using calc_t = core::common_arithmetic_type_t<decltype(in), float>;
+} // namespace detail
+
+template <typename dtype = void>
+constexpr void sqrt_ufunc(auto &&in, auto &&out, auto &&where) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
+            return;
+        }
+    }
 
     if constexpr (requires {
                       { std::isnan(in) } -> std::convertible_to<bool>;
@@ -3679,40 +3640,21 @@ constexpr void sqrt_ufunc_native(auto &&in, auto &&out) {
         }
     }
 
-    if constexpr (std::is_same_v<std::remove_cvref_t<decltype(in)>, bool>) {
-        out = static_cast<calc_t>(in);
+    if constexpr (core::bool_c<decltype(in)>) {
+        out = in;
         return;
 
     } else {
+        using calc_t =
+            core::floating_calc_type_t<dtype, decltype(in), decltype(out)>;
+
+        // NOTE: std::sqrt is not used here becase it is not constexpr in C++20.
         out = (in >= 0 && in < std::numeric_limits<calc_t>::infinity())
-                  ? sqrt_newton_raphson(static_cast<calc_t>(in),
-                                        static_cast<calc_t>(in),
-                                        static_cast<calc_t>(0))
+                  ? detail::sqrt_newton_raphson(static_cast<calc_t>(in),
+                                                static_cast<calc_t>(in),
+                                                static_cast<calc_t>(0))
                   : std::numeric_limits<calc_t>::quiet_NaN();
     }
-}
-
-constexpr void sqrt_ufunc(auto &&in, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
-            return;
-        }
-    }
-
-#ifdef REAL_GCC
-    if (!std::is_constant_evaluated()) {
-        if constexpr (requires { out = std::sqrt(in); }) {
-            out = std::sqrt(in);
-            return;
-        }
-    }
-
-#endif
-
-    sqrt_ufunc_native(std::forward<decltype(in)>(in),
-                      std::forward<decltype(out)>(out));
 }
 
 } // namespace ufunc
@@ -3723,12 +3665,14 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
                                   where_t &&where = where_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = core::resolve_output_like<dtype, true>(
+    using calc_t = core::floating_calc_type_t<dtype, decltype(in_mds)>;
+
+    auto out_md = core::resolve_output_like<calc_t>(
         std::forward<decltype(out)>(out), in_mds);
 
     core::batch<backend>(
         [](auto &&...elems) {
-            ufunc::sqrt_ufunc(std::forward<decltype(elems)>(elems)...);
+            ufunc::sqrt_ufunc<calc_t>(std::forward<decltype(elems)>(elems)...);
         },
         std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
@@ -3944,10 +3888,8 @@ namespace mdtensor {
 namespace ufunc {
 
 constexpr void absolute_ufunc(auto &&in, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
@@ -3973,7 +3915,9 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
                                       where_t &&where = where_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = core::resolve_output_like<dtype>(
+    using calc_t = core::calc_type_t<dtype, decltype(in_mds)>;
+
+    auto out_md = core::resolve_output_like<calc_t>(
         std::forward<decltype(out)>(out), in_mds);
 
     core::batch<backend>(
@@ -4609,7 +4553,7 @@ constexpr void matvec_ufunc(auto &&in1, auto &&in2, auto &&out) {
                   core::eigen::eigen_mappable_c<out_mds_t>) {
         if (!std::is_constant_evaluated() &&
             8 <= out_mds.extent(0) + out_mds.extent(1)) {
-            using value_t = core::common_arithmetic_type_t<
+            using value_t = core::promote_type_t<
                 typename std::remove_cvref_t<in1_mds_t>::value_type,
                 typename std::remove_cvref_t<in2_mds_t>::value_type>;
 
@@ -4661,8 +4605,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
     const auto uin1_exts = core::slice_extents_from_right<2>(in1_mds.extents());
     const auto uin2_exts = core::slice_extents_from_right<2>(in2_mds.extents());
     const auto uout_exts = core::extents<
-        core::common_integral_type_t<typename decltype(uin1_exts)::index_type,
-                                     typename decltype(uin2_exts)::index_type>,
+        std::common_type_t<typename decltype(uin1_exts)::index_type,
+                           typename decltype(uin2_exts)::index_type>,
         decltype(uin1_exts)::static_extent(0)>{uin1_exts.extent(0)};
 
     auto out = core::make_broadcasted_tensor<dtype>(
@@ -4776,7 +4720,7 @@ constexpr void vecmat_ufunc(auto &&in1, auto &&in2, auto &&out) {
                   core::eigen::eigen_mappable_c<out_mds_t>) {
         if (!std::is_constant_evaluated() &&
             8 <= out_mds.extent(0) + out_mds.extent(1)) {
-            using value_t = core::common_arithmetic_type_t<
+            using value_t = core::promote_type_t<
                 typename std::remove_cvref_t<in1_mds_t>::value_type,
                 typename std::remove_cvref_t<in2_mds_t>::value_type>;
 
@@ -4828,8 +4772,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
     const auto uin1_exts = core::slice_extents_from_right<2>(in1_mds.extents());
     const auto uin2_exts = core::slice_extents_from_right<2>(in2_mds.extents());
     const auto uout_exts = core::extents<
-        core::common_integral_type_t<typename decltype(uin1_exts)::index_type,
-                                     typename decltype(uin2_exts)::index_type>,
+        std::common_type_t<typename decltype(uin1_exts)::index_type,
+                           typename decltype(uin2_exts)::index_type>,
         decltype(uin2_exts)::static_extent(1)>{uin2_exts.extent(1)};
 
     auto out = core::make_broadcasted_tensor<dtype>(
@@ -4910,8 +4854,8 @@ template <core::mdspan_c in1_t, core::mdspan_c in2_t, core::mdspan_c out_t>
              core::eigen::eigen_mappable_c<out_t>)
 inline void matmul_ufunc_eigen(const in1_t &in1, const in2_t &in2,
                                const out_t &out) {
-    using value_t = core::common_arithmetic_type_t<typename in1_t::value_type,
-                                                   typename in2_t::value_type>;
+    using value_t = core::promote_type_t<typename in1_t::value_type,
+                                         typename in2_t::value_type>;
 
     const auto ein1 = core::eigen::to_eigen(in1);
     const auto ein2 = core::eigen::to_eigen(in2);
@@ -5104,10 +5048,8 @@ namespace ufunc {
 
 constexpr void logical_and_ufunc(auto &&in1, auto &&in2, auto &&out,
                                  auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
@@ -5117,7 +5059,7 @@ constexpr void logical_and_ufunc(auto &&in1, auto &&in2, auto &&out,
 
 } // namespace ufunc
 
-template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+template <core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
 [[nodiscard]] constexpr auto
 logical_and(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
@@ -5127,7 +5069,7 @@ logical_and(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    auto out_md = core::resolve_broadcasted_output<dtype>(
+    auto out_md = core::resolve_broadcasted_output<bool>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds);
 
@@ -5146,78 +5088,96 @@ logical_and(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
 
 namespace mdtensor {
 
-template <typename dtype = bool, bool keepdims = false,
-          core::Backend backend = core::Backend::AUTO, std::integral axes_t,
-          axes_t... axes, typename out_t = std::nullopt_t,
+template <bool keepdims = false, core::Backend backend = core::Backend::AUTO,
+          std::integral axes_t, axes_t... axes, typename out_t = std::nullopt_t,
           typename where_t = std::nullopt_t>
 [[nodiscard]] constexpr auto all(auto &&in,
                                  std::integer_sequence<axes_t, axes...>,
                                  out_t &&out = out_t{std::nullopt},
                                  where_t &&where = where_t{std::nullopt}) {
+    // TODO: move batch outside of reduce, add escape when out is initialized
+    // and already false. and specialization
+
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+    const auto where_mds =
+        core::to_const_mdspan(std::forward<decltype(where)>(where));
 
-    auto out_md = core::resolve_reduced_output<dtype, keepdims>(
-        std::forward<decltype(out)>(out),
-        std::integer_sequence<axes_t, axes...>{}, core::extents<std::uint8_t>{},
-        in_mds);
+    if constexpr (sizeof...(axes) == 0) {
+        bool init = false;
 
-    auto init = full_like<bool>(out_md, false);
+        const bool is_all_true = core::batch_while(
+            [&](auto &&in_u, auto &&where_u) {
+                static_cast<void>(core::initialize_ufunc(init, where_u));
 
-    // TODO: move batch outside of reduce,
-    // and add escape when out is initialized and already false.
-    core::reduce<keepdims>(
-        [&](auto &&...elems) {
-            core::batch<backend>(
-                [](auto &&in_u, auto &&out_u, auto &&init_u, auto &&where_u) {
-                    if (core::initialize_ufunc(
-                            std::forward<decltype(init_u)>(init_u),
-                            std::forward<decltype(where_u)>(where_u))) {
-                        ufunc::copy_ufunc<bool>(
-                            std::forward<decltype(in_u)>(in_u),
-                            std::forward<decltype(out_u)>(out_u));
-
-                    } else {
-                        ufunc::logical_and_ufunc(
-                            std::forward<decltype(in_u)>(in_u),
-                            std::forward<decltype(out_u)>(out_u),
-                            std::forward<decltype(out_u)>(out_u),
-                            std::forward<decltype(where_u)>(where_u));
+                if constexpr (requires { static_cast<bool>(where_u); }) {
+                    if (!static_cast<bool>(where_u)) {
+                        return true;
                     }
-                },
-                std::integer_sequence<bool, true, false, false, true>{},
-                std::forward<decltype(elems)>(elems)...);
-        },
-        std::integer_sequence<axes_t, axes...>{},
-        std::integer_sequence<bool, true, false, false, true>{}, in_mds, out_md,
-        init, std::forward<decltype(where)>(where));
+                }
 
-    if (!core::batch_while([](auto &&init_u) { return init_u; }, init)) {
-        throw std::runtime_error(
-            "mdtensor::all: cannot initialize output tensor.");
+                return static_cast<bool>(in_u);
+            },
+            std::integer_sequence<bool, true, true>{}, in_mds, where_mds);
+
+        if (!init) {
+            throw std::runtime_error(
+                "mdtensor::all: cannot initialize output tensor.");
+        }
+
+        return is_all_true;
+
+    } else {
+        auto out_md = core::resolve_reduced_output<bool, keepdims>(
+            std::forward<decltype(out)>(out),
+            std::integer_sequence<axes_t, axes...>{},
+            core::extents<std::uint8_t>{}, in_mds);
+
+        auto init = full_like<bool>(out_md, false);
+
+        core::reduce<keepdims>(
+            [&](auto &&...elems) {
+                core::batch<backend>(
+                    [](auto &&in_u, auto &&out_u, auto &&init_u,
+                       auto &&where_u) {
+                        if (core::initialize_ufunc(
+                                std::forward<decltype(init_u)>(init_u),
+                                std::forward<decltype(where_u)>(where_u))) {
+                            ufunc::copy_ufunc<bool>(
+                                std::forward<decltype(in_u)>(in_u),
+                                std::forward<decltype(out_u)>(out_u));
+
+                        } else {
+                            ufunc::logical_and_ufunc(
+                                std::forward<decltype(in_u)>(in_u),
+                                std::forward<decltype(out_u)>(out_u),
+                                std::forward<decltype(out_u)>(out_u),
+                                std::forward<decltype(where_u)>(where_u));
+                        }
+                    },
+                    std::integer_sequence<bool, true, false, false, true>{},
+                    std::forward<decltype(elems)>(elems)...);
+            },
+            std::integer_sequence<axes_t, axes...>{},
+            std::integer_sequence<bool, true, false, false, true>{}, in_mds,
+            out_md, init, where_mds);
+
+        if (!core::batch_while([](auto &&init_u) { return init_u; }, init)) {
+            throw std::runtime_error(
+                "mdtensor::all: cannot initialize output tensor.");
+        }
+
+        return out_md;
     }
-
-    return out_md;
 }
 
-template <std::int64_t axis, typename dtype = void, bool keepdims = false,
-          core::Backend backend = core::Backend::AUTO,
-          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
-[[nodiscard]] constexpr auto all(auto &&in, out_t &&out = out_t{std::nullopt},
+template <core::Backend backend = core::Backend::AUTO,
+          typename where_t = std::nullopt_t>
+    requires(!core::integer_sequence_c<where_t>)
+[[nodiscard]] constexpr bool all(auto &&in,
                                  where_t &&where = where_t{std::nullopt}) {
-    return all<dtype, keepdims, backend>(
-        std::forward<decltype(in)>(in),
-        std::integer_sequence<std::int64_t, axis>{},
-        std::forward<decltype(out)>(out), std::forward<decltype(where)>(where));
-}
-
-template <typename dtype = void, bool keepdims = false,
-          core::Backend backend = core::Backend::AUTO,
-          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
-[[nodiscard]] constexpr auto all(auto &&in, out_t &&out = out_t{std::nullopt},
-                                 where_t &&where = where_t{std::nullopt}) {
-    return all<dtype, keepdims, backend>(
-        std::forward<decltype(in)>(in), std::index_sequence<>{},
-        std::forward<decltype(out)>(out), std::forward<decltype(where)>(where));
+    return all<false, backend>(std::forward<decltype(in)>(in),
+                               std::index_sequence<>{}, std::nullopt,
+                               std::forward<decltype(where)>(where));
 }
 
 } // namespace mdtensor
@@ -5237,7 +5197,9 @@ template <typename dtype = void, bool keepdims = false,
                                  where_t &&where = where_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = core::resolve_reduced_output<dtype, keepdims>(
+    using calc_t = core::calc_type_t<dtype, decltype(in_mds)>;
+
+    auto out_md = core::resolve_reduced_output<calc_t, keepdims>(
         std::forward<decltype(out)>(out),
         std::integer_sequence<axes_t, axes...>{}, core::extents<std::uint8_t>{},
         in_mds);
@@ -5283,33 +5245,17 @@ template <typename dtype = void, bool keepdims = false,
     return out_md;
 }
 
-template <std::int64_t axis, typename dtype = void, bool keepdims = false,
-          core::Backend backend = core::Backend::AUTO,
-          typename out_t = std::nullopt_t, typename initial_t = std::nullopt_t,
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename initial_t = std::nullopt_t,
           typename where_t = std::nullopt_t>
-[[nodiscard]] constexpr auto sum(auto &&in, out_t &&out = out_t{std::nullopt},
+    requires(!core::integer_sequence_c<initial_t>)
+[[nodiscard]] constexpr auto sum(auto &&in,
                                  initial_t &&initial = initial_t{std::nullopt},
                                  where_t &&where = where_t{std::nullopt}) {
-    return sum<dtype, keepdims, backend>(
-        std::forward<decltype(in)>(in),
-        std::integer_sequence<std::int64_t, axis>{},
-        std::forward<decltype(out)>(out),
-        std::forward<decltype(initial)>(initial),
-        std::forward<decltype(where)>(where));
-}
-
-template <typename dtype = void, bool keepdims = false,
-          core::Backend backend = core::Backend::AUTO,
-          typename out_t = std::nullopt_t, typename initial_t = std::nullopt_t,
-          typename where_t = std::nullopt_t>
-[[nodiscard]] constexpr auto sum(auto &&in, out_t &&out = out_t{std::nullopt},
-                                 initial_t &&initial = initial_t{std::nullopt},
-                                 where_t &&where = where_t{std::nullopt}) {
-    return sum<dtype, keepdims, backend>(
-        std::forward<decltype(in)>(in), std::index_sequence<>{},
-        std::forward<decltype(out)>(out),
-        std::forward<decltype(initial)>(initial),
-        std::forward<decltype(where)>(where));
+    return sum<dtype, false, backend>(std::forward<decltype(in)>(in),
+                                      std::index_sequence<>{}, std::nullopt,
+                                      std::forward<decltype(initial)>(initial),
+                                      std::forward<decltype(where)>(where));
 }
 
 } // namespace mdtensor
@@ -5612,22 +5558,18 @@ constexpr void isclose_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&rtol,
         }
     }
 
-    using out_t = std::remove_cvref_t<decltype(out)>;
-    using calc_t =
-        core::common_arithmetic_type_t<decltype(in1), decltype(in2),
-                                       decltype(rtol), decltype(atol)>;
+    using common_t = core::promote_type_t<decltype(in1), decltype(in2),
+                                          decltype(rtol), decltype(atol)>;
 
-    out = static_cast<out_t>(
-        absolute(static_cast<calc_t>(in1) - static_cast<calc_t>(in2)) <=
-        (static_cast<calc_t>(atol) +
-         static_cast<calc_t>(rtol) * absolute(static_cast<calc_t>(in2))));
+    out = absolute(static_cast<common_t>(in1) - static_cast<common_t>(in2)) <=
+          (static_cast<common_t>(atol) +
+           static_cast<common_t>(rtol) * absolute(static_cast<common_t>(in2)));
 }
 
 } // namespace ufunc
 
-template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
-          typename rtol_t = double, typename atol_t = double,
-          typename out_t = std::nullopt_t>
+template <core::Backend backend = core::Backend::AUTO, typename rtol_t = double,
+          typename atol_t = double, typename out_t = std::nullopt_t>
 [[nodiscard]] constexpr auto
 isclose(auto &&in1, auto &&in2, rtol_t &&rtol = rtol_t{1e-05},
         atol_t &&atol = atol_t{1e-08}, out_t &&out = out_t{std::nullopt},
@@ -5641,7 +5583,7 @@ isclose(auto &&in1, auto &&in2, rtol_t &&rtol = rtol_t{1e-05},
     const auto atol_mds =
         core::to_const_mdspan(std::forward<decltype(atol)>(atol));
 
-    auto out_md = core::resolve_broadcasted_output<dtype>(
+    auto out_md = core::resolve_broadcasted_output<bool>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds, rtol_mds, atol_mds);
 
@@ -5666,11 +5608,43 @@ template <core::Backend backend = core::Backend::AUTO, typename rtol_t = double,
 [[nodiscard]] constexpr bool
 allclose(auto &&in1, auto &&in2, rtol_t &&rtol = rtol_t{1e-05},
          atol_t &&atol = atol_t{1e-08}, const bool equal_nan = false) {
-    return all<void, false, core::Backend::NATIVE>(isclose<bool, backend>(
+#if false
+    // NOTE: This implementation is not used because it cannot use escape.
+    // TODO: use lazy-evaluation
+    return all<false, core::Backend::NATIVE>(isclose<backend>(
         std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
-        std::forward<decltype(rtol)>(rtol), std::forward<decltype(atol)>(atol),
-        std::nullopt, equal_nan));
+        std::forward<decltype(rtol)>(rtol),
+        std::forward<decltype(atol)>(atol), std::nullopt, equal_nan));
+
+#else
+    bool init = false;
+
+    const bool is_allclose = core::batch_while(
+        [&](auto &&in1_u, auto &&in2_u, auto &&rtol_u, auto &&atol_u) {
+            static_cast<void>(core::initialize_ufunc(init, std::nullopt));
+
+            bool out;
+            ufunc::isclose_ufunc(std::forward<decltype(in1_u)>(in1_u),
+                                 std::forward<decltype(in2_u)>(in2_u), out,
+                                 std::forward<decltype(rtol_u)>(rtol_u),
+                                 std::forward<decltype(atol_u)>(atol_u),
+                                 equal_nan);
+            return out;
+        },
+        std::integer_sequence<bool, true, true, true, true>{},
+        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
+        std::forward<decltype(rtol)>(rtol), std::forward<decltype(atol)>(atol));
+
+    if (!init) {
+        throw std::runtime_error(
+            "mdtensor::allclose: cannot initialize output tensor.");
+    }
+
+    return is_allclose;
+
+#endif
 }
+
 } // namespace mdtensor
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/allclose.hpp
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/logic/any.hpp
@@ -5701,10 +5675,8 @@ namespace ufunc {
 
 constexpr void logical_or_ufunc(auto &&in1, auto &&in2, auto &&out,
                                 auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
@@ -5714,7 +5686,7 @@ constexpr void logical_or_ufunc(auto &&in1, auto &&in2, auto &&out,
 
 } // namespace ufunc
 
-template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+template <core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
 [[nodiscard]] constexpr auto
 logical_or(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
@@ -5724,7 +5696,7 @@ logical_or(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    auto out_md = core::resolve_broadcasted_output<dtype>(
+    auto out_md = core::resolve_broadcasted_output<bool>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds);
 
@@ -5743,78 +5715,96 @@ logical_or(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
 
 namespace mdtensor {
 
-template <typename dtype = bool, bool keepdims = false,
-          core::Backend backend = core::Backend::AUTO, std::integral axes_t,
-          axes_t... axes, typename out_t = std::nullopt_t,
+template <bool keepdims = false, core::Backend backend = core::Backend::AUTO,
+          std::integral axes_t, axes_t... axes, typename out_t = std::nullopt_t,
           typename where_t = std::nullopt_t>
 [[nodiscard]] constexpr auto any(auto &&in,
                                  std::integer_sequence<axes_t, axes...>,
                                  out_t &&out = out_t{std::nullopt},
                                  where_t &&where = where_t{std::nullopt}) {
+    // TODO: move batch outside of reduce, add escape when out is initialized
+    // and already false. and specialization
+
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+    const auto where_mds =
+        core::to_const_mdspan(std::forward<decltype(where)>(where));
 
-    auto out_md = core::resolve_reduced_output<dtype, keepdims>(
-        std::forward<decltype(out)>(out),
-        std::integer_sequence<axes_t, axes...>{}, core::extents<std::uint8_t>{},
-        in_mds);
+    if constexpr (sizeof...(axes) == 0) {
+        bool init = false;
 
-    auto init = full_like<bool>(out_md, false);
+        const bool is_all_false = core::batch_while(
+            [&](auto &&in_u, auto &&where_u) {
+                static_cast<void>(core::initialize_ufunc(init, where_u));
 
-    // TODO: move batch outside of reduce,
-    // and add escape when out is initialized and already true.
-    core::reduce<keepdims>(
-        [&](auto &&...elems) {
-            core::batch<backend>(
-                [](auto &&in_u, auto &&out_u, auto &&init_u, auto &&where_u) {
-                    if (core::initialize_ufunc(
-                            std::forward<decltype(init_u)>(init_u),
-                            std::forward<decltype(where_u)>(where_u))) {
-                        ufunc::copy_ufunc<bool>(
-                            std::forward<decltype(in_u)>(in_u),
-                            std::forward<decltype(out_u)>(out_u));
-
-                    } else {
-                        ufunc::logical_or_ufunc(
-                            std::forward<decltype(in_u)>(in_u),
-                            std::forward<decltype(out_u)>(out_u),
-                            std::forward<decltype(out_u)>(out_u),
-                            std::forward<decltype(where_u)>(where_u));
+                if constexpr (requires { static_cast<bool>(where_u); }) {
+                    if (!static_cast<bool>(where_u)) {
+                        return true;
                     }
-                },
-                std::integer_sequence<bool, true, false, false, true>{},
-                std::forward<decltype(elems)>(elems)...);
-        },
-        std::integer_sequence<axes_t, axes...>{},
-        std::integer_sequence<bool, true, false, false, true>{}, in_mds, out_md,
-        init, std::forward<decltype(where)>(where));
+                }
 
-    if (!all(init)) {
-        throw std::runtime_error(
-            "mdtensor::any: cannot initialize output tensor.");
+                return !static_cast<bool>(in_u);
+            },
+            std::integer_sequence<bool, true, true>{}, in_mds, where_mds);
+
+        if (!init) {
+            throw std::runtime_error(
+                "mdtensor::any: cannot initialize output tensor.");
+        }
+
+        return !is_all_false;
+
+    } else {
+        auto out_md = core::resolve_reduced_output<bool, keepdims>(
+            std::forward<decltype(out)>(out),
+            std::integer_sequence<axes_t, axes...>{},
+            core::extents<std::uint8_t>{}, in_mds);
+
+        auto init = full_like<bool>(out_md, false);
+
+        core::reduce<keepdims>(
+            [&](auto &&...elems) {
+                core::batch<backend>(
+                    [](auto &&in_u, auto &&out_u, auto &&init_u,
+                       auto &&where_u) {
+                        if (core::initialize_ufunc(
+                                std::forward<decltype(init_u)>(init_u),
+                                std::forward<decltype(where_u)>(where_u))) {
+                            ufunc::copy_ufunc<bool>(
+                                std::forward<decltype(in_u)>(in_u),
+                                std::forward<decltype(out_u)>(out_u));
+
+                        } else {
+                            ufunc::logical_or_ufunc(
+                                std::forward<decltype(in_u)>(in_u),
+                                std::forward<decltype(out_u)>(out_u),
+                                std::forward<decltype(out_u)>(out_u),
+                                std::forward<decltype(where_u)>(where_u));
+                        }
+                    },
+                    std::integer_sequence<bool, true, false, false, true>{},
+                    std::forward<decltype(elems)>(elems)...);
+            },
+            std::integer_sequence<axes_t, axes...>{},
+            std::integer_sequence<bool, true, false, false, true>{}, in_mds,
+            out_md, init, where_mds);
+
+        if (!all(init)) {
+            throw std::runtime_error(
+                "mdtensor::any: cannot initialize output tensor.");
+        }
+
+        return out_md;
     }
-
-    return out_md;
 }
 
-template <std::int64_t axis, typename dtype = void, bool keepdims = false,
-          core::Backend backend = core::Backend::AUTO,
-          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
-[[nodiscard]] constexpr auto any(auto &&in, out_t &&out = out_t{std::nullopt},
+template <core::Backend backend = core::Backend::AUTO,
+          typename where_t = std::nullopt_t>
+    requires(!core::integer_sequence_c<where_t>)
+[[nodiscard]] constexpr bool any(auto &&in,
                                  where_t &&where = where_t{std::nullopt}) {
-    return any<dtype, keepdims, backend>(
-        std::forward<decltype(in)>(in),
-        std::integer_sequence<std::int64_t, axis>{},
-        std::forward<decltype(out)>(out), std::forward<decltype(where)>(where));
-}
-
-template <typename dtype = void, bool keepdims = false,
-          core::Backend backend = core::Backend::AUTO,
-          typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
-[[nodiscard]] constexpr auto any(auto &&in, out_t &&out = out_t{std::nullopt},
-                                 where_t &&where = where_t{std::nullopt}) {
-    return any<dtype, keepdims, backend>(
-        std::forward<decltype(in)>(in), std::index_sequence<>{},
-        std::forward<decltype(out)>(out), std::forward<decltype(where)>(where));
+    return any<false, backend>(std::forward<decltype(in)>(in),
+                               std::index_sequence<>{}, std::nullopt,
+                               std::forward<decltype(where)>(where));
 }
 
 } // namespace mdtensor
@@ -5845,9 +5835,7 @@ constexpr bool array_equal_ufunc(auto &&in1, auto &&in2) {
         }
     }
 
-    using calc_t = core::common_arithmetic_type_t<decltype(in1), decltype(in2)>;
-
-    return static_cast<calc_t>(in1) == static_cast<calc_t>(in2);
+    return in1 == in2;
 }
 
 } // namespace ufunc
@@ -5935,10 +5923,8 @@ namespace mdtensor {
 namespace ufunc {
 
 constexpr void equal_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
@@ -5948,7 +5934,7 @@ constexpr void equal_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
 
 } // namespace ufunc
 
-template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+template <core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
 [[nodiscard]] constexpr auto equal(auto &&in1, auto &&in2,
                                    out_t &&out = out_t{std::nullopt},
@@ -5958,7 +5944,7 @@ template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    auto out_md = core::resolve_broadcasted_output<dtype>(
+    auto out_md = core::resolve_broadcasted_output<bool>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds);
 
@@ -5990,10 +5976,8 @@ namespace mdtensor {
 namespace ufunc {
 
 constexpr void greater_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
@@ -6003,7 +5987,7 @@ constexpr void greater_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
 
 } // namespace ufunc
 
-template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+template <core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
 [[nodiscard]] constexpr auto greater(auto &&in1, auto &&in2,
                                      out_t &&out = out_t{std::nullopt},
@@ -6013,7 +5997,7 @@ template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    auto out_md = core::resolve_broadcasted_output<dtype>(
+    auto out_md = core::resolve_broadcasted_output<bool>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds);
 
@@ -6046,10 +6030,8 @@ namespace ufunc {
 
 constexpr void greater_equal_ufunc(auto &&in1, auto &&in2, auto &&out,
                                    auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
@@ -6059,7 +6041,7 @@ constexpr void greater_equal_ufunc(auto &&in1, auto &&in2, auto &&out,
 
 } // namespace ufunc
 
-template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+template <core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
 [[nodiscard]] constexpr auto
 greater_equal(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
@@ -6069,7 +6051,10 @@ greater_equal(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    auto out_md = core::resolve_broadcasted_output<dtype>(
+    using calc_t =
+        core::calc_type_t<bool, decltype(in1_mds), decltype(in2_mds)>;
+
+    auto out_md = core::resolve_broadcasted_output<calc_t>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds);
 
@@ -6101,10 +6086,8 @@ namespace mdtensor {
 namespace ufunc {
 
 constexpr void isinf_ufunc(auto &&in, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
@@ -6123,13 +6106,13 @@ constexpr void isinf_ufunc(auto &&in, auto &&out, auto &&where) {
 
 } // namespace ufunc
 
-template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+template <core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
 [[nodiscard]] constexpr auto isinf(auto &&in, out_t &&out = out_t{std::nullopt},
                                    where_t &&where = where_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = core::resolve_output_like<dtype>(
+    auto out_md = core::resolve_output_like<bool>(
         std::forward<decltype(out)>(out), in_mds);
 
     core::batch<backend>(
@@ -6160,10 +6143,8 @@ namespace mdtensor {
 namespace ufunc {
 
 constexpr void isnan_ufunc(auto &&in, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
@@ -6182,13 +6163,13 @@ constexpr void isnan_ufunc(auto &&in, auto &&out, auto &&where) {
 
 } // namespace ufunc
 
-template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+template <core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
 [[nodiscard]] constexpr auto isnan(auto &&in, out_t &&out = out_t{std::nullopt},
                                    where_t &&where = where_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = core::resolve_output_like<dtype>(
+    auto out_md = core::resolve_output_like<bool>(
         std::forward<decltype(out)>(out), in_mds);
 
     core::batch<backend>(
@@ -6219,10 +6200,8 @@ namespace mdtensor {
 namespace ufunc {
 
 constexpr void less_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
@@ -6232,7 +6211,7 @@ constexpr void less_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
 
 } // namespace ufunc
 
-template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+template <core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
 [[nodiscard]] constexpr auto less(auto &&in1, auto &&in2,
                                   out_t &&out = out_t{std::nullopt},
@@ -6242,7 +6221,7 @@ template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    auto out_md = core::resolve_broadcasted_output<dtype>(
+    auto out_md = core::resolve_broadcasted_output<bool>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds);
 
@@ -6275,10 +6254,8 @@ namespace ufunc {
 
 constexpr void less_equal_ufunc(auto &&in1, auto &&in2, auto &&out,
                                 auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
@@ -6288,7 +6265,7 @@ constexpr void less_equal_ufunc(auto &&in1, auto &&in2, auto &&out,
 
 } // namespace ufunc
 
-template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+template <core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
 [[nodiscard]] constexpr auto
 less_equal(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
@@ -6298,7 +6275,7 @@ less_equal(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    auto out_md = core::resolve_broadcasted_output<dtype>(
+    auto out_md = core::resolve_broadcasted_output<bool>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds);
 
@@ -6330,10 +6307,8 @@ namespace mdtensor {
 namespace ufunc {
 
 constexpr void logical_not_ufunc(auto &&in, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
@@ -6343,14 +6318,14 @@ constexpr void logical_not_ufunc(auto &&in, auto &&out, auto &&where) {
 
 } // namespace ufunc
 
-template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+template <core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
 [[nodiscard]] constexpr auto
 logical_not(auto &&in, out_t &&out = out_t{std::nullopt},
             where_t &&where = where_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = core::resolve_output_like<dtype>(
+    auto out_md = core::resolve_output_like<bool>(
         std::forward<decltype(out)>(out), in_mds);
 
     core::batch<backend>(
@@ -6382,10 +6357,8 @@ namespace ufunc {
 
 constexpr void logical_xor_ufunc(auto &&in1, auto &&in2, auto &&out,
                                  auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
@@ -6395,7 +6368,7 @@ constexpr void logical_xor_ufunc(auto &&in1, auto &&in2, auto &&out,
 
 } // namespace ufunc
 
-template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+template <core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
 [[nodiscard]] constexpr auto
 logical_xor(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
@@ -6405,7 +6378,7 @@ logical_xor(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    auto out_md = core::resolve_broadcasted_output<dtype>(
+    auto out_md = core::resolve_broadcasted_output<bool>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds);
 
@@ -6438,10 +6411,8 @@ namespace ufunc {
 
 constexpr void not_equal_ufunc(auto &&in1, auto &&in2, auto &&out,
                                auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
@@ -6451,7 +6422,7 @@ constexpr void not_equal_ufunc(auto &&in1, auto &&in2, auto &&out,
 
 } // namespace ufunc
 
-template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+template <core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
 [[nodiscard]] constexpr auto
 not_equal(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
@@ -6461,7 +6432,7 @@ not_equal(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    auto out_md = core::resolve_broadcasted_output<dtype>(
+    auto out_md = core::resolve_broadcasted_output<bool>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds);
 
@@ -6605,7 +6576,7 @@ template <std::int64_t axis, core::extents_c... ins_t>
     static_assert(sizeof...(ins) > 0,
                   "At least one extents must be provided for concatenation.");
 
-    using index_t = core::common_integral_type_t<
+    using index_t = std::common_type_t<
         typename std::remove_cvref_t<ins_t>::index_type...>;
 
     constexpr std::size_t rank = std::remove_cvref_t<
@@ -6660,7 +6631,7 @@ template <std::int64_t axis = 0, typename dtype = void>
             detail::concatenate_extents<axis>(ins.extents()...);
 
         // generate out
-        using value_t = core::output_value_t<
+        using value_t = core::calc_type_t<
             dtype, typename std::remove_cvref_t<decltype(ins)>::value_type...>;
         auto out = empty<value_t>(out_extents);
 
@@ -6880,19 +6851,18 @@ template <std::int64_t... axes>
 namespace mdtensor {
 namespace ufunc {
 
+template <typename dtype = void>
 constexpr void atan2_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
 
-    using value_t = core::common_arithmetic_type_t<decltype(in1), decltype(in2),
-                                                   decltype(out)>;
+    using calc_t = core::floating_calc_type_t<dtype, decltype(in1),
+                                              decltype(in2), decltype(out)>;
 
-    out = std::atan2(static_cast<value_t>(in1), static_cast<value_t>(in2));
+    out = std::atan2(static_cast<calc_t>(in1), static_cast<calc_t>(in2));
 }
 
 } // namespace ufunc
@@ -6907,13 +6877,16 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    auto out_md = core::resolve_broadcasted_output<dtype, true>(
+    using calc_t =
+        core::floating_calc_type_t<dtype, decltype(in1_mds), decltype(in2_mds)>;
+
+    auto out_md = core::resolve_broadcasted_output<calc_t>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds);
 
     core::batch<backend>(
         [](auto &&...elems) {
-            ufunc::atan2_ufunc(std::forward<decltype(elems)>(elems)...);
+            ufunc::atan2_ufunc<calc_t>(std::forward<decltype(elems)>(elems)...);
         },
         std::integer_sequence<bool, true, true, false, true>{}, in1_mds,
         in2_mds, out_md, std::forward<decltype(where)>(where));
@@ -6943,16 +6916,18 @@ constexpr void clip_ufunc(auto &&in, auto &&min, auto &&max, auto &&out) {
     // when min > max, np.clip returns max, and std::clamp returns min.
     // mdtensor.clip is designed to match the behavior of np.clip.
 
-    using value_t = std::remove_cvref_t<decltype(in)>;
-
     out = in;
 
     if constexpr (!core::nullopt_t_c<decltype(min)>) {
-        out = std::max(out, static_cast<value_t>(min));
+        using common_t = core::promote_type_t<decltype(out), decltype(min)>;
+
+        out = std::max(static_cast<common_t>(out), static_cast<common_t>(min));
     }
 
     if constexpr (!core::nullopt_t_c<decltype(max)>) {
-        out = std::min(out, static_cast<value_t>(max));
+        using common_t = core::promote_type_t<decltype(out), decltype(max)>;
+
+        out = std::min(static_cast<common_t>(out), static_cast<common_t>(max));
     }
 }
 
@@ -6970,7 +6945,10 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto max_mds =
         core::to_const_mdspan(std::forward<decltype(max)>(max));
 
-    auto out_md = core::resolve_broadcasted_output<dtype>(
+    using calc_t = core::calc_type_t<dtype, decltype(in_mds), decltype(min_mds),
+                                     decltype(max_mds)>;
+
+    auto out_md = core::resolve_broadcasted_output<calc_t>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{}, in_mds,
         min_mds, max_mds);
 
@@ -7002,18 +6980,18 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
 namespace mdtensor {
 namespace ufunc {
 
+template <typename dtype = void>
 constexpr void cos_ufunc(auto &&in, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
 
-    using value_t = core::common_arithmetic_type_t<decltype(in), decltype(out)>;
+    using calc_t =
+        core::floating_calc_type_t<dtype, decltype(in), decltype(out)>;
 
-    out = std::cos(static_cast<value_t>(in));
+    out = std::cos(static_cast<calc_t>(in));
 }
 
 } // namespace ufunc
@@ -7024,12 +7002,14 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
                                  where_t &&where = where_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = core::resolve_output_like<dtype, true>(
+    using calc_t = core::floating_calc_type_t<dtype, decltype(in_mds)>;
+
+    auto out_md = core::resolve_output_like<calc_t>(
         std::forward<decltype(out)>(out), in_mds);
 
     core::batch<backend>(
         [](auto &&...elems) {
-            ufunc::cos_ufunc(std::forward<decltype(elems)>(elems)...);
+            ufunc::cos_ufunc<calc_t>(std::forward<decltype(elems)>(elems)...);
         },
         std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
@@ -7060,11 +7040,10 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
                                      where_t &&where = where_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = core::resolve_output_like<dtype, true>(
-        std::forward<decltype(out)>(out), in_mds);
+    using calc_t = core::floating_calc_type_t<dtype, decltype(in_mds)>;
 
-    using calc_t =
-        core::common_value_type_t<decltype(in_mds), decltype(out_md)>;
+    auto out_md = core::resolve_output_like<calc_t>(
+        std::forward<decltype(out)>(out), in_mds);
 
     constexpr calc_t D2R = std::numbers::pi_v<calc_t> / calc_t{180};
 
@@ -7092,10 +7071,8 @@ namespace mdtensor {
 namespace ufunc {
 
 constexpr void divide_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
@@ -7115,7 +7092,10 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    auto out_md = core::resolve_broadcasted_output<dtype>(
+    using calc_t =
+        core::calc_type_t<dtype, decltype(in1_mds), decltype(in2_mds)>;
+
+    auto out_md = core::resolve_broadcasted_output<calc_t>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds);
 
@@ -7158,22 +7138,18 @@ namespace mdtensor {
 namespace ufunc {
 
 constexpr void maximum_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
-
-    using value_t = std::remove_cvref_t<decltype(out)>;
 
     // if one of the inputs is NaN, return NaN (numpy-like)
     if constexpr (requires {
                       { std::isnan(in1) } -> std::convertible_to<bool>;
                   }) {
         if (std::isnan(in1)) {
-            out = std::numeric_limits<value_t>::quiet_NaN();
+            out = in1;
             return;
         }
     }
@@ -7182,12 +7158,14 @@ constexpr void maximum_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
                       { std::isnan(in2) } -> std::convertible_to<bool>;
                   }) {
         if (std::isnan(in2)) {
-            out = std::numeric_limits<value_t>::quiet_NaN();
+            out = in2;
             return;
         }
     }
 
-    out = std::max(static_cast<value_t>(in1), static_cast<value_t>(in2));
+    using common_t = core::promote_type_t<decltype(in1), decltype(in2)>;
+
+    out = std::max(static_cast<common_t>(in1), static_cast<common_t>(in2));
 }
 
 } // namespace ufunc
@@ -7233,7 +7211,9 @@ template <typename dtype = void, bool keepdims = false,
                                  where_t &&where = where_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = core::resolve_reduced_output<dtype, keepdims>(
+    using calc_t = core::calc_type_t<dtype, decltype(in_mds)>;
+
+    auto out_md = core::resolve_reduced_output<calc_t, keepdims>(
         std::forward<decltype(out)>(out),
         std::integer_sequence<axes_t, axes...>{}, core::extents<std::uint8_t>{},
         in_mds);
@@ -7279,33 +7259,17 @@ template <typename dtype = void, bool keepdims = false,
     return out_md;
 }
 
-template <std::int64_t axis, typename dtype = void, bool keepdims = false,
-          core::Backend backend = core::Backend::AUTO,
-          typename out_t = std::nullopt_t, typename initial_t = std::nullopt_t,
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename initial_t = std::nullopt_t,
           typename where_t = std::nullopt_t>
-[[nodiscard]] constexpr auto max(auto &&in, out_t &&out = out_t{std::nullopt},
+    requires(!core::integer_sequence_c<initial_t>)
+[[nodiscard]] constexpr auto max(auto &&in,
                                  initial_t &&initial = initial_t{std::nullopt},
                                  where_t &&where = where_t{std::nullopt}) {
-    return max<dtype, keepdims, backend>(
-        std::forward<decltype(in)>(in),
-        std::integer_sequence<std::int64_t, axis>{},
-        std::forward<decltype(out)>(out),
-        std::forward<decltype(initial)>(initial),
-        std::forward<decltype(where)>(where));
-}
-
-template <typename dtype = void, bool keepdims = false,
-          core::Backend backend = core::Backend::AUTO,
-          typename out_t = std::nullopt_t, typename initial_t = std::nullopt_t,
-          typename where_t = std::nullopt_t>
-[[nodiscard]] constexpr auto max(auto &&in, out_t &&out = out_t{std::nullopt},
-                                 initial_t &&initial = initial_t{std::nullopt},
-                                 where_t &&where = where_t{std::nullopt}) {
-    return max<dtype, keepdims, backend>(
-        std::forward<decltype(in)>(in), std::index_sequence<>{},
-        std::forward<decltype(out)>(out),
-        std::forward<decltype(initial)>(initial),
-        std::forward<decltype(where)>(where));
+    return max<dtype, false, backend>(std::forward<decltype(in)>(in),
+                                      std::index_sequence<>{}, std::nullopt,
+                                      std::forward<decltype(initial)>(initial),
+                                      std::forward<decltype(where)>(where));
 }
 
 } // namespace mdtensor
@@ -7337,22 +7301,18 @@ namespace mdtensor {
 namespace ufunc {
 
 constexpr void minimum_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
-
-    using value_t = std::remove_cvref_t<decltype(out)>;
 
     // if one of the inputs is NaN, return NaN (numpy-like)
     if constexpr (requires {
                       { std::isnan(in1) } -> std::convertible_to<bool>;
                   }) {
         if (std::isnan(in1)) {
-            out = std::numeric_limits<value_t>::quiet_NaN();
+            out = in1;
             return;
         }
     }
@@ -7361,12 +7321,14 @@ constexpr void minimum_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
                       { std::isnan(in2) } -> std::convertible_to<bool>;
                   }) {
         if (std::isnan(in2)) {
-            out = std::numeric_limits<value_t>::quiet_NaN();
+            out = in2;
             return;
         }
     }
 
-    out = std::min(static_cast<value_t>(in1), static_cast<value_t>(in2));
+    using common_t = core::promote_type_t<decltype(in1), decltype(in2)>;
+
+    out = std::min(static_cast<common_t>(in1), static_cast<common_t>(in2));
 }
 
 } // namespace ufunc
@@ -7412,7 +7374,9 @@ template <typename dtype = void, bool keepdims = false,
                                  where_t &&where = where_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = core::resolve_reduced_output<dtype, keepdims>(
+    using calc_t = core::calc_type_t<dtype, decltype(in_mds)>;
+
+    auto out_md = core::resolve_reduced_output<calc_t, keepdims>(
         std::forward<decltype(out)>(out),
         std::integer_sequence<axes_t, axes...>{}, core::extents<std::uint8_t>{},
         in_mds);
@@ -7458,33 +7422,17 @@ template <typename dtype = void, bool keepdims = false,
     return out_md;
 }
 
-template <std::int64_t axis, typename dtype = void, bool keepdims = false,
-          core::Backend backend = core::Backend::AUTO,
-          typename out_t = std::nullopt_t, typename initial_t = std::nullopt_t,
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename initial_t = std::nullopt_t,
           typename where_t = std::nullopt_t>
-[[nodiscard]] constexpr auto min(auto &&in, out_t &&out = out_t{std::nullopt},
+    requires(!core::integer_sequence_c<initial_t>)
+[[nodiscard]] constexpr auto min(auto &&in,
                                  initial_t &&initial = initial_t{std::nullopt},
                                  where_t &&where = where_t{std::nullopt}) {
-    return min<dtype, keepdims, backend>(
-        std::forward<decltype(in)>(in),
-        std::integer_sequence<std::int64_t, axis>{},
-        std::forward<decltype(out)>(out),
-        std::forward<decltype(initial)>(initial),
-        std::forward<decltype(where)>(where));
-}
-
-template <typename dtype = void, bool keepdims = false,
-          core::Backend backend = core::Backend::AUTO,
-          typename out_t = std::nullopt_t, typename initial_t = std::nullopt_t,
-          typename where_t = std::nullopt_t>
-[[nodiscard]] constexpr auto min(auto &&in, out_t &&out = out_t{std::nullopt},
-                                 initial_t &&initial = initial_t{std::nullopt},
-                                 where_t &&where = where_t{std::nullopt}) {
-    return min<dtype, keepdims, backend>(
-        std::forward<decltype(in)>(in), std::index_sequence<>{},
-        std::forward<decltype(out)>(out),
-        std::forward<decltype(initial)>(initial),
-        std::forward<decltype(where)>(where));
+    return min<dtype, false, backend>(std::forward<decltype(in)>(in),
+                                      std::index_sequence<>{}, std::nullopt,
+                                      std::forward<decltype(initial)>(initial),
+                                      std::forward<decltype(where)>(where));
 }
 
 } // namespace mdtensor
@@ -7534,33 +7482,15 @@ nanmax(auto &&in, std::integer_sequence<axes_t, axes...>,
         std::forward<decltype(initial)>(initial), mask);
 }
 
-template <std::int64_t axis, typename dtype = void, bool keepdims = false,
-          core::Backend backend = core::Backend::AUTO,
-          typename out_t = std::nullopt_t, typename initial_t = std::nullopt_t,
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename initial_t = std::nullopt_t,
           typename where_t = std::nullopt_t>
+    requires(!core::integer_sequence_c<initial_t>)
 [[nodiscard]] constexpr auto
-nanmax(auto &&in, out_t &&out = out_t{std::nullopt},
-       initial_t &&initial = initial_t{std::nullopt},
+nanmax(auto &&in, initial_t &&initial = initial_t{std::nullopt},
        where_t &&where = where_t{std::nullopt}) {
-    return nanmax<dtype, keepdims, backend>(
-        std::forward<decltype(in)>(in),
-        std::integer_sequence<std::int64_t, axis>{},
-        std::forward<decltype(out)>(out),
-        std::forward<decltype(initial)>(initial),
-        std::forward<decltype(where)>(where));
-}
-
-template <typename dtype = void, bool keepdims = false,
-          core::Backend backend = core::Backend::AUTO,
-          typename out_t = std::nullopt_t, typename initial_t = std::nullopt_t,
-          typename where_t = std::nullopt_t>
-[[nodiscard]] constexpr auto
-nanmax(auto &&in, out_t &&out = out_t{std::nullopt},
-       initial_t &&initial = initial_t{std::nullopt},
-       where_t &&where = where_t{std::nullopt}) {
-    return nanmax<dtype, keepdims, backend>(
-        std::forward<decltype(in)>(in), std::index_sequence<>{},
-        std::forward<decltype(out)>(out),
+    return nanmax<dtype, false, backend>(
+        std::forward<decltype(in)>(in), std::index_sequence<>{}, std::nullopt,
         std::forward<decltype(initial)>(initial),
         std::forward<decltype(where)>(where));
 }
@@ -7612,33 +7542,14 @@ nanmin(auto &&in, std::integer_sequence<axes_t, axes...>,
         std::forward<decltype(initial)>(initial), mask);
 }
 
-template <std::int64_t axis, typename dtype = void, bool keepdims = false,
-          core::Backend backend = core::Backend::AUTO,
-          typename out_t = std::nullopt_t, typename initial_t = std::nullopt_t,
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename initial_t = std::nullopt_t,
           typename where_t = std::nullopt_t>
 [[nodiscard]] constexpr auto
-nanmin(auto &&in, out_t &&out = out_t{std::nullopt},
-       initial_t &&initial = initial_t{std::nullopt},
+nanmin(auto &&in, initial_t &&initial = initial_t{std::nullopt},
        where_t &&where = where_t{std::nullopt}) {
-    return nanmin<dtype, keepdims, backend>(
-        std::forward<decltype(in)>(in),
-        std::integer_sequence<std::int64_t, axis>{},
-        std::forward<decltype(out)>(out),
-        std::forward<decltype(initial)>(initial),
-        std::forward<decltype(where)>(where));
-}
-
-template <typename dtype = void, bool keepdims = false,
-          core::Backend backend = core::Backend::AUTO,
-          typename out_t = std::nullopt_t, typename initial_t = std::nullopt_t,
-          typename where_t = std::nullopt_t>
-[[nodiscard]] constexpr auto
-nanmin(auto &&in, out_t &&out = out_t{std::nullopt},
-       initial_t &&initial = initial_t{std::nullopt},
-       where_t &&where = where_t{std::nullopt}) {
-    return nanmin<dtype, keepdims, backend>(
-        std::forward<decltype(in)>(in), std::index_sequence<>{},
-        std::forward<decltype(out)>(out),
+    return nanmin<dtype, false, backend>(
+        std::forward<decltype(in)>(in), std::index_sequence<>{}, std::nullopt,
         std::forward<decltype(initial)>(initial),
         std::forward<decltype(where)>(where));
 }
@@ -7661,10 +7572,8 @@ namespace mdtensor {
 namespace ufunc {
 
 constexpr void negative_ufunc(auto &&in, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
@@ -7681,7 +7590,9 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
                                       where_t &&where = where_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = core::resolve_output_like<dtype>(
+    using calc_t = core::calc_type_t<dtype, decltype(in_mds)>;
+
+    auto out_md = core::resolve_output_like<calc_t>(
         std::forward<decltype(out)>(out), in_mds);
 
     core::batch<backend>(
@@ -7717,14 +7628,10 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
                                      where_t &&where = where_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = core::resolve_output_like<dtype, true>(
+    using calc_t = core::floating_calc_type_t<dtype, decltype(in_mds)>;
+
+    auto out_md = core::resolve_output_like<calc_t>(
         std::forward<decltype(out)>(out), in_mds);
-
-    using calc_t =
-        core::common_value_type_t<decltype(in_mds), decltype(out_md)>;
-
-    static_assert(std::is_floating_point_v<calc_t> &&
-                  "rad2deg conversion requires at least float precision.");
 
     constexpr calc_t R2D = std::numbers::inv_pi_v<calc_t> * calc_t{180};
 
@@ -7752,10 +7659,8 @@ namespace mdtensor {
 namespace ufunc {
 
 constexpr void sign_ufunc(auto &&in, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
@@ -7772,7 +7677,9 @@ template <typename dtype = std::int8_t,
                                   where_t &&where = where_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = core::resolve_output_like<dtype>(
+    using calc_t = core::signed_calc_type_t<dtype, decltype(in_mds)>;
+
+    auto out_md = core::resolve_output_like<calc_t>(
         std::forward<decltype(out)>(out), in_mds);
 
     core::batch<backend>(
@@ -7802,18 +7709,18 @@ template <typename dtype = std::int8_t,
 namespace mdtensor {
 namespace ufunc {
 
+template <typename dtype = void>
 constexpr void sin_ufunc(auto &&in, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
 
-    using value_t = core::common_arithmetic_type_t<decltype(in), decltype(out)>;
+    using calc_t =
+        core::floating_calc_type_t<dtype, decltype(in), decltype(out)>;
 
-    out = std::sin(static_cast<value_t>(in));
+    out = std::sin(static_cast<calc_t>(in));
 }
 
 } // namespace ufunc
@@ -7824,12 +7731,14 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
                                  where_t &&where = where_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = core::resolve_output_like<dtype, true>(
+    using calc_t = core::floating_calc_type_t<dtype, decltype(in_mds)>;
+
+    auto out_md = core::resolve_output_like<calc_t>(
         std::forward<decltype(out)>(out), in_mds);
 
     core::batch<backend>(
         [](auto &&...elems) {
-            ufunc::sin_ufunc(std::forward<decltype(elems)>(elems)...);
+            ufunc::sin_ufunc<calc_t>(std::forward<decltype(elems)>(elems)...);
         },
         std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
@@ -7854,18 +7763,18 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
 namespace mdtensor {
 namespace ufunc {
 
+template <typename dtype = void>
 constexpr void tan_ufunc(auto &&in, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
 
-    using value_t = core::common_arithmetic_type_t<decltype(in), decltype(out)>;
+    using calc_t =
+        core::floating_calc_type_t<dtype, decltype(in), decltype(out)>;
 
-    out = std::tan(static_cast<value_t>(in));
+    out = std::tan(static_cast<calc_t>(in));
 }
 
 } // namespace ufunc
@@ -7876,12 +7785,14 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
                                  where_t &&where = where_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = core::resolve_output_like<dtype, true>(
+    using calc_t = core::floating_calc_type_t<dtype, decltype(in_mds)>;
+
+    auto out_md = core::resolve_output_like<calc_t>(
         std::forward<decltype(out)>(out), in_mds);
 
     core::batch<backend>(
         [](auto &&...elems) {
-            ufunc::tan_ufunc(std::forward<decltype(elems)>(elems)...);
+            ufunc::tan_ufunc<calc_t>(std::forward<decltype(elems)>(elems)...);
         },
         std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));
@@ -8194,12 +8105,14 @@ using default_random_engine_t = std::mt19937_64;
 
 namespace ufunc {
 
+template <typename dtype = void>
 constexpr void randint_ufunc(auto &&out, auto &&low, auto &&high,
                              auto &&engine) {
-    using value_t = std::remove_cvref_t<decltype(out)>;
+    using calc_t =
+        core::calc_type_t<dtype, decltype(out), decltype(low), decltype(high)>;
 
-    static_assert(std::is_integral_v<value_t>,
-                  "randint_ufunc requires integral value type.");
+    static_assert(std::is_integral_v<calc_t>,
+                  "randint_ufunc requires integral calculation type.");
 
     constexpr bool has_low =
         !core::nullopt_t_c<std::remove_cvref_t<decltype(low)>>;
@@ -8210,34 +8123,35 @@ constexpr void randint_ufunc(auto &&out, auto &&low, auto &&high,
         // NOTE: This implementation matches the behavior of
         // numpy.random.randint(low, high)
 
-        out = engine.template get_bounded<value_t>(static_cast<value_t>(low),
-                                                   static_cast<value_t>(high));
+        out = engine.template get_bounded<calc_t>(static_cast<calc_t>(low),
+                                                  static_cast<calc_t>(high));
 
     } else if constexpr (has_low && !has_high) {
         // NOTE: This implementation matches the behavior of
         // numpy.random.randint(low, high=None)
 
-        out = engine.template get_bounded<value_t>(value_t{0},
-                                                   static_cast<value_t>(low));
+        out = engine.template get_bounded<calc_t>(calc_t{0},
+                                                  static_cast<calc_t>(low));
 
     } else if constexpr (!has_low && has_high) {
         // NOTE: This implementation is not exist in numpy.random.randint,
         // but maybe useful for some use cases.
 
-        out = engine.template get_bounded<value_t>(
-            std::numeric_limits<value_t>::lowest(), static_cast<value_t>(high));
+        out = engine.template get_bounded<calc_t>(
+            std::numeric_limits<calc_t>::lowest(), static_cast<calc_t>(high));
 
     } else {
         // NOTE: This implementation is not exist in numpy.random.randint,
         // but maybe useful for some use cases.
 
-        out = engine.template get<value_t>();
+        out = engine.template get<calc_t>();
     }
 }
 
 } // namespace ufunc
 
-template <typename dtype = int, typename EngineType = default_random_engine_t,
+template <std::integral value_t = int,
+          typename EngineType = default_random_engine_t,
           typename shape_t = core::extents<std::uint8_t>,
           typename low_t = std::nullopt_t, typename high_t = std::nullopt_t,
           typename out_t = std::nullopt_t>
@@ -8250,7 +8164,7 @@ randint(shape_t &&shape = shape_t{}, low_t &&low = low_t{std::nullopt},
     const auto high_mds =
         core::to_const_mdspan(std::forward<decltype(high)>(high));
 
-    auto out_md = core::resolve_output<dtype>(
+    auto out_md = core::resolve_output<value_t>(
         std::forward<decltype(out)>(out),
         core::get_broadcast_extents(
             std::index_sequence<0, 0, 0>{},
@@ -8261,8 +8175,8 @@ randint(shape_t &&shape = shape_t{}, low_t &&low = low_t{std::nullopt},
 
     core::batch<core::Backend::NATIVE>(
         [&](auto &&...elems) {
-            ufunc::randint_ufunc(std::forward<decltype(elems)>(elems)...,
-                                 engine);
+            ufunc::randint_ufunc<value_t>(
+                std::forward<decltype(elems)>(elems)..., engine);
         },
         std::integer_sequence<bool, false, true, true>{}, out_md, low_mds,
         high_mds);
@@ -8275,39 +8189,40 @@ randint(shape_t &&shape = shape_t{}, low_t &&low = low_t{std::nullopt},
 
 namespace mdtensor::random {
 namespace ufunc {
+namespace detail {
 
-template <std::floating_point value_t>
-[[nodiscard]] constexpr value_t pow2_neg(std::size_t bits) noexcept {
-    value_t result = value_t{1};
+template <std::floating_point calc_t>
+[[nodiscard]] constexpr calc_t pow2_neg(std::size_t bits) noexcept {
+    calc_t result = calc_t{1};
 
     for (std::size_t i = 0; i < bits; i++) {
-        result *= value_t{0.5};
+        result *= calc_t{0.5};
     }
 
     return result;
 }
 
+} // namespace detail
+
+template <typename dtype = void>
 constexpr void rand_ufunc(auto &&out, auto &&engine) {
-    using value_t = std::remove_cvref_t<decltype(out)>;
-
-    static_assert(std::is_floating_point_v<value_t>,
-                  "rand_ufunc requires floating-point value type.");
-
     using base_t = typename std::remove_cvref_t<decltype(engine)>::base_t;
 
     static_assert(std::unsigned_integral<base_t>,
                   "rand_ufunc requires an unsigned integral engine result.");
 
+    using calc_t = core::floating_calc_type_t<dtype, decltype(out)>;
+
     constexpr std::size_t base_bits = std::numeric_limits<base_t>::digits;
-    constexpr std::size_t value_bits = std::numeric_limits<value_t>::digits;
+    constexpr std::size_t value_bits = std::numeric_limits<calc_t>::digits;
 
     if constexpr (value_bits <= base_bits) {
         const base_t bits = engine() >> (base_bits - value_bits);
-        out = static_cast<value_t>(bits) * pow2_neg<value_t>(value_bits);
+        out = static_cast<calc_t>(bits) * detail::pow2_neg<calc_t>(value_bits);
 
     } else {
-        value_t result = value_t{0};
-        value_t scale = value_t{1};
+        calc_t result = 0;
+        calc_t scale = 1;
 
         std::size_t remaining = value_bits;
 
@@ -8315,10 +8230,10 @@ constexpr void rand_ufunc(auto &&out, auto &&engine) {
             const std::size_t take =
                 remaining < base_bits ? remaining : base_bits;
 
-            const base_t bits = engine() >> (base_bits - take);
+            const base_t base = engine() >> (base_bits - take);
 
-            scale *= pow2_neg<value_t>(take);
-            result += static_cast<value_t>(bits) * scale;
+            scale *= detail::pow2_neg<calc_t>(static_cast<calc_t>(take));
+            result += static_cast<calc_t>(base) * scale;
 
             remaining -= take;
         }
@@ -8329,14 +8244,14 @@ constexpr void rand_ufunc(auto &&out, auto &&engine) {
 
 } // namespace ufunc
 
-template <typename dtype = double,
+template <std::floating_point value_t = double,
           typename EngineType = default_random_engine_t,
           typename shape_t = core::extents<std::uint8_t>,
           typename out_t = std::nullopt_t>
 [[nodiscard]] constexpr auto rand(shape_t &&shape = shape_t{},
                                   out_t &&out = out_t{std::nullopt},
                                   const seed_t seed = make_random_seed()) {
-    auto out_md = core::resolve_output<dtype, true>(
+    auto out_md = core::resolve_output<value_t>(
         std::forward<decltype(out)>(out),
         core::to_extents(std::forward<decltype(shape)>(shape)));
 
@@ -8344,7 +8259,8 @@ template <typename dtype = double,
 
     core::batch<core::Backend::NATIVE>(
         [&](auto &&...elems) {
-            ufunc::rand_ufunc(std::forward<decltype(elems)>(elems)..., engine);
+            ufunc::rand_ufunc<value_t>(std::forward<decltype(elems)>(elems)...,
+                                       engine);
         },
         out_md);
 
@@ -8368,23 +8284,27 @@ template <typename dtype = double,
 namespace mdtensor::random {
 namespace ufunc {
 
+template <typename dtype = void>
 constexpr void uniform_ufunc(auto &&out, auto &&low, auto &&high,
                              auto &&engine) {
-    using value_t = std::remove_cvref_t<decltype(out)>;
+    using calc_t = core::floating_calc_type_t<dtype, decltype(out),
+                                              decltype(low), decltype(high)>;
 
-    rand_ufunc(std::forward<decltype(out)>(out),
-               std::forward<decltype(engine)>(engine));
+    rand_ufunc<calc_t>(std::forward<decltype(out)>(out),
+                       std::forward<decltype(engine)>(engine));
 
-    out = (static_cast<value_t>(high) - static_cast<value_t>(low)) * out +
-          static_cast<value_t>(low);
+    out = static_cast<calc_t>(low) +
+          (static_cast<calc_t>(high) - static_cast<calc_t>(low)) *
+              static_cast<calc_t>(out);
 }
 
 } // namespace ufunc
 
-template <
-    typename dtype = double, typename EngineType = default_random_engine_t,
-    typename shape_t = core::extents<std::uint8_t>, typename low_t = dtype,
-    typename high_t = dtype, typename out_t = std::nullopt_t>
+template <std::floating_point value_t = double,
+          typename EngineType = default_random_engine_t,
+          typename shape_t = core::extents<std::uint8_t>,
+          typename low_t = value_t, typename high_t = value_t,
+          typename out_t = std::nullopt_t>
 [[nodiscard]] constexpr auto
 uniform(shape_t &&shape = shape_t{}, low_t &&low = low_t{0},
         high_t &&high = high_t{1}, out_t &&out = out_t{std::nullopt},
@@ -8394,7 +8314,7 @@ uniform(shape_t &&shape = shape_t{}, low_t &&low = low_t{0},
     const auto high_mds =
         core::to_const_mdspan(std::forward<decltype(high)>(high));
 
-    auto out_md = core::resolve_output<dtype, true>(
+    auto out_md = core::resolve_output<value_t>(
         std::forward<decltype(out)>(out),
         core::get_broadcast_extents(
             std::index_sequence<0, 0, 0>{},
@@ -8405,8 +8325,8 @@ uniform(shape_t &&shape = shape_t{}, low_t &&low = low_t{0},
 
     core::batch<core::Backend::NATIVE>(
         [&](auto &&...elems) {
-            ufunc::uniform_ufunc(std::forward<decltype(elems)>(elems)...,
-                                 engine);
+            ufunc::uniform_ufunc<value_t>(
+                std::forward<decltype(elems)>(elems)..., engine);
         },
         std::integer_sequence<bool, false, true, true>{}, out_md, low_mds,
         high_mds);
