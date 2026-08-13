@@ -20,11 +20,10 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
                                      where_t &&where = where_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = core::resolve_output_like<dtype, true>(
-        std::forward<decltype(out)>(out), in_mds);
+    using calc_t = core::floating_calc_type_t<dtype, decltype(in_mds)>;
 
-    using calc_t =
-        core::common_value_type_t<decltype(in_mds), decltype(out_md)>;
+    auto out_md = core::resolve_output_like<calc_t>(
+        std::forward<decltype(out)>(out), in_mds);
 
     constexpr calc_t D2R = std::numbers::pi_v<calc_t> / calc_t{180};
 

@@ -27,12 +27,12 @@ struct Target {
             }
         }();
 
-        auto out = md::empty<dtype>(len);
+        auto out = md::empty<std::int8_t>(len);
 
         benchmark::ClobberMemory();
 
         for (auto _ : state) {
-            static_cast<void>(md::sign<void, backend>(in, out));
+            static_cast<void>(md::sign<std::int8_t, backend>(in, out));
             benchmark::ClobberMemory();
         }
 

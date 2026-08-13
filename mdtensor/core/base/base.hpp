@@ -11,7 +11,6 @@
 
 #include "type/type.hpp"
 
-#include "expect.hpp"
 #include "extents.hpp"
 #include "mdspan.hpp"
 #include "submdspan.hpp"

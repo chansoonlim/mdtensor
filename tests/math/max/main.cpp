@@ -32,11 +32,11 @@ TEST(run_time, 2) {
 
     const auto a = md::reshape(md::arange(4), md::dims<2>{2, 2});
 
-    const auto a_max1 = md::max<0>(a);
-    const auto a_max2 = md::max<1>(a);
-    const auto a_max3 = md::max<0>(
-        a, std::nullopt, -1,
-        md::tensor<bool, md::dims<1>>{{false, true}, md::dims<1>{2}});
+    const auto a_max1 = md::max(a, std::index_sequence<0>{});
+    const auto a_max2 = md::max(a, std::index_sequence<1>{});
+    const auto a_max3 =
+        md::max(a, std::index_sequence<0>{}, std::nullopt, -1,
+                md::tensor<bool, md::dims<1>>{{false, true}, md::dims<1>{2}});
 
     std::cout << "a_max1: " << md::to_string(a_max1) << std::endl;
     std::cout << "a_max2: " << md::to_string(a_max2) << std::endl;
@@ -57,8 +57,7 @@ TEST(run_time, 3) {
     b(2) = std::numeric_limits<value_t>::quiet_NaN();
 
     const auto b_max1 = md::max(b);
-    const auto b_max2 =
-        md::max(b, std::nullopt, -1, md::logical_not(md::isnan(b)));
+    const auto b_max2 = md::max(b, -1, md::logical_not(md::isnan(b)));
     const auto b_max3 = md::nanmax(b);
 
     std::cout << "b_max1: " << md::to_string(b_max1) << std::endl;
@@ -78,7 +77,8 @@ TEST(run_time, 4) {
     const auto a =
         md::tensor<value_t, md::dims<2>>{{-50, 10}, md::dims<2>{2, 1}};
 
-    const auto a_max = md::max<-1>(a, std::nullopt, 0);
+    const auto a_max =
+        md::max(a, std::integer_sequence<int, -1>{}, std::nullopt, 0);
 
     std::cout << "a_max: " << md::to_string(a_max) << std::endl;
 
@@ -86,7 +86,7 @@ TEST(run_time, 4) {
         a_max, md::tensor<value_t, md::extents<index_t, 2>>{{0, 10}}));
 }
 
-TEST(run_time, 5) { ASSERT_EQ(md::max(5, std::nullopt, 6), 6); }
+TEST(run_time, 5) { ASSERT_EQ(md::max(5, 6), 6); }
 
 TEST(compile_time, 1) {
     using index_t = std::size_t;
@@ -107,11 +107,11 @@ TEST(compile_time, 2) {
     constexpr auto a =
         md::reshape(md::arange<4>(), md::extents<index_t, 2, 2>{});
 
-    constexpr auto a_max1 = md::max<0>(a);
-    constexpr auto a_max2 = md::max<1>(a);
+    constexpr auto a_max1 = md::max(a, std::index_sequence<0>{});
+    constexpr auto a_max2 = md::max(a, std::index_sequence<1>{});
     constexpr auto a_max3 =
-        md::max<0>(a, std::nullopt, -1,
-                   md::tensor<bool, md::extents<index_t, 2>>{{false, true}});
+        md::max(a, std::index_sequence<0>{}, std::nullopt, -1,
+                md::tensor<bool, md::extents<index_t, 2>>{{false, true}});
 
     std::cout << "a_max1: " << md::to_string(a_max1) << std::endl;
     std::cout << "a_max2: " << md::to_string(a_max2) << std::endl;
@@ -135,8 +135,7 @@ TEST(compile_time, 3) {
     }();
 
     constexpr auto b_max1 = md::max(b);
-    constexpr auto b_max2 =
-        md::max(b, std::nullopt, -1, md::logical_not(md::isnan(b)));
+    constexpr auto b_max2 = md::max(b, -1, md::logical_not(md::isnan(b)));
     constexpr auto b_max3 = md::nanmax(b);
 
     std::cout << "b_max1: " << md::to_string(b_max1) << std::endl;
@@ -156,7 +155,8 @@ TEST(compile_time, 4) {
     constexpr auto a =
         md::tensor<value_t, md::extents<index_t, 2, 1>>{{-50, 10}};
 
-    constexpr auto a_max = md::max<-1>(a, std::nullopt, 0);
+    constexpr auto a_max =
+        md::max(a, std::integer_sequence<int, -1>{}, std::nullopt, 0);
 
     std::cout << "a_max: " << md::to_string(a_max) << std::endl;
 
@@ -164,4 +164,4 @@ TEST(compile_time, 4) {
         a_max, md::tensor<value_t, md::extents<index_t, 2>>{{0, 10}}));
 }
 
-TEST(compile_time, 5) { static_assert(md::max(5, std::nullopt, 6) == 6); }
+TEST(compile_time, 5) { static_assert(md::max(5, 6) == 6); }

@@ -41,7 +41,7 @@ struct Target {
         benchmark::ClobberMemory();
 
         for (auto _ : state) {
-            static_cast<void>(md::less_equal<void, backend>(in1, in2, out));
+            static_cast<void>(md::less_equal<backend>(in1, in2, out));
             benchmark::ClobberMemory();
         }
 

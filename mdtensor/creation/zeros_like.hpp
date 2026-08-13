@@ -17,8 +17,13 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t>
 [[nodiscard]] constexpr auto zeros_like(auto &&in,
                                         out_t &&out = out_t{std::nullopt}) {
-    return full_like<dtype, backend>(std::forward<decltype(in)>(in), 0,
-                                     std::forward<decltype(out)>(out));
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    using value_t = core::calc_type_t<dtype, decltype(in_mds)>;
+
+    return full_like<value_t, backend>(std::forward<decltype(in)>(in),
+                                       value_t{0},
+                                       std::forward<decltype(out)>(out));
 }
 
 } // namespace mdtensor

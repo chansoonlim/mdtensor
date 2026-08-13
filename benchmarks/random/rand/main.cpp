@@ -25,7 +25,7 @@ struct Target {
         benchmark::ClobberMemory();
 
         for (auto _ : state) {
-            static_cast<void>(md::random::rand<void>(out.extents(), out));
+            static_cast<void>(md::random::rand<dtype>(out.extents(), out));
             benchmark::ClobberMemory();
         }
 

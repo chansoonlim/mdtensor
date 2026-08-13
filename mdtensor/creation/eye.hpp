@@ -29,7 +29,7 @@ constexpr void eye_ufunc(auto &&out, const int &k) {
 
 } // namespace ufunc
 
-template <typename dtype = std::int8_t,
+template <core::arithmetic value_t = std::int8_t,
           core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t>
 [[nodiscard]] constexpr auto eye(auto &&shape, const int &k = 0,
@@ -43,8 +43,8 @@ template <typename dtype = std::int8_t,
         static_assert(exts.rank() >= 2, "eye requires rank >= 2");
 
         auto out_md =
-            core::resolve_output<dtype>(std::forward<decltype(out)>(out),
-                                        std::forward<decltype(exts)>(exts));
+            core::resolve_output<value_t>(std::forward<decltype(out)>(out),
+                                          std::forward<decltype(exts)>(exts));
 
         core::batch<backend>(
             [&](auto &&...elems) {
@@ -62,20 +62,20 @@ template <typename dtype = std::int8_t,
 
         using index_t = std::make_unsigned_t<shape_t>;
 
-        return eye<dtype, backend>(
+        return eye<value_t, backend>(
             core::dextents<index_t, 2>{static_cast<index_t>(shape),
                                        static_cast<index_t>(shape)},
             k);
     }
 }
 
-template <std::size_t N, typename dtype = std::int8_t,
+template <std::size_t N, core::arithmetic value_t = std::int8_t,
           core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t>
 [[nodiscard]] constexpr auto eye(const int &k = 0,
                                  out_t &&out = out_t{std::nullopt}) {
-    return eye<dtype, backend>(core::extents<std::size_t, N, N>{}, k,
-                               std::forward<out_t>(out));
+    return eye<value_t, backend>(core::extents<std::size_t, N, N>{}, k,
+                                 std::forward<out_t>(out));
 }
 
 } // namespace mdtensor

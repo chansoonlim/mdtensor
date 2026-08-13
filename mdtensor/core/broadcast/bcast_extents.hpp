@@ -102,8 +102,8 @@ template <extents_c... ins_t>
     static_assert(sizeof...(ins) > 0,
                   "At least one extents must be provided for broadcasting.");
 
-    using index_t = core::common_integral_type_t<
-        typename std::remove_cvref_t<ins_t>::index_type...>;
+    using index_t =
+        std::common_type_t<typename std::remove_cvref_t<ins_t>::index_type...>;
 
     constexpr std::size_t brank = std::max({ins.rank()...});
 

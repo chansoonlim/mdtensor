@@ -7,6 +7,8 @@
  * See README and LICENSE files for full attribution details.
  */
 
+#define BENCHMARK_SKIP_INTEGER_TYPES
+
 #include "benchmarks/common/benchmarking.hpp"
 
 #include "mdtensor/mdtensor.hpp"
@@ -23,7 +25,7 @@ struct Target {
         benchmark::ClobberMemory();
 
         for (auto _ : state) {
-            static_cast<void>(md::linspace<0, void, backend>(
+            static_cast<void>(md::linspace<0, dtype, backend>(
                 out.extents(), dtype{0}, dtype{1}, true, out));
             benchmark::ClobberMemory();
         }

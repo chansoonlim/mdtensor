@@ -46,33 +46,14 @@ nanmin(auto &&in, std::integer_sequence<axes_t, axes...>,
         std::forward<decltype(initial)>(initial), mask);
 }
 
-template <std::int64_t axis, typename dtype = void, bool keepdims = false,
-          core::Backend backend = core::Backend::AUTO,
-          typename out_t = std::nullopt_t, typename initial_t = std::nullopt_t,
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename initial_t = std::nullopt_t,
           typename where_t = std::nullopt_t>
 [[nodiscard]] constexpr auto
-nanmin(auto &&in, out_t &&out = out_t{std::nullopt},
-       initial_t &&initial = initial_t{std::nullopt},
+nanmin(auto &&in, initial_t &&initial = initial_t{std::nullopt},
        where_t &&where = where_t{std::nullopt}) {
-    return nanmin<dtype, keepdims, backend>(
-        std::forward<decltype(in)>(in),
-        std::integer_sequence<std::int64_t, axis>{},
-        std::forward<decltype(out)>(out),
-        std::forward<decltype(initial)>(initial),
-        std::forward<decltype(where)>(where));
-}
-
-template <typename dtype = void, bool keepdims = false,
-          core::Backend backend = core::Backend::AUTO,
-          typename out_t = std::nullopt_t, typename initial_t = std::nullopt_t,
-          typename where_t = std::nullopt_t>
-[[nodiscard]] constexpr auto
-nanmin(auto &&in, out_t &&out = out_t{std::nullopt},
-       initial_t &&initial = initial_t{std::nullopt},
-       where_t &&where = where_t{std::nullopt}) {
-    return nanmin<dtype, keepdims, backend>(
-        std::forward<decltype(in)>(in), std::index_sequence<>{},
-        std::forward<decltype(out)>(out),
+    return nanmin<dtype, false, backend>(
+        std::forward<decltype(in)>(in), std::index_sequence<>{}, std::nullopt,
         std::forward<decltype(initial)>(initial),
         std::forward<decltype(where)>(where));
 }

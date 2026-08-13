@@ -21,12 +21,14 @@ using default_random_engine_t = std::mt19937_64;
 
 namespace ufunc {
 
+template <typename dtype = void>
 constexpr void randint_ufunc(auto &&out, auto &&low, auto &&high,
                              auto &&engine) {
-    using value_t = std::remove_cvref_t<decltype(out)>;
+    using calc_t =
+        core::calc_type_t<dtype, decltype(out), decltype(low), decltype(high)>;
 
-    static_assert(std::is_integral_v<value_t>,
-                  "randint_ufunc requires integral value type.");
+    static_assert(std::is_integral_v<calc_t>,
+                  "randint_ufunc requires integral calculation type.");
 
     constexpr bool has_low =
         !core::nullopt_t_c<std::remove_cvref_t<decltype(low)>>;
@@ -37,34 +39,35 @@ constexpr void randint_ufunc(auto &&out, auto &&low, auto &&high,
         // NOTE: This implementation matches the behavior of
         // numpy.random.randint(low, high)
 
-        out = engine.template get_bounded<value_t>(static_cast<value_t>(low),
-                                                   static_cast<value_t>(high));
+        out = engine.template get_bounded<calc_t>(static_cast<calc_t>(low),
+                                                  static_cast<calc_t>(high));
 
     } else if constexpr (has_low && !has_high) {
         // NOTE: This implementation matches the behavior of
         // numpy.random.randint(low, high=None)
 
-        out = engine.template get_bounded<value_t>(value_t{0},
-                                                   static_cast<value_t>(low));
+        out = engine.template get_bounded<calc_t>(calc_t{0},
+                                                  static_cast<calc_t>(low));
 
     } else if constexpr (!has_low && has_high) {
         // NOTE: This implementation is not exist in numpy.random.randint,
         // but maybe useful for some use cases.
 
-        out = engine.template get_bounded<value_t>(
-            std::numeric_limits<value_t>::lowest(), static_cast<value_t>(high));
+        out = engine.template get_bounded<calc_t>(
+            std::numeric_limits<calc_t>::lowest(), static_cast<calc_t>(high));
 
     } else {
         // NOTE: This implementation is not exist in numpy.random.randint,
         // but maybe useful for some use cases.
 
-        out = engine.template get<value_t>();
+        out = engine.template get<calc_t>();
     }
 }
 
 } // namespace ufunc
 
-template <typename dtype = int, typename EngineType = default_random_engine_t,
+template <std::integral value_t = int,
+          typename EngineType = default_random_engine_t,
           typename shape_t = core::extents<std::uint8_t>,
           typename low_t = std::nullopt_t, typename high_t = std::nullopt_t,
           typename out_t = std::nullopt_t>
@@ -77,7 +80,7 @@ randint(shape_t &&shape = shape_t{}, low_t &&low = low_t{std::nullopt},
     const auto high_mds =
         core::to_const_mdspan(std::forward<decltype(high)>(high));
 
-    auto out_md = core::resolve_output<dtype>(
+    auto out_md = core::resolve_output<value_t>(
         std::forward<decltype(out)>(out),
         core::get_broadcast_extents(
             std::index_sequence<0, 0, 0>{},
@@ -88,8 +91,8 @@ randint(shape_t &&shape = shape_t{}, low_t &&low = low_t{std::nullopt},
 
     core::batch<core::Backend::NATIVE>(
         [&](auto &&...elems) {
-            ufunc::randint_ufunc(std::forward<decltype(elems)>(elems)...,
-                                 engine);
+            ufunc::randint_ufunc<value_t>(
+                std::forward<decltype(elems)>(elems)..., engine);
         },
         std::integer_sequence<bool, false, true, true>{}, out_md, low_mds,
         high_mds);

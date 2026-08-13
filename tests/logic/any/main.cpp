@@ -34,7 +34,7 @@ TEST(run_time, 2) {
         {true, false, true, false, false, false}, md::dims<2>{2, 3}};
 
     EXPECT_TRUE(md::array_equal(
-        md::any<0>(a),
+        md::any(a, std::index_sequence<0>{}),
         md::tensor<value_t, md::extents<index_t, 3>>{{true, false, true}}));
 }
 
@@ -55,7 +55,7 @@ TEST(run_time, 4) {
         md::dims<2>{2, 1}};
 
     EXPECT_TRUE(md::array_equal(
-        md::any<1, void, true>(a),
+        md::any<true>(a, std::index_sequence<1>{}),
         md::tensor<bool, md::dims<2>>{{true, true}, md::dims<2>{2, 1}}));
 }
 
@@ -68,7 +68,7 @@ TEST(run_time, 5) {
     const auto where =
         md::tensor<bool, md::dims<2>>{{false, true}, md::dims<2>{2, 1}};
 
-    EXPECT_EQ(md::any(a, std::nullopt, where), false);
+    EXPECT_FALSE(md::any(a, where));
 }
 
 TEST(run_time, 6) {
@@ -79,10 +79,10 @@ TEST(run_time, 6) {
                                                     md::dims<2>{3, 3}};
 
     EXPECT_TRUE(md::array_equal(
-        md::any<0>(a),
+        md::any(a, std::index_sequence<0>{}),
         md::tensor<bool, md::extents<index_t, 3>>{{true, false, true}}));
     EXPECT_TRUE(md::array_equal(
-        md::any<1>(a),
+        md::any(a, std::index_sequence<1>{}),
         md::tensor<bool, md::extents<index_t, 3>>{{true, true, false}}));
 }
 
@@ -104,7 +104,7 @@ TEST(compile_time, 2) {
         {true, false, true, false, false, false}};
 
     static_assert(md::array_equal(
-        md::any<0>(a),
+        md::any(a, std::index_sequence<0>{}),
         md::tensor<value_t, md::extents<index_t, 3>>{{true, false, true}}));
 }
 
@@ -125,8 +125,13 @@ TEST(compile_time, 4) {
         {std::numeric_limits<value_t>::quiet_NaN(),
          std::numeric_limits<value_t>::infinity()}};
 
+    std::cout << "a: " << md::to_string(a) << std::endl;
+    std::cout << "any: "
+              << md::to_string(md::any<true>(a, std::index_sequence<0>{}))
+              << std::endl;
+
     static_assert(md::array_equal(
-        md::any<1, void, true>(a),
+        md::any<true>(a, std::index_sequence<1>{}),
         md::tensor<bool, md::extents<index_t, 2, 1>>{{true, true}}));
 }
 
@@ -140,7 +145,7 @@ TEST(compile_time, 5) {
     constexpr auto where =
         md::tensor<bool, md::extents<index_t, 2, 1>>{{false, true}};
 
-    static_assert(md::any(a, std::nullopt, where) == false);
+    static_assert(!md::any(a, where));
 }
 
 TEST(compile_time, 6) {
@@ -151,9 +156,9 @@ TEST(compile_time, 6) {
         {1, 0, 0, 0, 0, 1, 0, 0, 0}};
 
     static_assert(md::array_equal(
-        md::any<0>(a),
+        md::any(a, std::index_sequence<0>{}),
         md::tensor<bool, md::extents<index_t, 3>>{{true, false, true}}));
     static_assert(md::array_equal(
-        md::any<1>(a),
+        md::any(a, std::index_sequence<1>{}),
         md::tensor<bool, md::extents<index_t, 3>>{{true, true, false}}));
 }

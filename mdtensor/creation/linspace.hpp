@@ -15,11 +15,11 @@
 #include "copy.hpp"
 
 namespace mdtensor {
-namespace ufunc {
+namespace detail {
 
-template <core::Backend backend = core::Backend::AUTO>
-constexpr void linspace_ufunc(auto &&start, auto &&stop, auto &&out,
-                              const bool endpoint = true) {
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
+constexpr void linspace_impl(auto &&start, auto &&stop, auto &&out,
+                             const bool endpoint = true) {
     const auto start_mds =
         core::to_const_mdspan(std::forward<decltype(start)>(start));
     const auto stop_mds =
@@ -27,7 +27,6 @@ constexpr void linspace_ufunc(auto &&start, auto &&stop, auto &&out,
     const auto out_mds =
         core::to_output_mdspan(std::forward<decltype(out)>(out));
 
-    using value_t = typename decltype(out_mds)::value_type;
     using index_t = typename decltype(out_mds)::index_type;
 
     const index_t num = out_mds.extent(0);
@@ -37,38 +36,42 @@ constexpr void linspace_ufunc(auto &&start, auto &&stop, auto &&out,
 
     } else if (num == 1) {
         if (!endpoint) {
-            static_cast<void>(copy<value_t, backend>(
+            static_cast<void>(copy<void, backend>(
                 start_mds, core::submdspan_from_left(out_mds, 0)));
 
         } else {
-            static_cast<void>(copy<value_t, backend>(
+            static_cast<void>(copy<void, backend>(
                 stop_mds, core::submdspan_from_left(out_mds, 0)));
         }
 
     } else {
-        const value_t scale = value_t{1} / (endpoint ? num - 1 : num);
+        using calc_t = core::floating_calc_type_t<dtype, decltype(start_mds),
+                                                  decltype(stop_mds)>;
 
-        const auto actual_step = multiply<value_t, backend>(
-            subtract<value_t, backend>(stop_mds, start_mds), scale);
+        const calc_t scale =
+            calc_t{1} / static_cast<calc_t>(endpoint ? num - 1 : num);
 
-        static_cast<void>(
-            copy(start_mds, core::submdspan_from_left(out_mds, 0)));
+        const auto actual_step = multiply<calc_t, backend>(
+            subtract<calc_t, backend>(stop_mds, start_mds), scale);
+
+        static_cast<void>(copy<void, backend>(
+            start_mds, core::submdspan_from_left(out_mds, 0)));
 
         for (index_t i = 1; i < num; i++) {
-            static_cast<void>(add<void, backend>(
+            static_cast<void>(add<calc_t, backend>(
                 core::submdspan_from_left(out_mds, i - 1), actual_step,
                 core::submdspan_from_left(out_mds, i)));
         }
 
         if (endpoint) {
             // Ensure that the last element is exactly equal to the stop value
-            static_cast<void>(
-                copy(stop_mds, core::submdspan_from_left(out_mds, num - 1)));
+            static_cast<void>(copy<void, backend>(
+                stop_mds, core::submdspan_from_left(out_mds, num - 1)));
         }
     }
 }
 
-} // namespace ufunc
+} // namespace detail
 
 template <std::int64_t axis = 0, typename dtype = void,
           core::Backend backend = core::Backend::AUTO,
@@ -76,6 +79,7 @@ template <std::int64_t axis = 0, typename dtype = void,
 [[nodiscard]] constexpr auto linspace(auto &&shape, auto &&start, auto &&stop,
                                       const bool endpoint = true,
                                       out_t &&out = out_t{std::nullopt}) {
+    // TODO: modify batch and use linspace_impl.
     const auto exts = core::to_extents(std::forward<decltype(shape)>(shape));
 
     static_assert(exts.rank() == 1,
@@ -92,10 +96,10 @@ template <std::int64_t axis = 0, typename dtype = void,
         static_cast<std::size_t>(core::bounding_index(axis, bexts.rank()));
     constexpr std::size_t out_urank = bexts.rank() + 1 - baxis;
 
-    using value_t = core::output_value_t<dtype, decltype(start_bcast),
-                                         decltype(stop_bcast)>;
+    using calc_t = core::floating_calc_type_t<dtype, decltype(start_bcast),
+                                              decltype(stop_bcast)>;
 
-    auto out_md = core::resolve_output<value_t>(
+    auto out_md = core::resolve_output<calc_t>(
         std::forward<decltype(out)>(out),
         core::compose_extents(
             core::slice_extents_from_left<baxis>(bexts), exts,
@@ -103,7 +107,7 @@ template <std::int64_t axis = 0, typename dtype = void,
 
     core::batch<backend>(
         [&](auto &&...elems) {
-            ufunc::linspace_ufunc<core::Backend::NATIVE>(
+            detail::linspace_impl<calc_t, core::Backend::NATIVE>(
                 std::forward<decltype(elems)>(elems)..., endpoint);
         },
         std::index_sequence<out_urank - 1, out_urank - 1, out_urank>{},

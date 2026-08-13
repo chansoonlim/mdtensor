@@ -15,22 +15,18 @@ namespace mdtensor {
 namespace ufunc {
 
 constexpr void maximum_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
-
-    using value_t = std::remove_cvref_t<decltype(out)>;
 
     // if one of the inputs is NaN, return NaN (numpy-like)
     if constexpr (requires {
                       { std::isnan(in1) } -> std::convertible_to<bool>;
                   }) {
         if (std::isnan(in1)) {
-            out = std::numeric_limits<value_t>::quiet_NaN();
+            out = in1;
             return;
         }
     }
@@ -39,12 +35,14 @@ constexpr void maximum_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
                       { std::isnan(in2) } -> std::convertible_to<bool>;
                   }) {
         if (std::isnan(in2)) {
-            out = std::numeric_limits<value_t>::quiet_NaN();
+            out = in2;
             return;
         }
     }
 
-    out = std::max(static_cast<value_t>(in1), static_cast<value_t>(in2));
+    using common_t = core::promote_type_t<decltype(in1), decltype(in2)>;
+
+    out = std::max(static_cast<common_t>(in1), static_cast<common_t>(in2));
 }
 
 } // namespace ufunc

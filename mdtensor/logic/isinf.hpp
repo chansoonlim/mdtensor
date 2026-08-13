@@ -15,10 +15,8 @@ namespace mdtensor {
 namespace ufunc {
 
 constexpr void isinf_ufunc(auto &&in, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
@@ -37,13 +35,13 @@ constexpr void isinf_ufunc(auto &&in, auto &&out, auto &&where) {
 
 } // namespace ufunc
 
-template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+template <core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
 [[nodiscard]] constexpr auto isinf(auto &&in, out_t &&out = out_t{std::nullopt},
                                    where_t &&where = where_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = core::resolve_output_like<dtype>(
+    auto out_md = core::resolve_output_like<bool>(
         std::forward<decltype(out)>(out), in_mds);
 
     core::batch<backend>(

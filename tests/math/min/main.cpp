@@ -32,11 +32,11 @@ TEST(run_time, 2) {
 
     const auto a = md::reshape(md::arange(4), md::dims<2>{2, 2});
 
-    const auto a_min1 = md::min<0>(a);
-    const auto a_min2 = md::min<1>(a);
-    const auto a_min3 = md::min<0>(
-        a, std::nullopt, 10,
-        md::tensor<bool, md::dims<1>>{{false, true}, md::dims<1>{2}});
+    const auto a_min1 = md::min(a, std::index_sequence<0>{});
+    const auto a_min2 = md::min(a, std::index_sequence<1>{});
+    const auto a_min3 =
+        md::min(a, std::index_sequence<0>{}, std::nullopt, 10,
+                md::tensor<bool, md::dims<1>>{{false, true}, md::dims<1>{2}});
 
     std::cout << "a_min1: " << md::to_string(a_min1) << std::endl;
     std::cout << "a_min2: " << md::to_string(a_min2) << std::endl;
@@ -57,8 +57,7 @@ TEST(run_time, 3) {
     b(2) = std::numeric_limits<value_t>::quiet_NaN();
 
     const auto b_min1 = md::min(b);
-    const auto b_min2 =
-        md::min(b, std::nullopt, 10, md::logical_not(md::isnan(b)));
+    const auto b_min2 = md::min(b, 10, md::logical_not(md::isnan(b)));
     const auto b_min3 = md::nanmin(b);
 
     std::cout << "b_min1: " << md::to_string(b_min1) << std::endl;
@@ -78,7 +77,8 @@ TEST(run_time, 4) {
     const auto a =
         md::tensor<value_t, md::dims<2>>{{-50, 10}, md::dims<2>{2, 1}};
 
-    const auto a_min = md::min<-1>(a, std::nullopt, 0);
+    const auto a_min =
+        md::min(a, std::integer_sequence<int, -1>{}, std::nullopt, 0);
 
     std::cout << "a_min: " << md::to_string(a_min) << std::endl;
 
@@ -86,7 +86,7 @@ TEST(run_time, 4) {
         a_min, md::tensor<value_t, md::extents<index_t, 2>>{{-50, 0}}));
 }
 
-TEST(run_time, 5) { ASSERT_EQ(md::min(6, std::nullopt, 5), 5); }
+TEST(run_time, 5) { ASSERT_EQ(md::min(6, 5), 5); }
 
 TEST(compile_time, 1) {
     using index_t = std::size_t;
@@ -107,11 +107,11 @@ TEST(compile_time, 2) {
     constexpr auto a =
         md::reshape(md::arange<4>(), md::extents<index_t, 2, 2>{});
 
-    constexpr auto a_min1 = md::min<0>(a);
-    constexpr auto a_min2 = md::min<1>(a);
+    constexpr auto a_min1 = md::min(a, std::index_sequence<0>{});
+    constexpr auto a_min2 = md::min(a, std::index_sequence<1>{});
     constexpr auto a_min3 =
-        md::min<0>(a, std::nullopt, 10,
-                   md::tensor<bool, md::extents<index_t, 2>>{{false, true}});
+        md::min(a, std::index_sequence<0>{}, std::nullopt, 10,
+                md::tensor<bool, md::extents<index_t, 2>>{{false, true}});
 
     std::cout << "a_min1: " << md::to_string(a_min1) << std::endl;
     std::cout << "a_min2: " << md::to_string(a_min2) << std::endl;
@@ -135,8 +135,7 @@ TEST(compile_time, 3) {
     }();
 
     constexpr auto b_min1 = md::min(b);
-    constexpr auto b_min2 =
-        md::min(b, std::nullopt, 10, md::logical_not(md::isnan(b)));
+    constexpr auto b_min2 = md::min(b, 10, md::logical_not(md::isnan(b)));
     constexpr auto b_min3 = md::nanmin(b);
 
     std::cout << "b_min1: " << md::to_string(b_min1) << std::endl;
@@ -156,7 +155,8 @@ TEST(compile_time, 4) {
     constexpr auto a =
         md::tensor<value_t, md::extents<index_t, 2, 1>>{{-50, 10}};
 
-    constexpr auto a_min = md::min<-1>(a, std::nullopt, 0);
+    constexpr auto a_min =
+        md::min(a, std::integer_sequence<int, -1>{}, std::nullopt, 0);
 
     std::cout << "a_min: " << md::to_string(a_min) << std::endl;
 
@@ -164,4 +164,4 @@ TEST(compile_time, 4) {
         a_min, md::tensor<value_t, md::extents<index_t, 2>>{{-50, 0}}));
 }
 
-TEST(compile_time, 5) { static_assert(md::min(6, std::nullopt, 5) == 5); }
+TEST(compile_time, 5) { static_assert(md::min(6, 5) == 5); }

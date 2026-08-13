@@ -26,7 +26,7 @@ struct Target {
 
         for (auto _ : state) {
             static_cast<void>(
-                md::random::uniform<void>(out.extents(), 0, 1, out));
+                md::random::uniform<dtype>(out.extents(), 0, 1, out));
             benchmark::ClobberMemory();
         }
 

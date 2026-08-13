@@ -70,7 +70,7 @@ template <std::int64_t axis, core::extents_c... ins_t>
     static_assert(sizeof...(ins) > 0,
                   "At least one extents must be provided for concatenation.");
 
-    using index_t = core::common_integral_type_t<
+    using index_t = std::common_type_t<
         typename std::remove_cvref_t<ins_t>::index_type...>;
 
     constexpr std::size_t rank = std::remove_cvref_t<
@@ -125,7 +125,7 @@ template <std::int64_t axis = 0, typename dtype = void>
             detail::concatenate_extents<axis>(ins.extents()...);
 
         // generate out
-        using value_t = core::output_value_t<
+        using value_t = core::calc_type_t<
             dtype, typename std::remove_cvref_t<decltype(ins)>::value_type...>;
         auto out = empty<value_t>(out_extents);
 

@@ -21,21 +21,19 @@ template <typename dtype = void, core::extents_c exts_t,
                                     out_t &&out = out_t{std::nullopt}) {
     static_assert(exts.rank() == 1, "arange only supports rank-1 extents");
 
-    using calc_t = core::output_value_t<dtype, start_t, step_t>;
+    using calc_t = core::calc_type_t<dtype, start_t, step_t>;
 
     auto out_md = core::resolve_output<calc_t>(
         std::forward<decltype(out)>(out), std::forward<decltype(exts)>(exts));
 
-    using value_t = decltype(out_md)::value_type;
-    using index_t = decltype(out_md)::index_type;
-
     const calc_t actual_step =
         static_cast<calc_t>(start + step) - static_cast<calc_t>(start);
 
-    out_md(0) = static_cast<value_t>(start);
+    out_md(0) = start;
 
+    using index_t = decltype(out_md)::index_type;
     for (index_t i = 1; i < out_md.extent(0); i++) {
-        out_md(i) = out_md(i - 1) + static_cast<value_t>(actual_step);
+        out_md(i) = out_md(i - 1) + actual_step;
     }
 
     return out_md;
@@ -47,6 +45,7 @@ template <typename dtype = void, core::arithmetic_c start_t,
 [[nodiscard]] constexpr auto arange(start_t &&start, stop_t &&stop,
                                     step_t &&step = step_t{1},
                                     out_t &&out = out_t{std::nullopt}) {
+
     const std::int64_t num = std::ceil((stop - start) / step);
 
     if (num < 0) {

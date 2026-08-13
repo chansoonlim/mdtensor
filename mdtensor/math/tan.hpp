@@ -14,18 +14,18 @@
 namespace mdtensor {
 namespace ufunc {
 
+template <typename dtype = void>
 constexpr void tan_ufunc(auto &&in, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
 
-    using value_t = core::common_arithmetic_type_t<decltype(in), decltype(out)>;
+    using calc_t =
+        core::floating_calc_type_t<dtype, decltype(in), decltype(out)>;
 
-    out = std::tan(static_cast<value_t>(in));
+    out = std::tan(static_cast<calc_t>(in));
 }
 
 } // namespace ufunc
@@ -36,12 +36,14 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
                                  where_t &&where = where_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = core::resolve_output_like<dtype, true>(
+    using calc_t = core::floating_calc_type_t<dtype, decltype(in_mds)>;
+
+    auto out_md = core::resolve_output_like<calc_t>(
         std::forward<decltype(out)>(out), in_mds);
 
     core::batch<backend>(
         [](auto &&...elems) {
-            ufunc::tan_ufunc(std::forward<decltype(elems)>(elems)...);
+            ufunc::tan_ufunc<calc_t>(std::forward<decltype(elems)>(elems)...);
         },
         std::integer_sequence<bool, true, false, true>{}, in_mds, out_md,
         std::forward<decltype(where)>(where));

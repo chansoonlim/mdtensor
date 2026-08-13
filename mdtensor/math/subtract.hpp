@@ -16,10 +16,8 @@ namespace ufunc {
 
 constexpr void subtract_ufunc(auto &&in1, auto &&in2, auto &&out,
                               auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
@@ -39,7 +37,10 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    auto out_md = core::resolve_broadcasted_output<dtype>(
+    using calc_t =
+        core::calc_type_t<dtype, decltype(in1_mds), decltype(in2_mds)>;
+
+    auto out_md = core::resolve_broadcasted_output<calc_t>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds);
 

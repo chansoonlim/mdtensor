@@ -101,7 +101,7 @@ constexpr void vecmat_ufunc(auto &&in1, auto &&in2, auto &&out) {
                   core::eigen::eigen_mappable_c<out_mds_t>) {
         if (!std::is_constant_evaluated() &&
             8 <= out_mds.extent(0) + out_mds.extent(1)) {
-            using value_t = core::common_arithmetic_type_t<
+            using value_t = core::promote_type_t<
                 typename std::remove_cvref_t<in1_mds_t>::value_type,
                 typename std::remove_cvref_t<in2_mds_t>::value_type>;
 
@@ -153,8 +153,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
     const auto uin1_exts = core::slice_extents_from_right<2>(in1_mds.extents());
     const auto uin2_exts = core::slice_extents_from_right<2>(in2_mds.extents());
     const auto uout_exts = core::extents<
-        core::common_integral_type_t<typename decltype(uin1_exts)::index_type,
-                                     typename decltype(uin2_exts)::index_type>,
+        std::common_type_t<typename decltype(uin1_exts)::index_type,
+                           typename decltype(uin2_exts)::index_type>,
         decltype(uin2_exts)::static_extent(1)>{uin2_exts.extent(1)};
 
     auto out = core::make_broadcasted_tensor<dtype>(

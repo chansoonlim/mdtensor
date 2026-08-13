@@ -219,11 +219,8 @@ reduce(auto &&func, std::integer_sequence<axes_t, axes...>,
 }
 
 [[nodiscard]] constexpr bool initialize_ufunc(auto &&init, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
-            // not targeted by where
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return false;
         }
     }

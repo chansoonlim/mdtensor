@@ -34,7 +34,7 @@ TEST(run_time, 2) {
                                                     md::dims<2>{2, 2}};
 
     EXPECT_TRUE(md::array_equal(
-        md::all<0>(a),
+        md::all(a, std::index_sequence<0>{}),
         md::tensor<value_t, md::extents<index_t, 2>>{{true, false}}));
 }
 
@@ -73,7 +73,7 @@ TEST(compile_time, 2) {
         {true, false, true, true}};
 
     static_assert(md::array_equal(
-        md::all<0>(a),
+        md::all(a, std::index_sequence<0>{}),
         md::tensor<value_t, md::extents<index_t, 2>>{{true, false}}));
 }
 

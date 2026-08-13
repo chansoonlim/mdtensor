@@ -13,12 +13,13 @@
 
 namespace mdtensor {
 
-template <typename dtype = double, core::Backend backend = core::Backend::AUTO,
+template <core::arithmetic value_t = double,
+          core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t>
 [[nodiscard]] constexpr auto zeros(auto &&shape,
                                    out_t &&out = out_t{std::nullopt}) {
-    return full<dtype, backend>(std::forward<decltype(shape)>(shape), 0,
-                                std::forward<decltype(out)>(out));
+    return full<value_t, backend>(std::forward<decltype(shape)>(shape),
+                                  value_t{0}, std::forward<decltype(out)>(out));
 }
 
 } // namespace mdtensor
