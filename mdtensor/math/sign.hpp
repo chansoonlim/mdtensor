@@ -35,7 +35,9 @@ template <typename dtype = std::int8_t,
                                   where_t &&where = where_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out_md = core::resolve_output_like<dtype>(
+    using calc_t = core::signed_calc_type_t<dtype, decltype(in_mds)>;
+
+    auto out_md = core::resolve_output_like<calc_t>(
         std::forward<decltype(out)>(out), in_mds);
 
     core::batch<backend>(

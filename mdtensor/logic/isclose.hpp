@@ -42,22 +42,19 @@ constexpr void isclose_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&rtol,
         }
     }
 
-    using out_t = std::remove_cvref_t<decltype(out)>;
-    using calc_t =
+    using common_t =
         core::common_arithmetic_type_t<decltype(in1), decltype(in2),
                                        decltype(rtol), decltype(atol)>;
 
-    out = static_cast<out_t>(
-        absolute(static_cast<calc_t>(in1) - static_cast<calc_t>(in2)) <=
-        (static_cast<calc_t>(atol) +
-         static_cast<calc_t>(rtol) * absolute(static_cast<calc_t>(in2))));
+    out = absolute(static_cast<common_t>(in1) - static_cast<common_t>(in2)) <=
+          (static_cast<common_t>(atol) +
+           static_cast<common_t>(rtol) * absolute(static_cast<common_t>(in2)));
 }
 
 } // namespace ufunc
 
-template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
-          typename rtol_t = double, typename atol_t = double,
-          typename out_t = std::nullopt_t>
+template <core::Backend backend = core::Backend::AUTO, typename rtol_t = double,
+          typename atol_t = double, typename out_t = std::nullopt_t>
 [[nodiscard]] constexpr auto
 isclose(auto &&in1, auto &&in2, rtol_t &&rtol = rtol_t{1e-05},
         atol_t &&atol = atol_t{1e-08}, out_t &&out = out_t{std::nullopt},
@@ -71,7 +68,7 @@ isclose(auto &&in1, auto &&in2, rtol_t &&rtol = rtol_t{1e-05},
     const auto atol_mds =
         core::to_const_mdspan(std::forward<decltype(atol)>(atol));
 
-    auto out_md = core::resolve_broadcasted_output<dtype>(
+    auto out_md = core::resolve_broadcasted_output<bool>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds, rtol_mds, atol_mds);
 

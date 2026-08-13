@@ -42,7 +42,7 @@ struct Target {
 
         for (auto _ : state) {
             static_cast<void>(
-                md::isclose<void, backend>(in1, in2, 1e-05, 1e-08, out));
+                md::isclose<backend>(in1, in2, 1e-05, 1e-08, out));
             benchmark::ClobberMemory();
         }
 

@@ -225,16 +225,21 @@ template <typename Target>
         }
     };
 
-#ifndef BENCHMARK_SKIP_INTEGER_TYPES
+#if !defined(BENCHMARK_SKIP_INTEGER_TYPES) &&                                  \
+    !defined(BENCHMARK_SKIP_UNSIGNED_INTEGER_TYPES)
     register_dtype.template operator()<bool>("b");
-    register_dtype.template operator()<std::int8_t>("i8");
     register_dtype.template operator()<std::uint8_t>("u8");
-    register_dtype.template operator()<std::int16_t>("i16");
     register_dtype.template operator()<std::uint16_t>("u16");
-    register_dtype.template operator()<std::int32_t>("i32");
     register_dtype.template operator()<std::uint32_t>("u32");
-    register_dtype.template operator()<std::int64_t>("i64");
     register_dtype.template operator()<std::uint64_t>("u64");
+#endif
+
+#if !defined(BENCHMARK_SKIP_INTEGER_TYPES) &&                                  \
+    !defined(BENCHMARK_SKIP_SIGNED_INTEGER_TYPES)
+    register_dtype.template operator()<std::int8_t>("i8");
+    register_dtype.template operator()<std::int16_t>("i16");
+    register_dtype.template operator()<std::int32_t>("i32");
+    register_dtype.template operator()<std::int64_t>("i64");
 #endif
 
 #ifndef BENCHMARK_SKIP_FLOATING_POINT_TYPES

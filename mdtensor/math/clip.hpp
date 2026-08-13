@@ -19,16 +19,20 @@ constexpr void clip_ufunc(auto &&in, auto &&min, auto &&max, auto &&out) {
     // when min > max, np.clip returns max, and std::clamp returns min.
     // mdtensor.clip is designed to match the behavior of np.clip.
 
-    using value_t = std::remove_cvref_t<decltype(in)>;
-
     out = in;
 
     if constexpr (!core::nullopt_t_c<decltype(min)>) {
-        out = std::max(out, static_cast<value_t>(min));
+        using common_t =
+            core::common_arithmetic_type_t<decltype(out), decltype(min)>;
+
+        out = std::max(static_cast<common_t>(out), static_cast<common_t>(min));
     }
 
     if constexpr (!core::nullopt_t_c<decltype(max)>) {
-        out = std::min(out, static_cast<value_t>(max));
+        using common_t =
+            core::common_arithmetic_type_t<decltype(out), decltype(max)>;
+
+        out = std::min(static_cast<common_t>(out), static_cast<common_t>(max));
     }
 }
 
@@ -46,7 +50,11 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto max_mds =
         core::to_const_mdspan(std::forward<decltype(max)>(max));
 
-    auto out_md = core::resolve_broadcasted_output<dtype>(
+    using calc_t =
+        core::floating_calc_type_t<dtype, decltype(in_mds), decltype(min_mds),
+                                   decltype(max_mds)>;
+
+    auto out_md = core::resolve_broadcasted_output<calc_t>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{}, in_mds,
         min_mds, max_mds);
 

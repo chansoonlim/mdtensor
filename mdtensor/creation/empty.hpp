@@ -13,9 +13,9 @@
 
 namespace mdtensor {
 
-template <typename dtype = double>
+template <typename value_t = double>
 [[nodiscard]] constexpr auto empty(auto &&shape) {
-    return core::make_tensor<dtype>(
+    return core::make_tensor<value_t>(
         core::to_extents(std::forward<decltype(shape)>(shape)));
 }
 

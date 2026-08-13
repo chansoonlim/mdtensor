@@ -21,7 +21,7 @@ resolve_broadcasted_output(auto &&out, std::index_sequence<uranks...>,
                            uout_exts_t &&uout_exts, auto &&...ins) {
     if constexpr (floating) {
         // Ensure that the output type is at least float precision
-        using value_t = core::output_value_t<dtype, float, decltype(ins)...>;
+        using value_t = core::calc_type_t<dtype, float, decltype(ins)...>;
 
         const auto out_md = resolve_broadcasted_output<value_t, false>(
             std::forward<decltype(out)>(out), std::index_sequence<uranks...>{},

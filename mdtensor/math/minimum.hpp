@@ -23,14 +23,12 @@ constexpr void minimum_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
         }
     }
 
-    using value_t = std::remove_cvref_t<decltype(out)>;
-
     // if one of the inputs is NaN, return NaN (numpy-like)
     if constexpr (requires {
                       { std::isnan(in1) } -> std::convertible_to<bool>;
                   }) {
         if (std::isnan(in1)) {
-            out = std::numeric_limits<value_t>::quiet_NaN();
+            out = in1;
             return;
         }
     }
@@ -39,12 +37,15 @@ constexpr void minimum_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
                       { std::isnan(in2) } -> std::convertible_to<bool>;
                   }) {
         if (std::isnan(in2)) {
-            out = std::numeric_limits<value_t>::quiet_NaN();
+            out = in2;
             return;
         }
     }
 
-    out = std::min(static_cast<value_t>(in1), static_cast<value_t>(in2));
+    using common_t =
+        core::common_arithmetic_type_t<decltype(in1), decltype(in2)>;
+
+    out = std::min(static_cast<common_t>(in1), static_cast<common_t>(in2));
 }
 
 } // namespace ufunc

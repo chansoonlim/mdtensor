@@ -19,7 +19,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
                                        out_t &&out = out_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    using value_t = core::output_value_t<dtype, decltype(in_mds)>;
+    using value_t = core::calc_type_t<dtype, decltype(in_mds)>;
 
     return full<value_t, backend>(in_mds.extents(),
                                   std::forward<decltype(val)>(val),

@@ -41,7 +41,7 @@ struct Target {
         benchmark::ClobberMemory();
 
         for (auto _ : state) {
-            static_cast<void>(md::logical_xor<void, backend>(in1, in2, out));
+            static_cast<void>(md::logical_xor<backend>(in1, in2, out));
             benchmark::ClobberMemory();
         }
 

@@ -18,7 +18,7 @@ template <typename dtype = void, bool floating = false, extents_c exts_t>
 [[nodiscard]] constexpr auto resolve_output(auto &&out, exts_t &&exts) {
     if constexpr (floating) {
         // Ensure that the output type is at least float precision
-        using value_t = core::output_value_t<dtype, float>;
+        using value_t = core::calc_type_t<dtype, float>;
 
         const auto out_md = resolve_output<value_t, false>(
             std::forward<decltype(out)>(out), std::forward<exts_t>(exts));
@@ -37,10 +37,11 @@ template <typename dtype = void, bool floating = false, extents_c exts_t>
         const auto out_mds = to_output_mdspan(std::forward<decltype(out)>(out));
 
         using value_t = typename decltype(out_mds)::value_type;
-        using calc_t = core::output_value_t<dtype, value_t>;
+        using calc_t = core::calc_type_t<dtype, value_t>;
 
         static_assert(
-            std::same_as<core::common_value_type_t<calc_t, value_t>, value_t>,
+            std::same_as<core::common_arithmetic_type_t<calc_t, value_t>,
+                         value_t>,
             "Resolved output type must not be less precise than desired.");
 
         static_assert(
@@ -62,13 +63,13 @@ template <typename dtype = void, bool floating = false>
 
     if constexpr (floating) {
         // Ensure that the output type is at least float precision
-        using value_t = core::output_value_t<dtype, decltype(in_mds), float>;
+        using value_t = core::calc_type_t<dtype, decltype(in_mds), float>;
 
         return resolve_output<value_t, floating>(
             std::forward<decltype(out)>(out), in_mds.extents());
 
     } else {
-        using value_t = core::output_value_t<dtype, decltype(in_mds)>;
+        using value_t = core::calc_type_t<dtype, decltype(in_mds)>;
 
         return resolve_output<value_t, floating>(
             std::forward<decltype(out)>(out), in_mds.extents());

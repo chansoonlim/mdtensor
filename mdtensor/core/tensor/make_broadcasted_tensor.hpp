@@ -28,7 +28,7 @@ make_broadcasted_tensor(std::index_sequence<uranks...>, uout_exts_t &&uout_exts,
         return make_tensor<dtype>(std::forward<uout_exts_t>(uout_exts));
 
     } else {
-        using value_t = output_value_t<dtype, decltype(ins)...>;
+        using value_t = calc_type_t<dtype, decltype(ins)...>;
 
         // calculate broadcasted extents
         const auto bexts = get_broadcast_extents(
@@ -69,7 +69,7 @@ make_broadcasted_tensors(std::index_sequence<uranks...>, auto &&uout_exts_tuple,
         }(std::make_index_sequence<outs_num>{});
 
     } else {
-        using value_t = output_value_t<dtype, decltype(ins)...>;
+        using value_t = calc_type_t<dtype, decltype(ins)...>;
 
         // calculate broadcasted extents
         const auto bexts = get_broadcast_extents(

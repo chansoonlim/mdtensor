@@ -28,7 +28,7 @@ constexpr void greater_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
 
 } // namespace ufunc
 
-template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+template <core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
 [[nodiscard]] constexpr auto greater(auto &&in1, auto &&in2,
                                      out_t &&out = out_t{std::nullopt},
@@ -38,7 +38,7 @@ template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    auto out_md = core::resolve_broadcasted_output<dtype>(
+    auto out_md = core::resolve_broadcasted_output<bool>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds);
 

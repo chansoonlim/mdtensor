@@ -82,4 +82,19 @@ template <std::size_t... uranks, bool... bcast>
         bexts);
 }
 
+template <std::size_t... uranks, bool... bcast>
+[[nodiscard]] constexpr bool
+can_broadcast(std::index_sequence<uranks...>,
+              std::integer_sequence<bool, bcast...>, auto &&...ios) {
+    try {
+        static_cast<void>(broadcast(std::index_sequence<uranks...>{},
+                                    std::integer_sequence<bool, bcast...>{},
+                                    std::forward<decltype(ios)>(ios)...));
+        return true;
+
+    } catch (const std::exception &e) {
+        return false;
+    }
+}
+
 } // namespace mdtensor::core

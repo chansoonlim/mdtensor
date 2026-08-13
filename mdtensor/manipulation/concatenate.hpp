@@ -125,7 +125,7 @@ template <std::int64_t axis = 0, typename dtype = void>
             detail::concatenate_extents<axis>(ins.extents()...);
 
         // generate out
-        using value_t = core::output_value_t<
+        using value_t = core::calc_type_t<
             dtype, typename std::remove_cvref_t<decltype(ins)>::value_type...>;
         auto out = empty<value_t>(out_extents);
 

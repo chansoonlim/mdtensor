@@ -25,10 +25,11 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto val_mds =
         core::to_const_mdspan(std::forward<decltype(val)>(val));
 
-    auto out_md =
-        core::resolve_output<core::output_value_t<dtype, decltype(val_mds)>>(
-            std::forward<decltype(out)>(out),
-            core::to_extents(std::forward<decltype(shape)>(shape)));
+    using value_t = core::calc_type_t<dtype, decltype(val_mds)>;
+
+    auto out_md = core::resolve_output<value_t>(
+        std::forward<decltype(out)>(out),
+        core::to_extents(std::forward<decltype(shape)>(shape)));
 
     core::batch<backend>(
         [](auto &&...elems) {

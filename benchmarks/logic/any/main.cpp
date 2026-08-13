@@ -32,7 +32,8 @@ struct Target {
         benchmark::ClobberMemory();
 
         for (auto _ : state) {
-            static_cast<void>(md::any<0, bool, false, backend>(in, out));
+            static_cast<void>(
+                md::any<false, backend>(in, std::index_sequence<0>{}, out));
             benchmark::ClobberMemory();
         }
 

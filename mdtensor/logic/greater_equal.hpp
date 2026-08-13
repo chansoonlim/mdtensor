@@ -29,7 +29,7 @@ constexpr void greater_equal_ufunc(auto &&in1, auto &&in2, auto &&out,
 
 } // namespace ufunc
 
-template <typename dtype = bool, core::Backend backend = core::Backend::AUTO,
+template <core::Backend backend = core::Backend::AUTO,
           typename out_t = std::nullopt_t, typename where_t = std::nullopt_t>
 [[nodiscard]] constexpr auto
 greater_equal(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
@@ -39,7 +39,10 @@ greater_equal(auto &&in1, auto &&in2, out_t &&out = out_t{std::nullopt},
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    auto out_md = core::resolve_broadcasted_output<dtype>(
+    using calc_t =
+        core::calc_type_t<bool, decltype(in1_mds), decltype(in2_mds)>;
+
+    auto out_md = core::resolve_broadcasted_output<calc_t>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds);
 

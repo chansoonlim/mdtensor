@@ -23,7 +23,7 @@ resolve_reduced_output(auto &&out, std::integer_sequence<axes_t, axes...>,
                        auto &&...ins) {
     if constexpr (floating) {
         // Ensure that the output type is at least float precision
-        using value_t = output_value_t<dtype, float, decltype(ins)...>;
+        using value_t = calc_type_t<dtype, float, decltype(ins)...>;
 
         const auto out_md = resolve_reduced_output<value_t, keepdims, false>(
             std::forward<decltype(out)>(out),

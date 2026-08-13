@@ -14,6 +14,7 @@
 namespace mdtensor {
 namespace ufunc {
 
+template <typename dtype = void>
 constexpr void atan2_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
     if constexpr (requires {
                       { where == false } -> std::convertible_to<bool>;
@@ -23,10 +24,10 @@ constexpr void atan2_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
         }
     }
 
-    using value_t = core::common_arithmetic_type_t<decltype(in1), decltype(in2),
-                                                   decltype(out)>;
+    using calc_t = core::floating_calc_type_t<dtype, decltype(in1),
+                                              decltype(in2), decltype(out)>;
 
-    out = std::atan2(static_cast<value_t>(in1), static_cast<value_t>(in2));
+    out = std::atan2(static_cast<calc_t>(in1), static_cast<calc_t>(in2));
 }
 
 } // namespace ufunc
@@ -41,13 +42,16 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    auto out_md = core::resolve_broadcasted_output<dtype, true>(
+    using calc_t =
+        core::floating_calc_type_t<dtype, decltype(in1_mds), decltype(in2_mds)>;
+
+    auto out_md = core::resolve_broadcasted_output<calc_t, true>(
         std::forward<decltype(out)>(out), core::extents<std::uint8_t>{},
         in1_mds, in2_mds);
 
     core::batch<backend>(
         [](auto &&...elems) {
-            ufunc::atan2_ufunc(std::forward<decltype(elems)>(elems)...);
+            ufunc::atan2_ufunc<calc_t>(std::forward<decltype(elems)>(elems)...);
         },
         std::integer_sequence<bool, true, true, false, true>{}, in1_mds,
         in2_mds, out_md, std::forward<decltype(where)>(where));
