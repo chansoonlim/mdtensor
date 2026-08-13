@@ -16,10 +16,8 @@ namespace ufunc {
 
 template <typename dtype = void>
 constexpr void sin_ufunc(auto &&in, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }

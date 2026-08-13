@@ -15,10 +15,8 @@ namespace mdtensor {
 namespace ufunc {
 
 constexpr void maximum_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }

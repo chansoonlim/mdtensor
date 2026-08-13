@@ -68,7 +68,7 @@ TEST(run_time, 5) {
     const auto where =
         md::tensor<bool, md::dims<2>>{{false, true}, md::dims<2>{2, 1}};
 
-    EXPECT_EQ(md::any(a, where), false);
+    EXPECT_FALSE(md::any(a, where));
 }
 
 TEST(run_time, 6) {
@@ -145,7 +145,7 @@ TEST(compile_time, 5) {
     constexpr auto where =
         md::tensor<bool, md::extents<index_t, 2, 1>>{{false, true}};
 
-    static_assert(md::any(a, where) == false);
+    static_assert(!md::any(a, where));
 }
 
 TEST(compile_time, 6) {

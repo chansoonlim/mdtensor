@@ -27,10 +27,8 @@ sqrt_newton_raphson(const calc_t &x, const calc_t &curr, const calc_t &prev) {
 
 template <typename dtype = void>
 constexpr void sqrt_ufunc(auto &&in, auto &&out, auto &&where) {
-    if constexpr (requires {
-                      { where == false } -> std::convertible_to<bool>;
-                  }) {
-        if (where == false) {
+    if constexpr (requires { static_cast<bool>(where); }) {
+        if (!static_cast<bool>(where)) {
             return;
         }
     }
