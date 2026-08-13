@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "make_tensor.hpp"
+#include "../base/base.hpp"
 
 namespace mdtensor::core {
 

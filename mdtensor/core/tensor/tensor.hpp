@@ -11,7 +11,6 @@
 
 #include "make_broadcasted_tensor.hpp"
 #include "make_reduced_tensor.hpp"
-#include "make_tensor.hpp"
 #include "resolve_broadcasted_output.hpp"
 #include "resolve_output.hpp"
 #include "resolve_reduced_output.hpp"

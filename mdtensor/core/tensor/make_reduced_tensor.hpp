@@ -10,7 +10,6 @@
 #pragma once
 
 #include "../ufunc/ufunc.hpp"
-#include "make_tensor.hpp"
 
 namespace mdtensor::core {
 namespace detail {

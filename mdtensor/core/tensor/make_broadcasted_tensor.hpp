@@ -10,7 +10,6 @@
 #pragma once
 
 #include "../broadcast/broadcast.hpp"
-#include "make_tensor.hpp"
 #include "output_value_type.hpp"
 
 namespace mdtensor::core {
