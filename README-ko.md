@@ -55,7 +55,7 @@ mdtensor는 Eigen, OpenMP 같은 optional backend를 사용할 수 있지만, AP
 
 ---
 
-## 빠른 예제 ([오른쪽 링크를 누르면 Godbolt에서 실행 가능합니다 😃](https://godbolt.org/z/cYea11TK4))
+## 빠른 예제 ([링크를 누르면 Godbolt에서 실행 가능합니다 😃](https://godbolt.org/z/cYea11TK4))
 
 ```cpp
 #include <iostream>
