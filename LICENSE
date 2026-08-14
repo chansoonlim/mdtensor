@@ -1,12 +1,20 @@
 Copyright 2025 Uon Robotics, South Korea.
 Copyright 2026 Chan-Soon Lim.
 
-This software includes derivative works based on
-CTMD (Compile-Time Multi-Dimensional) library version 0.16.1
-by Uon Robotics, originally licensed under the Apache License, Version 2.0.
+mdtensor is distributed under the Apache License, Version 2.0.
 
-The original CTMD code has been modified and extended as part of the
-mdtensor project. Such modifications are clearly marked where applicable.
+This project includes portions originally derived from CTMD v0.16.1
+(2025.08.19 release), an Apache License 2.0 library originally developed
+at Uon Robotics by Chan-Soon Lim.
+
+Since then, mdtensor has been substantially modified, reorganized, and
+extended with a broader NumPy-like tensor API, std::mdspan/mdarray-based
+view semantics, expanded broadcasting and manipulation utilities, additional
+logic/math/random utilities, and linear algebra routines including LU
+decomposition, solve, and Cholesky decomposition.
+
+Original CTMD copyrights remain with Uon Robotics. Modifications and
+extensions in mdtensor are maintained by Chan-Soon Lim.
 
 ------------------------------------------------------------------------------
 
