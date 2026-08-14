@@ -8,9 +8,6 @@
 #     copts = [
 #         "-O3",
 #         "-funroll-loops",
-#         "-fno-rtti",
-#         "-Wall",
-#         "-Wextra",
 #         "-march=native",
 #         "-fopenmp",
 #         "-foffload=nvptx-none",

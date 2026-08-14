@@ -114,7 +114,7 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
 }
 
 template <extents_c in_t>
-[[nodiscard]] constexpr bool is_same_extents(in_t &&in) noexcept {
+[[nodiscard]] constexpr bool is_same_extents(in_t &&) noexcept {
     return true;
 }
 

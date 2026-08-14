@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief add_to benchmark executable.
+ * @brief add benchmark executable.
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -38,7 +38,7 @@ struct Target {
 int main(int argc, char **argv) {
     benchmarking::Settings settings;
 
-    settings.benchmark_name = "add_to";
+    settings.benchmark_name = "add";
     settings.defaults.dtype = "ps";
     settings.defaults.backend = "auto";
     settings.defaults.range_end = 10'000'000;

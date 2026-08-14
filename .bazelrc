@@ -1,2 +1,4 @@
-common --action_env=BAZEL_CXXOPTS="-std=c++20"
-common --compilation_mode=opt
+build --cxxopt=-std=c++20
+
+# build options
+build:ofast --cxxopt=-Ofast

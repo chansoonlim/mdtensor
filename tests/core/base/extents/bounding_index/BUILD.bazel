@@ -1,19 +1,6 @@
-load("@rules_cc//cc:defs.bzl", "cc_test")
+load("//:macro.bzl", "mdtensor_cc_test")
 
-cc_test(
+mdtensor_cc_test(
     name = "main",
-    srcs = [
-        "main.cpp",
-        ],
-    copts = [
-        "-O3",
-        "-funroll-loops",
-        "-fno-rtti",
-        "-Wall",
-        "-march=native",
-    ],
-    deps = [
-        "@googletest//:gtest_main",
-        "//:mdtensor",
-    ],
+    srcs = ["main.cpp"],
 )

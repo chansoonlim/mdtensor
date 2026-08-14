@@ -1,23 +1,6 @@
-load("@rules_cc//cc:defs.bzl", "cc_binary")
+load("//:macro.bzl", "mdtensor_benchmark")
 
-cc_binary(
+mdtensor_benchmark(
     name = "main",
-    srcs = [
-        "main.cpp"
-    ],
-    copts = [
-        "-O3",
-        "-funroll-loops",
-        "-fno-rtti",
-        "-Wall",
-        "-Wextra",
-        "-march=native",
-        "-fopenmp",
-    ],
-    linkopts = [
-        "-fopenmp",
-    ],
-    deps = [
-        "//benchmarks/common:benchmarking",
-    ],
+    srcs = ["main.cpp"],
 )

@@ -7,13 +7,6 @@ cc_library(
         "@mdspan",
         # "@eigen",
     ],
-    copts = [
-        "-O3",
-        "-fno-rtti",
-        "-funroll-loops",
-        "-Wall",
-        "-march=native",
-    ],
     defines = [
         # "MDTENSOR_USE_EIGEN",
     ],

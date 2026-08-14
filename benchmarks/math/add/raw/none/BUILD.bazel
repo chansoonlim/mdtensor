@@ -8,14 +8,7 @@ cc_binary(
     copts = [
         "-O3",
         "-funroll-loops",
-        "-fno-rtti",
-        "-Wall",
-        "-Wextra",
         "-march=native",
-        "-fopenmp",
-    ],
-    linkopts = [
-        "-fopenmp",
     ],
     deps = [
         "//benchmarks/common:benchmarking",
