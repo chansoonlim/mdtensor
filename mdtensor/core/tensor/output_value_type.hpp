@@ -12,10 +12,6 @@
 #include "../base/base.hpp"
 
 namespace mdtensor::core {
-
-template <typename T>
-using to_mdspan_t = decltype(to_mdspan(std::declval<T>())); // TODO: remove
-
 namespace detail {
 
 //////////////////////////////////////////////////////////////////////
