@@ -1,61 +1,39 @@
 [English](./README.md)
 | [한국어](./README-ko.md)
 
-# mdtensor — A Modern C++ Tensor Library with NumPy-like Syntax
+# mdtensor — A Modern C++ Tensor Library with a NumPy-like Interface
 
-**mdtensor** is a header-only Modern C++ tensor library designed around [`std::mdspan`](https://en.cppreference.com/w/cpp/container/mdspan)-based views (C++23) and [`kokkos::mdarray`](https://github.com/kokkos/mdspan/blob/stable/include/experimental/mdarray)-based containers. Its goal is to provide a NumPy-like tensor programming experience in C++ while preserving the qualities C++ developers care about: static type information, as much `constexpr` computation as practical, low-overhead views, and direct interoperability with user-owned memory.
+**mdtensor** is a header-only Modern C++ tensor computation library built around non-owning views based on C++23's [`std::mdspan`](https://en.cppreference.com/w/cpp/container/mdspan) and owning containers based on [`kokkos::mdarray`](https://github.com/kokkos/mdspan/blob/stable/include/experimental/mdarray). It aims to provide an interface similar to NumPy while actively leveraging Modern C++ features to maximize compile-time evaluation and optimize runtime performance.
 
----
-
-## Why mdtensor?
-
-NumPy has evolved around vectorized operations and broadcasting to reduce Python-level loop and function-call overhead. Expressing multiple operations as multidimensional array operations moves iteration into the library, makes memory access patterns more predictable, and often improves performance on modern CPUs. In C++, function-call overhead is relatively small, and matrix-oriented libraries such as Eigen have long been widely used in practice. As a result, demand for a general NumPy-style N-dimensional tensor library in C++ has historically been smaller.
-
-[`std::mdspan`](https://en.cppreference.com/w/cpp/container/mdspan), introduced in C++23, is an important step toward representing multidimensional views in standard C++. [`std::linalg`](https://en.cppreference.com/w/cpp/numeric/linalg) is also planned for C++26. Although `std::mdspan` requires the rank to be known at compile time, it is designed as a zero-overhead abstraction and is well suited for efficiently expressing multidimensional operations in C++.
-
-The author has spent years working on robotics algorithms, frequently porting Python-based algorithm code to C++ or C to accelerate execution on PCs and MCUs. Python has several acceleration tools, such as PyPy and Numba, but constraints around performance and deployment often still require reimplementing algorithms in C++ and matching Python results. Adding SIMD, CPU/GPU parallelism, or other performance techniques typically requires additional work each time.
-
-Recent research also explores executing high-performance algorithms in microseconds through SIMD-based computation. For example, [Motions in Microseconds via Vectorized Sampling-Based Planning](https://arxiv.org/abs/2309.14545) highlights the potential impact of vectorized computation on robotics algorithms. mdtensor targets this area: **expressing NumPy-like multidimensional operations in C++ with static type information and low overhead**.
-
-mdtensor provides:
-
-- **NumPy-like API**: Element-wise math, logic, manipulation, and broadcasting APIs familiar to NumPy users.
-- **[`std::mdspan`](https://en.cppreference.com/w/cpp/container/mdspan)-based views**: Lightweight multidimensional views that can reference external memory without owning it.
-- **[`kokkos::mdarray`](https://github.com/kokkos/mdspan/blob/stable/include/experimental/mdarray)-based containers**: Owning multidimensional containers developed within the `std::mdspan` ecosystem.
-- **`constexpr`-oriented implementation**: Designed so that many operations can be tested or computed at compile time where practical.
-- **Zero-copy broadcasting and manipulation views**: Uses stride-based view transformations instead of eager copies whenever possible.
+> mdtensor is under active development. Both the internal framework and the public APIs may change substantially. At this stage, please consider it an experimental repository for high-performance tensor computation with `std::mdspan`, rather than a production-ready library.
 
 ---
 
-## Design Philosophy
+## Why Build Another Numerical Computing Library?
 
-### 1. NumPy-like surface API, C++-native internals
+NumPy has evolved around vectorized operations and broadcasting to reduce the overhead of Python-level loops and function calls. Expressing multidimensional computations as array operations moves loops into the library and makes memory access patterns more predictable, making it easier to achieve high performance on modern CPUs. In contrast, function-call overhead is comparatively low in C++, and matrix-oriented libraries such as Eigen have long been widely used in production. As a result, demand for a general-purpose, NumPy-style N-dimensional tensor library has historically been lower.
 
-mdtensor borrows familiar names and semantics from NumPy, such as `add`, `multiply`, `allclose`, `broadcast_to`, `reshape`, `transpose`, `matmul`, `inv`, `lu`, and `solve`. Internally, however, it is built around the C++ type system and [`std::mdspan`](https://en.cppreference.com/w/cpp/container/mdspan)-centered view abstractions. It operates on scalars, mdspans, mdarrays, and objects that can be converted through the core conversion utilities.
+C++23's [`std::mdspan`](https://en.cppreference.com/w/cpp/container/mdspan) is an important step toward representing multidimensional views in a standardized way in C++. [`std::linalg`](https://en.cppreference.com/w/cpp/numeric/linalg) is also expected to be introduced in C++26. Although the rank of a `std::mdspan` must be known at compile time, it is designed as a zero-overhead abstraction and is therefore well suited to expressing multidimensional computations efficiently in C++.
 
-### 2. Views first; copies only when necessary
+While researching robotics algorithms, the author has spent many years porting algorithms written in Python to C++ or C to accelerate them on PCs and MCUs. Python provides several acceleration tools, including PyPy and Numba, but performance and deployment constraints often make it necessary to reimplement algorithms in C++ and repeatedly verify that their results match the Python implementation. Applying SIMD and CPU/GPU parallelism then requires additional, separate optimization work.
 
-mdtensor prefers mdspan views during input conversion and shape manipulation. Broadcasting is represented with stride-0 dimensions, while transpose and reshape are designed as view operations whenever the memory layout allows. Owning mdarray-style results are returned only by out-of-place APIs that require a new result object.
+Research on executing high-performance algorithms on microsecond timescales through SIMD-based computation has also become increasingly active. For example, [Motions in Microseconds via Vectorized Sampling-Based Planning](https://arxiv.org/abs/2309.14545) demonstrates how vectorized computation can improve the performance of robotics algorithms. mdtensor targets precisely this area: **implementing NumPy-like multidimensional broadcasting operations in C++ as efficiently as possible**.
 
-### 3. Maximize `constexpr`; pursue zero-overhead abstraction at runtime
+Because `std::mdspan` is relatively new, established libraries may find it difficult to adopt it quickly while preserving backward compatibility. Initial tests also indicate that algorithms built on `std::mdspan` can be optimized aggressively by compilers when combined with loop unrolling. mdtensor is being developed to apply this potential first to robotics software, where real-time computational performance is critical. More mathematical libraries are expected to emerge around the capabilities of `std::mdspan`; accordingly, mdtensor's implementations of fundamental NumPy-equivalent functionality are released under the Apache License 2.0.
 
-Many tests and examples are written so tensor operations can be validated in constant-evaluation contexts. To support this, the implementation favors small loops, `constexpr` helpers, static extent propagation, and core paths that avoid runtime-only constructs. Runtime performance remains a central goal, and the library uses modern C++ features where they provide measurable benefits.
+mdtensor provides the following features:
 
-### 4. Use static shape information
-
-mdtensor uses C++23 [`std::extents`](https://en.cppreference.com/w/cpp/container/mdspan/extents). Sizes known at compile time are preserved as static extents, while sizes known only at runtime are represented as dynamic extents. This allows more validation and optimization to happen at compile time when static shape information is available.
-
-### 5. Build large algorithms from small kernels
-
-The core `batch` and `batch_out` mechanisms provide the foundation for expanding scalar or low-rank element kernels into N-dimensional tensor operations. Element-wise math, logical comparison, reduction, and linear algebra wrappers are built on top of these reusable building blocks.
-
-### 6. Backends are optional, not the center of the API
-
-mdtensor can use optional backends such as Eigen and OpenMP, but the public API is not tied to a specific backend. The default library remains header-only and lightweight.
+- **NumPy-like API**: Familiar APIs for element-wise mathematics, logic, array manipulation, and broadcasting.
+- **Views based on [`std::mdspan`](https://en.cppreference.com/w/cpp/container/mdspan)**: Lightweight multidimensional views that refer to external memory without owning it.
+- **Containers based on [`kokkos::mdarray`](https://github.com/kokkos/mdspan/blob/stable/include/experimental/mdarray)**: Owning multidimensional containers developed within the `std::mdspan` ecosystem.
+- **`constexpr`-oriented implementation**: Designed so that as many operations as possible can be used for compile-time evaluation and testing. Every currently implemented API can be evaluated in a `constexpr` context.
+- **Zero-copy broadcasting and manipulation views**: Uses stride-based view transformations rather than eager copies whenever possible.
 
 ---
 
 ## Quick Example ([Run on Godbolt 😃](https://godbolt.org/z/cYea11TK4))
+
+### 1. Compile-time Addition with Broadcasting
 
 ```cpp
 #include <iostream>
@@ -87,9 +65,9 @@ int main() {
 }
 ```
 
-Output:
+Result:
 
-```bash
+```text
 a extents: (3, 1, 2)
 a: [[[1, 1]], [[1, 1]], [[1, 1]]]
 
@@ -100,15 +78,12 @@ c extents: (3, 2, 2)
 c: [[[3, 3], [3, 3]], [[3, 3], [3, 3]], [[3, 3], [3, 3]]]
 ```
 
-This example demonstrates the core idea of mdtensor: NumPy-like broadcasting can be used together with C++ static extents and compile-time validation.
 
 ---
 
-## API Groups
+## Currently Implemented API Groups
 
-The currently implemented public API is organized into the following modules. The “Comparable NumPy/SciPy API” column indicates semantic correspondence by name and intent; it does not guarantee exact behavioral equivalence.
-
-| Module | API | Comparable NumPy/SciPy API |
+| Module | mdtensor API | Comparable NumPy API |
 |---|---|---|
 | Creation | [`empty`](mdtensor/creation/empty.hpp), [`empty_like`](mdtensor/creation/empty_like.hpp), [`eye`](mdtensor/creation/eye.hpp), [`ones`](mdtensor/creation/ones.hpp), [`ones_like`](mdtensor/creation/ones_like.hpp), [`zeros`](mdtensor/creation/zeros.hpp), [`zeros_like`](mdtensor/creation/zeros_like.hpp), [`full`](mdtensor/creation/full.hpp), [`full_like`](mdtensor/creation/full_like.hpp), [`copy`](mdtensor/creation/copy.hpp), [`arange`](mdtensor/creation/arange.hpp), [`linspace`](mdtensor/creation/linspace.hpp) | [`np.empty`](https://numpy.org/doc/stable/reference/generated/numpy.empty.html), [`np.empty_like`](https://numpy.org/doc/stable/reference/generated/numpy.empty_like.html), [`np.eye`](https://numpy.org/doc/stable/reference/generated/numpy.eye.html), [`np.ones`](https://numpy.org/doc/stable/reference/generated/numpy.ones.html), [`np.ones_like`](https://numpy.org/doc/stable/reference/generated/numpy.ones_like.html), [`np.zeros`](https://numpy.org/doc/stable/reference/generated/numpy.zeros.html), [`np.zeros_like`](https://numpy.org/doc/stable/reference/generated/numpy.zeros_like.html), [`np.full`](https://numpy.org/doc/stable/reference/generated/numpy.full.html), [`np.full_like`](https://numpy.org/doc/stable/reference/generated/numpy.full_like.html), [`np.copy`](https://numpy.org/doc/stable/reference/generated/numpy.copy.html), [`np.arange`](https://numpy.org/doc/stable/reference/generated/numpy.arange.html), [`np.linspace`](https://numpy.org/doc/stable/reference/generated/numpy.linspace.html) |
 | Manipulation | [`reshape`](mdtensor/manipulation/reshape.hpp), [`flatten`](mdtensor/manipulation/flatten.hpp), [`transpose`](mdtensor/manipulation/transpose.hpp), [`broadcast`](mdtensor/manipulation/broadcast.hpp), [`broadcast_to`](mdtensor/manipulation/broadcast_to.hpp), [`expand_dims`](mdtensor/manipulation/expand_dims.hpp), [`concatenate`](mdtensor/manipulation/concatenate.hpp) | [`np.reshape`](https://numpy.org/doc/stable/reference/generated/numpy.reshape.html), [`ndarray.flatten`](https://numpy.org/doc/stable/reference/generated/numpy.ndarray.flatten.html), [`np.transpose`](https://numpy.org/doc/stable/reference/generated/numpy.transpose.html), [`np.broadcast`](https://numpy.org/doc/stable/reference/generated/numpy.broadcast.html), [`np.broadcast_to`](https://numpy.org/doc/stable/reference/generated/numpy.broadcast_to.html), [`np.expand_dims`](https://numpy.org/doc/stable/reference/generated/numpy.expand_dims.html), [`np.concatenate`](https://numpy.org/doc/stable/reference/generated/numpy.concatenate.html) |
@@ -122,7 +97,7 @@ The currently implemented public API is organized into the following modules. Th
 
 ## Installation
 
-mdtensor is a header-only library. Add the repository to your include path and include the following header:
+mdtensor is a header-only library. Add the repository to your compiler's include path and include the following header. A compiler with C++20 or later support is required.
 
 ```cpp
 #include "mdtensor/mdtensor.hpp"
@@ -132,15 +107,15 @@ mdtensor is a header-only library. Add the repository to your include path and i
 
 ## Tests and Benchmarks
 
-This repository uses the [Bazel](https://bazel.build/) build system. After installing Bazel, tests and benchmarks can be run with the commands below. The development environment configured by `.devcontainer/dockerfile` can run them without additional setup.
+This repository uses the [Bazel](https://bazel.build/) build system. After installing Bazel, you can run the tests and benchmarks with the commands below. The development environment defined by `.devcontainer/dockerfile` can run them without additional setup.
 
-Run tests:
+### 1. Run All Tests
 
 ```bash
 bazel test tests/...
 ```
 
-Run a benchmark example:
+### 2. Run a Benchmark
 
 ```bash
 bazel run benchmarks/math/add:main
@@ -150,18 +125,16 @@ bazel run benchmarks/math/add:main
 
 ## Roadmap
 
-Future development directions include:
-
-- Expanding NumPy API coverage.
-- Strengthening general broadcasting rules.
-- Introducing lazy computation.
-- Selecting optimal computation groups and backends through compile-time and runtime cost analysis, such as SIMD, Eigen, and CPU/GPU multiprocessor backends.
+- Expand NumPy API coverage
+- Strengthen generalized broadcasting rules
+- Introduce lazy computation
+- Select the optimal backend based on compile-time and runtime workload analysis, including SIMD, Eigen, and CPU/GPU multiprocessor backends
 
 ---
 
 ## Contributing
 
-This project is actively maintained. New APIs and framework-level changes are currently added mainly according to the author’s needs. If you would like to collaborate on new APIs, framework improvements, or backend extensions, please feel free to open an issue or pull request.
+This project is actively maintained, although new APIs and framework changes are currently driven primarily by the author's needs. Feel free to open an issue or pull request if you are interested in developing new APIs, improving the framework, or extending backend support.
 
 ---
 
@@ -169,6 +142,6 @@ This project is actively maintained. New APIs and framework-level changes are cu
 
 mdtensor is distributed under the Apache License 2.0. See [`LICENSE`](LICENSE) for details.
 
-mdtensor includes portions originally derived from CTMD v0.16.1 (2025.08.19 release). CTMD is an Apache License 2.0-based library developed at Uon Robotics by the author. Since then, mdtensor has been substantially modified, reorganized, and extended to provide a broader NumPy-like tensor API, `std::mdspan`/`mdarray`-based view semantics, expanded broadcasting and manipulation utilities, logic/math/random utilities, and linear algebra features such as LU decomposition, solve, and Cholesky decomposition.
+mdtensor contains some code derived from CTMD v0.16.1, released on August 19, 2025. CTMD is an Apache License 2.0 library developed by the author of this project at Uon Robotics. Since then, mdtensor has been substantially modified through API extensions and framework improvements.
 
-Original CTMD copyrights remain with Uon Robotics. Modifications and extensions in mdtensor are maintained by Chan-Soon Lim.
+The original copyright for CTMD is held by Uon Robotics. The modifications and extensions in mdtensor are maintained by Chan-Soon Lim.
