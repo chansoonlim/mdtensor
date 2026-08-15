@@ -96,4 +96,42 @@ template <mdspan_c io_t>
     }
 }
 
+template <mdspan_c in_t>
+[[nodiscard]] consteval bool is_always_c_contiguous() noexcept {
+    return std::same_as<typename std::remove_cvref_t<in_t>::layout_type,
+                        stdex::layout_right>;
+}
+
+template <mdspan_c in_t>
+[[nodiscard]] constexpr bool is_c_contiguous(in_t &&in) noexcept {
+    if constexpr (in.rank() == 0) {
+        return true;
+
+    } else {
+        // Empty tensors have no observable element ordering.
+        if (extents_size(in.extents()) == 0) {
+            return true;
+        }
+
+        if (!in.is_unique() || !in.is_exhaustive() || !in.is_strided()) {
+            return false;
+        }
+
+        std::size_t expected_stride = 1;
+
+        for (std::size_t i = in.rank(); i-- > 0;) {
+            const std::size_t extent = static_cast<std::size_t>(in.extent(i));
+
+            if (extent > 1 &&
+                static_cast<std::size_t>(in.stride(i)) != expected_stride) {
+                return false;
+            }
+
+            expected_stride *= extent;
+        }
+
+        return true;
+    }
+}
+
 } // namespace mdtensor::core

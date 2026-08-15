@@ -202,11 +202,11 @@ template <typename Target, typename dtype>
     register_mode.template operator()<md::Backend::SIMD>("simd");
 #endif
 
-#ifdef MDTENSOR_USE_EIGEN
+#if defined(MDTENSOR_USE_EIGEN) && defined(BENCHMARK_MPMODE_EIGEN)
     register_mode.template operator()<md::Backend::EIGEN>("eigen");
 #endif
 
-#ifdef MDTENSOR_USE_OPENMP
+#if defined(MDTENSOR_USE_OPENMP) && defined(BENCHMARK_MPMODE_OPENMP)
     register_mode.template operator()<md::Backend::OPENMP>("openmp");
 #endif
 

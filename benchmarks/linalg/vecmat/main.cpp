@@ -7,6 +7,10 @@
  * See README and LICENSE files for full attribution details.
  */
 
+#ifdef MDTENSOR_USE_EIGEN
+#define BENCHMARK_MPMODE_EIGEN
+#endif
+
 #include "benchmarks/common/benchmarking.hpp"
 
 #include "mdtensor/mdtensor.hpp"
@@ -25,7 +29,7 @@ struct Target {
         benchmark::ClobberMemory();
 
         for (auto _ : state) {
-            md::linalg::vecmat_to<backend>(in1, in2, out);
+            static_cast<void>(md::linalg::vecmat<void, backend>(in1, in2, out));
             benchmark::ClobberMemory();
         }
 
@@ -38,7 +42,7 @@ int main(int argc, char **argv) {
 
     settings.benchmark_name = "vecmat";
     settings.defaults.dtype = "ps";
-    settings.defaults.backend = "auto";
+    settings.defaults.backend = "all";
 
     settings.defaults.range_multiplier = false;
     settings.defaults.range_step = 1;

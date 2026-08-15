@@ -135,6 +135,51 @@ make_reduced_tensor(std::integer_sequence<axes_t, axes...>,
     }(std::make_index_sequence<sizeof...(ins)>{});
 }
 
-// TODO: develop make_reduce_outputs
+template <typename dtype = void, bool keepdims = false, std::integral axes_t,
+          axes_t... axes, std::size_t... uranks>
+[[nodiscard]] constexpr auto
+make_reduced_tensors(std::integer_sequence<axes_t, axes...>,
+                     std::index_sequence<uranks...>, auto &&uout_exts_tuple,
+                     auto &&...ins) {
+    static_assert(sizeof...(uranks) == sizeof...(ins),
+                  "Number of uranks must match number of inputs.");
+
+    constexpr std::size_t ins_num = sizeof...(uranks);
+    constexpr std::size_t outs_num =
+        std::tuple_size_v<std::remove_cvref_t<decltype(uout_exts_tuple)>>;
+
+    if constexpr (ins_num == 0) {
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            return std::tuple{
+                make_tensor<dtype>(std::get<Is>(uout_exts_tuple))...};
+        }(std::make_index_sequence<outs_num>{});
+
+    } else {
+        using value_t = calc_type_t<dtype, decltype(ins)...>;
+
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            return std::tuple{
+                make_tensor<value_t>(make_reduced_extents<keepdims>(
+                    std::integer_sequence<axes_t, axes...>{},
+                    std::index_sequence<uranks...>{},
+                    std::get<Is>(uout_exts_tuple),
+                    std::forward<decltype(ins)>(ins)...))...};
+        }(std::make_index_sequence<outs_num>{});
+    }
+}
+
+template <typename dtype = void, bool keepdims = false, std::integral axes_t,
+          axes_t... axes>
+[[nodiscard]] constexpr auto
+make_reduced_tensors(std::integer_sequence<axes_t, axes...>,
+                     auto &&uout_exts_tuple, auto &&...ins) {
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return make_reduced_tensors<dtype, keepdims>(
+            std::integer_sequence<axes_t, axes...>{},
+            std::index_sequence<((void)Is, 0)...>{},
+            std::forward<decltype(uout_exts_tuple)>(uout_exts_tuple),
+            std::forward<decltype(ins)>(ins)...);
+    }(std::make_index_sequence<sizeof...(ins)>{});
+}
 
 } // namespace mdtensor::core

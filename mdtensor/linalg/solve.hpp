@@ -101,33 +101,19 @@ namespace ufunc {
 
 } // namespace ufunc
 
-template <core::Backend backend = core::Backend::AUTO>
-constexpr void solve_to(auto &&a, auto &&b, auto &&x, auto &&valid) {
-    const auto b_mds = core::to_const_mdspan(std::forward<decltype(b)>(b));
-
-    constexpr std::size_t rhs_rank = b_mds.rank() == 1 ? 1 : 2;
-
-    core::batch<backend>(
-        [](auto &&a, auto &&b, auto &&x, auto &&valid) {
-            valid = ufunc::solve_ufunc(std::forward<decltype(a)>(a),
-                                       std::forward<decltype(b)>(b),
-                                       std::forward<decltype(x)>(x));
-        },
-        std::index_sequence<2, rhs_rank, rhs_rank, 0>{},
-        std::integer_sequence<bool, true, true, false, false>{},
-        std::forward<decltype(a)>(a), b_mds, std::forward<decltype(x)>(x),
-        std::forward<decltype(valid)>(valid));
-}
-
-template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto solve(auto &&a, auto &&b) {
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto solve(auto &&a, auto &&b,
+                                   out_t &&out = out_t{std::nullopt}) {
     const auto a_mds = core::to_const_mdspan(std::forward<decltype(a)>(a));
     const auto b_mds = core::to_const_mdspan(std::forward<decltype(b)>(b));
 
+    using calc_t = core::calc_type_t<dtype, decltype(a_mds), decltype(b_mds)>;
+
     constexpr std::size_t rhs_rank = b_mds.rank() == 1 ? 1 : 2;
 
-    auto x = core::make_broadcasted_tensor<dtype>(
-        std::index_sequence<2, rhs_rank>{},
+    auto out_md = core::resolve_broadcasted_output<calc_t>(
+        std::forward<decltype(out)>(out), std::index_sequence<2, rhs_rank>{},
         core::slice_extents_from_right<rhs_rank>(b_mds.extents()), a_mds,
         b_mds);
 
@@ -135,9 +121,17 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
         std::index_sequence<2, rhs_rank>{}, core::extents<std::uint8_t>{},
         a_mds, b_mds);
 
-    solve_to<backend>(a_mds, b_mds, x, valid);
+    core::batch<backend>(
+        [](auto &&a, auto &&b, auto &&o, auto &&valid) {
+            valid = ufunc::solve_ufunc(std::forward<decltype(a)>(a),
+                                       std::forward<decltype(b)>(b),
+                                       std::forward<decltype(o)>(o));
+        },
+        std::index_sequence<2, rhs_rank, rhs_rank, 0>{},
+        std::integer_sequence<bool, true, true, false, false>{}, a_mds, b_mds,
+        out_md, valid);
 
-    return std::pair{x, valid};
+    return std::pair{out_md, valid};
 }
 
 } // namespace mdtensor::linalg

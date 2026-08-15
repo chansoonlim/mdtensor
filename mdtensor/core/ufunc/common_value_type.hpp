@@ -1,6 +1,7 @@
 /**
  * @file
- * @brief Make tensor utilities for mdtensor.
+ * @brief Numpy-like common type promotion for md-like types (mdspan, mdarray,
+ * etc.)
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -67,49 +68,23 @@ template <typename T, typename... Ts> struct value_type_filter<T, Ts...> {
 };
 
 //////////////////////////////////////////////////////////////////////
-/////////////// choose_dtype_or //////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-template <typename dtype, typename... Ts> struct choose_dtype_or;
-
-template <typename dtype, typename... Ts>
-    requires(!std::is_void_v<std::remove_cvref_t<dtype>>)
-struct choose_dtype_or<dtype, Ts...> {
-    using type = std::remove_cvref_t<dtype>;
-};
-
-template <typename... Ts>
-    requires(sizeof...(Ts) > 0 &&
-             (std::is_arithmetic_v<std::remove_cvref_t<Ts>> && ...))
-struct choose_dtype_or<void, Ts...> {
-    using type = core::promote_type_t<std::remove_cvref_t<Ts>...>;
-};
-
-//////////////////////////////////////////////////////////////////////
 /////////////// get_value_from_filter ////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-template <typename dtype, typename Tuple> struct get_value_from_filter {};
+template <typename Tuple> struct get_value_from_filter {};
 
-template <typename dtype, typename... Ts>
-struct get_value_from_filter<dtype, std::tuple<Ts...>>
-    : choose_dtype_or<dtype, Ts...> {};
+template <typename... Ts> struct get_value_from_filter<std::tuple<Ts...>> {
+    using type = core::promote_type_t<std::remove_cvref_t<Ts>...>;
+};
 
 } // namespace detail
 
 //////////////////////////////////////////////////////////////////////
-/////////////// calc_type_t //////////////////////////////////////////
+/////////////// common_value_type_t //////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-template <typename dtype, typename... Ts>
-using calc_type_t = typename detail::get_value_from_filter<
-    dtype, typename detail::value_type_filter<Ts...>::type>::type;
-
-template <typename dtype, typename... Ts>
-using signed_calc_type_t =
-    promote_type_t<calc_type_t<dtype, Ts...>, std::int8_t>;
-
-template <typename dtype, typename... Ts>
-using floating_calc_type_t = promote_type_t<calc_type_t<dtype, Ts...>, float>;
+template <typename... Ts>
+using common_value_type_t = typename detail::get_value_from_filter<
+    typename detail::value_type_filter<Ts...>::type>::type;
 
 } // namespace mdtensor::core

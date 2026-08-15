@@ -10,4 +10,5 @@
 #pragma once
 
 #include "batch.hpp"
+#include "common_value_type.hpp"
 #include "reduce.hpp"

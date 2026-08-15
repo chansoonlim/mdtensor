@@ -189,167 +189,164 @@ constexpr void lu_permute_l_ufunc(auto &&in, auto &&pl, auto &&u) {
 
 } // namespace ufunc
 
-template <core::Backend backend = core::Backend::AUTO>
-constexpr void lu_p_indices_to(auto &&in, auto &&p_indices, auto &&l,
-                               auto &&u) {
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_tuple_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+lu_p_indices(auto &&in, out_tuple_t &&out_tuple = out_tuple_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    using in_mds_t = decltype(in_mds);
+    using index_t = typename in_mds_t::index_type;
+
+    constexpr std::size_t rank = in_mds_t::rank();
+
+    constexpr std::size_t m_s = in_mds_t::static_extent(rank - 2);
+    constexpr std::size_t n_s = in_mds_t::static_extent(rank - 1);
+    constexpr std::size_t k_s = [] {
+        if constexpr (m_s == dyn || n_s == dyn) {
+            return dyn;
+
+        } else {
+            return m_s < n_s ? m_s : n_s;
+        }
+    }();
+
+    const index_t m = in_mds.extent(rank - 2);
+    const index_t n = in_mds.extent(rank - 1);
+    const index_t k = m < n ? m : n;
+
+    using calc_t = core::calc_type_t<dtype, decltype(in_mds)>;
+
+    auto [p_indices_md, l_md, u_md] = core::resolve_broadcasted_outputs<calc_t>(
+        std::forward<decltype(out_tuple)>(out_tuple), std::index_sequence<2>{},
+        std::tuple{core::extents<index_t, m_s>{m},
+                   core::extents<index_t, m_s, k_s>{m, k},
+                   core::extents<index_t, k_s, n_s>{k, n}},
+        in_mds);
+
     core::batch<backend>(
         [](auto &&...elems) {
             ufunc::lu_p_indices_ufunc(std::forward<decltype(elems)>(elems)...);
         },
         std::index_sequence<2, 1, 2, 2>{},
-        std::integer_sequence<bool, true, false, false, false>{},
-        std::forward<decltype(in)>(in),
-        std::forward<decltype(p_indices)>(p_indices),
-        std::forward<decltype(l)>(l), std::forward<decltype(u)>(u));
+        std::integer_sequence<bool, true, false, false, false>{}, in_mds,
+        p_indices_md, l_md, u_md);
+
+    return std::tuple{p_indices_md, l_md, u_md};
 }
 
-template <core::Backend backend = core::Backend::AUTO>
-constexpr void lu_full_to(auto &&in, auto &&p, auto &&l, auto &&u) {
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_tuple_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+lu_full(auto &&in, out_tuple_t &&out_tuple = out_tuple_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    using in_mds_t = decltype(in_mds);
+    using index_t = typename in_mds_t::index_type;
+
+    constexpr std::size_t rank = in_mds_t::rank();
+
+    constexpr std::size_t m_s = in_mds_t::static_extent(rank - 2);
+    constexpr std::size_t n_s = in_mds_t::static_extent(rank - 1);
+    constexpr std::size_t k_s = [] {
+        if constexpr (m_s == dyn || n_s == dyn) {
+            return dyn;
+
+        } else {
+            return m_s < n_s ? m_s : n_s;
+        }
+    }();
+
+    const index_t m = in_mds.extent(rank - 2);
+    const index_t n = in_mds.extent(rank - 1);
+    const index_t k = m < n ? m : n;
+
+    using calc_t = core::calc_type_t<dtype, decltype(in_mds)>;
+
+    auto [p_md, l_md, u_md] = core::resolve_broadcasted_outputs<calc_t>(
+        std::forward<decltype(out_tuple)>(out_tuple), std::index_sequence<2>{},
+        std::tuple{core::extents<index_t, m_s, m_s>{m, m},
+                   core::extents<index_t, m_s, k_s>{m, k},
+                   core::extents<index_t, k_s, n_s>{k, n}},
+        in_mds);
+
     core::batch<backend>(
         [](auto &&...elems) {
             ufunc::lu_full_ufunc(std::forward<decltype(elems)>(elems)...);
         },
         std::index_sequence<2, 2, 2, 2>{},
-        std::integer_sequence<bool, true, false, false, false>{},
-        std::forward<decltype(in)>(in), std::forward<decltype(p)>(p),
-        std::forward<decltype(l)>(l), std::forward<decltype(u)>(u));
+        std::integer_sequence<bool, true, false, false, false>{}, in_mds, p_md,
+        l_md, u_md);
+
+    return std::tuple{p_md, l_md, u_md};
 }
 
-template <core::Backend backend = core::Backend::AUTO>
-constexpr void lu_permute_l_to(auto &&in, auto &&pl, auto &&u) {
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_tuple_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+lu_permute_l(auto &&in, out_tuple_t &&out_tuple = out_tuple_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    using in_mds_t = decltype(in_mds);
+    using index_t = typename in_mds_t::index_type;
+
+    constexpr std::size_t rank = in_mds_t::rank();
+
+    constexpr std::size_t m_s = in_mds_t::static_extent(rank - 2);
+    constexpr std::size_t n_s = in_mds_t::static_extent(rank - 1);
+    constexpr std::size_t k_s = [] {
+        if constexpr (m_s == dyn || n_s == dyn) {
+            return dyn;
+
+        } else {
+            return m_s < n_s ? m_s : n_s;
+        }
+    }();
+
+    const index_t m = in_mds.extent(rank - 2);
+    const index_t n = in_mds.extent(rank - 1);
+    const index_t k = m < n ? m : n;
+
+    using calc_t = core::calc_type_t<dtype, decltype(in_mds)>;
+
+    auto [pl_md, u_md] = core::resolve_broadcasted_outputs<calc_t>(
+        std::forward<decltype(out_tuple)>(out_tuple), std::index_sequence<2>{},
+        std::tuple{core::extents<index_t, m_s, k_s>{m, k},
+                   core::extents<index_t, k_s, n_s>{k, n}},
+        in_mds);
+
     core::batch<backend>(
         [](auto &&...elems) {
             ufunc::lu_permute_l_ufunc(std::forward<decltype(elems)>(elems)...);
         },
         std::index_sequence<2, 2, 2>{},
-        std::integer_sequence<bool, true, false, false>{},
-        std::forward<decltype(in)>(in), std::forward<decltype(pl)>(pl),
-        std::forward<decltype(u)>(u));
-}
+        std::integer_sequence<bool, true, false, false>{}, in_mds, pl_md, u_md);
 
-template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto lu_p_indices(auto &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
-
-    using in_mds_t = decltype(in_mds);
-    using index_t = typename in_mds_t::index_type;
-
-    constexpr std::size_t rank = in_mds_t::rank();
-
-    constexpr std::size_t m_s = in_mds_t::static_extent(rank - 2);
-    constexpr std::size_t n_s = in_mds_t::static_extent(rank - 1);
-    constexpr std::size_t k_s = [] {
-        if constexpr (m_s == dyn || n_s == dyn) {
-            return dyn;
-
-        } else {
-            return m_s < n_s ? m_s : n_s;
-        }
-    }();
-
-    const index_t m = in_mds.extent(rank - 2);
-    const index_t n = in_mds.extent(rank - 1);
-    const index_t k = m < n ? m : n;
-
-    auto outs = core::make_broadcasted_tensors<dtype>(
-        std::index_sequence<2>{},
-        std::tuple{extents<index_t, m_s>{m},
-                   core::extents<index_t, m_s, k_s>{m, k},
-                   core::extents<index_t, k_s, n_s>{k, n}},
-        in_mds);
-
-    lu_p_indices_to<backend>(in_mds, std::get<0>(outs), std::get<1>(outs),
-                             std::get<2>(outs));
-
-    return outs;
-}
-
-template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto lu_full(auto &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
-
-    using in_mds_t = decltype(in_mds);
-    using index_t = typename in_mds_t::index_type;
-
-    constexpr std::size_t rank = in_mds_t::rank();
-
-    constexpr std::size_t m_s = in_mds_t::static_extent(rank - 2);
-    constexpr std::size_t n_s = in_mds_t::static_extent(rank - 1);
-    constexpr std::size_t k_s = [] {
-        if constexpr (m_s == dyn || n_s == dyn) {
-            return dyn;
-
-        } else {
-            return m_s < n_s ? m_s : n_s;
-        }
-    }();
-
-    const index_t m = in_mds.extent(rank - 2);
-    const index_t n = in_mds.extent(rank - 1);
-    const index_t k = m < n ? m : n;
-
-    auto outs = core::make_broadcasted_tensors<dtype>(
-        std::index_sequence<2>{},
-        std::tuple{extents<index_t, m_s, m_s>{m, m},
-                   core::extents<index_t, m_s, k_s>{m, k},
-                   core::extents<index_t, k_s, n_s>{k, n}},
-        in_mds);
-
-    lu_full_to<backend>(in_mds, std::get<0>(outs), std::get<1>(outs),
-                        std::get<2>(outs));
-
-    return outs;
-}
-
-template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto lu_permute_l(auto &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
-
-    using in_mds_t = decltype(in_mds);
-    using index_t = typename in_mds_t::index_type;
-
-    constexpr std::size_t rank = in_mds_t::rank();
-
-    constexpr std::size_t m_s = in_mds_t::static_extent(rank - 2);
-    constexpr std::size_t n_s = in_mds_t::static_extent(rank - 1);
-    constexpr std::size_t k_s = [] {
-        if constexpr (m_s == dyn || n_s == dyn) {
-            return dyn;
-
-        } else {
-            return m_s < n_s ? m_s : n_s;
-        }
-    }();
-
-    const index_t m = in_mds.extent(rank - 2);
-    const index_t n = in_mds.extent(rank - 1);
-    const index_t k = m < n ? m : n;
-
-    auto outs = core::make_broadcasted_tensors<dtype>(
-        std::index_sequence<2>{},
-        std::tuple{extents<index_t, m_s, k_s>{m, k},
-                   core::extents<index_t, k_s, n_s>{k, n}},
-        in_mds);
-
-    lu_permute_l_to<backend>(in_mds, std::get<0>(outs), std::get<1>(outs));
-
-    return outs;
+    return std::tuple{pl_md, u_md};
 }
 
 template <bool permute_l = false, bool p_indices = false, typename dtype = void,
-          core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto lu(auto &&in) {
+          core::Backend backend = core::Backend::AUTO,
+          typename out_tuple_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+lu(auto &&in, out_tuple_t &&out_tuple = out_tuple_t{std::nullopt}) {
     static_assert(!(permute_l && p_indices),
                   "lu cannot return both permuted L and P indices.");
 
     if constexpr (permute_l) {
-        return lu_permute_l<dtype, backend>(std::forward<decltype(in)>(in));
+        return lu_permute_l<dtype, backend>(
+            std::forward<decltype(in)>(in),
+            std::forward<decltype(out_tuple)>(out_tuple));
 
     } else if constexpr (p_indices) {
-        return lu_p_indices<dtype, backend>(std::forward<decltype(in)>(in));
+        return lu_p_indices<dtype, backend>(
+            std::forward<decltype(in)>(in),
+            std::forward<decltype(out_tuple)>(out_tuple));
 
     } else {
-        return lu_full<dtype, backend>(std::forward<decltype(in)>(in));
+        return lu_full<dtype, backend>(
+            std::forward<decltype(in)>(in),
+            std::forward<decltype(out_tuple)>(out_tuple));
     }
 }
 

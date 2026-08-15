@@ -53,8 +53,8 @@ template <core::extents_c in_t>
 [[nodiscard]] constexpr auto flatten(auto &&in) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    return reshape<core::Copy::TRUE>(in_mds,
-                                     detail::flatten_extents(in_mds.extents()));
+    return reshape<core::CopyMode::TRUE>(
+        in_mds, detail::flatten_extents(in_mds.extents()));
 }
 
 } // namespace mdtensor

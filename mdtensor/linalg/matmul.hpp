@@ -17,10 +17,8 @@
 #include "vecmat.hpp"
 
 #ifdef MDTENSOR_USE_EIGEN
-#include "../core/eigen/eigen.hpp"
+#include "../core/external/eigen/eigen.hpp"
 #endif
-
-// TODO: modifiy
 
 namespace mdtensor::linalg {
 namespace ufunc {
@@ -33,6 +31,9 @@ constexpr void matmul_ufunc_native_noalias(auto &&in1, auto &&in2, auto &&out) {
     const auto out_mds =
         core::to_output_mdspan(std::forward<decltype(out)>(out));
 
+    using calc_t =
+        core::common_value_type_t<decltype(in1_mds), decltype(in2_mds)>;
+
     using out_index_t = typename decltype(out_mds)::index_type;
     using in1_index_t = typename decltype(in1_mds)::index_type;
 
@@ -41,7 +42,8 @@ constexpr void matmul_ufunc_native_noalias(auto &&in1, auto &&in2, auto &&out) {
             out_mds(i, j) = 0;
 
             for (in1_index_t k = 0; k < in1_mds.extent(1); k++) {
-                out_mds(i, j) += in1_mds(i, k) * in2_mds(k, j);
+                out_mds(i, j) += static_cast<calc_t>(in1_mds(i, k)) *
+                                 static_cast<calc_t>(in2_mds(k, j));
             }
         }
     }
@@ -77,75 +79,61 @@ constexpr void matmul_ufunc_native(auto &&in1, auto &&in2, auto &&out) {
 
 #ifdef MDTENSOR_USE_EIGEN
 
-template <core::mdspan_c in1_t, core::mdspan_c in2_t, core::mdspan_c out_t>
-    requires(core::eigen::eigen_mappable_c<in1_t> &&
-             core::eigen::eigen_mappable_c<in2_t> &&
-             core::eigen::eigen_mappable_c<out_t>)
-inline void matmul_ufunc_eigen(const in1_t &in1, const in2_t &in2,
-                               const out_t &out) {
-    using value_t = core::promote_type_t<typename in1_t::value_type,
-                                         typename in2_t::value_type>;
+inline void matmul_ufunc_eigen(auto &&in1, auto &&in2, auto &&out) {
+    const auto ein1 = core::eigen::to_eigen_matrix(in1);
+    const auto ein2 = core::eigen::to_eigen_matrix(in2);
+    auto eout = core::eigen::to_eigen_matrix<core::CopyMode::FALSE>(out);
 
-    const auto ein1 = core::eigen::to_eigen(in1);
-    const auto ein2 = core::eigen::to_eigen(in2);
-    auto eout = core::eigen::to_eigen(out);
+    using calc_t = core::promote_type_t<typename decltype(ein1)::Scalar,
+                                        typename decltype(ein2)::Scalar>;
 
-    eout = (ein1.template cast<value_t>() * ein2.template cast<value_t>())
-               .template cast<typename out_t::value_type>();
+    eout = (ein1.template cast<calc_t>() * ein2.template cast<calc_t>())
+               .template cast<typename decltype(eout)::Scalar>();
 }
 
 #endif
-
-constexpr core::Backend matmul_auto_backend(auto &&in1, auto &&in2,
-                                            auto &&out) {
-    if (std::is_constant_evaluated()) {
-        return core::Backend::NATIVE;
-    }
-
-#ifdef MDTENSOR_USE_EIGEN
-    if constexpr (core::eigen::eigen_mappable_c<decltype(in1)> &&
-                  core::eigen::eigen_mappable_c<decltype(in2)> &&
-                  core::eigen::eigen_mappable_c<decltype(out)>) {
-        return core::Backend::EIGEN;
-    }
-#endif
-
-    return core::Backend::NATIVE;
-}
 
 } // namespace ufunc
 
-template <core::Backend backend = core::Backend::AUTO>
-constexpr void matmul_to(auto &&in1, auto &&in2, auto &&out) {
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto matmul(auto &&in1, auto &&in2,
+                                    out_t &&out = out_t{std::nullopt}) {
     const auto in1_mds =
         core::to_const_mdspan(std::forward<decltype(in1)>(in1));
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
-    const auto out_mds =
-        core::to_output_mdspan(std::forward<decltype(out)>(out));
 
     constexpr bool is_in1_mds_1d = (in1_mds.rank() == 1);
     constexpr bool is_in2_mds_1d = (in2_mds.rank() == 1);
 
     if constexpr (is_in1_mds_1d && !is_in2_mds_1d) {
-        vecmat_to<backend>(in1_mds, in2_mds, out_mds);
+        return vecmat<dtype, backend>(in1_mds, in2_mds,
+                                      std::forward<decltype(out)>(out));
 
     } else if constexpr (!is_in1_mds_1d && is_in2_mds_1d) {
-        matvec_to<backend>(in1_mds, in2_mds, out_mds);
+        return matvec<dtype, backend>(in1_mds, in2_mds,
+                                      std::forward<decltype(out)>(out));
 
     } else {
-        const auto be = backend;
-        // constexpr auto be =
-        //     (backend == core::Backend::AUTO)
-        //         ?
-        // ufunc::matmul_auto_backend(std::forward<decltype(in1)>(in1),
-        // std::forward<decltype(in2)>(in2),
-        // std::forward<decltype(out)>(out))
-        //         : backend;
+        using calc_t =
+            core::calc_type_t<dtype, decltype(in1_mds), decltype(in2_mds)>;
 
-        if (
+        const auto uin1_exts =
+            core::slice_extents_from_right<2>(in1_mds.extents());
+        const auto uin2_exts =
+            core::slice_extents_from_right<2>(in2_mds.extents());
+        const auto uout_exts =
+            core::compose_extents(core::slice_extents_from_left<1>(uin1_exts),
+                                  core::slice_extents_from_right<1>(uin2_exts));
+
+        auto out_md = core::resolve_broadcasted_output<calc_t>(
+            std::forward<decltype(out)>(out), std::index_sequence<2, 2>{},
+            uout_exts, in1_mds, in2_mds);
+
+        if constexpr (
 #ifdef MDTENSOR_USE_EIGEN
-            be == core::Backend::EIGEN
+            backend == core::Backend::EIGEN
 #else
             false
 #endif
@@ -157,71 +145,22 @@ constexpr void matmul_to(auto &&in1, auto &&in2, auto &&out) {
                         std::forward<decltype(elems)>(elems)...);
                 },
                 std::index_sequence<2, 2, 2>{},
-                std::integer_sequence<bool, true, true, false>{},
-                std::forward<decltype(in1)>(in1),
-                std::forward<decltype(in2)>(in2),
-                std::forward<decltype(out)>(out));
+                std::integer_sequence<bool, true, true, false>{}, in1_mds,
+                in2_mds, out_md);
 #endif
 
-        } else if (be == core::Backend::NATIVE) {
-            core::batch<core::Backend::NATIVE>(
-                [](auto &&...elems) {
-                    ufunc::matmul_ufunc_native(
-                        std::forward<decltype(elems)>(elems)...);
-                },
-                std::index_sequence<2, 2, 2>{},
-                std::integer_sequence<bool, true, true, false>{},
-                std::forward<decltype(in1)>(in1),
-                std::forward<decltype(in2)>(in2),
-                std::forward<decltype(out)>(out));
-
         } else {
-            core::batch<core::Backend::NATIVE>(
+            core::batch<backend>(
                 [](auto &&...elems) {
                     ufunc::matmul_ufunc_native(
                         std::forward<decltype(elems)>(elems)...);
                 },
                 std::index_sequence<2, 2, 2>{},
-                std::integer_sequence<bool, true, true, false>{},
-                std::forward<decltype(in1)>(in1),
-                std::forward<decltype(in2)>(in2),
-                std::forward<decltype(out)>(out));
+                std::integer_sequence<bool, true, true, false>{}, in1_mds,
+                in2_mds, out_md);
         }
-    }
-}
 
-template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto matmul(auto &&in1, auto &&in2) {
-    const auto in1_mds =
-        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
-    const auto in2_mds =
-        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
-
-    constexpr bool is_in1_mds_1d = (in1_mds.rank() == 1);
-    constexpr bool is_in2_mds_1d = (in2_mds.rank() == 1);
-
-    if constexpr (is_in1_mds_1d && !is_in2_mds_1d) {
-        return vecmat<dtype, backend>(in1_mds, in2_mds);
-
-    } else if constexpr (!is_in1_mds_1d && is_in2_mds_1d) {
-        return matvec<dtype, backend>(in1_mds, in2_mds);
-
-    } else {
-        const auto uin1_exts =
-            core::slice_extents_from_right<2>(in1_mds.extents());
-        const auto uin2_exts =
-            core::slice_extents_from_right<2>(in2_mds.extents());
-        const auto uout_exts =
-            core::compose_extents(core::slice_extents_from_left<1>(uin1_exts),
-                                  core::slice_extents_from_right<1>(uin2_exts));
-
-        auto out = core::make_broadcasted_tensor<dtype>(
-            std::index_sequence<uin1_exts.rank(), uin2_exts.rank()>{},
-            uout_exts, in1_mds, in2_mds);
-
-        matmul_to<backend>(in1_mds, in2_mds, out);
-
-        return out;
+        return out_md;
     }
 }
 

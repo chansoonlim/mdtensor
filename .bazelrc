@@ -1,4 +1,9 @@
 build --cxxopt=-std=c++20
 
-# build options
-build:ofast --cxxopt=-Ofast
+# fastmath option (use as bazel run --config=fastmath)
+build:fastmath --config=release
+build:fastmath --cxxopt=-ffast-math
+build:fastmath --linkopt=-ffast-math
+
+# using eigen option (use as bazel run --config=eigen)
+build:eigen --cxxopt=-DMDTENSOR_USE_EIGEN

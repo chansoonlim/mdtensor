@@ -13,53 +13,7 @@
 #include "../ufunc/ufunc.hpp"
 
 namespace mdtensor::core {
-
-enum class Copy {
-    TRUE,  // Copy the input tensor to a new tensor
-    FALSE, // Do not copy the input tensor; return a view of the input tensor
-    AUTO,  // Automatically determine whether to copy or not based on input
-};
-
 namespace detail {
-
-template <typename in_t>
-    requires(mdspan_c<in_t> || mdarray_c<in_t>)
-[[nodiscard]] consteval bool is_always_c_contiguous() noexcept {
-    return std::same_as<typename std::remove_cvref_t<in_t>::layout_type,
-                        stdex::layout_right>;
-}
-
-template <mdspan_c in_t>
-[[nodiscard]] constexpr bool is_c_contiguous(const in_t &in) noexcept {
-    if constexpr (in.rank() == 0) {
-        return true;
-
-    } else {
-        // Empty tensors have no observable element ordering.
-        if (extents_size(in.extents()) == 0) {
-            return true;
-        }
-
-        if (!in.is_unique() || !in.is_exhaustive() || !in.is_strided()) {
-            return false;
-        }
-
-        std::size_t expected_stride = 1;
-
-        for (std::size_t i = in.rank(); i-- > 0;) {
-            const std::size_t extent = static_cast<std::size_t>(in.extent(i));
-
-            if (extent > 1 &&
-                static_cast<std::size_t>(in.stride(i)) != expected_stride) {
-                return false;
-            }
-
-            expected_stride *= extent;
-        }
-
-        return true;
-    }
-}
 
 template <extents_c exts_t>
 [[nodiscard]] constexpr auto make_reshape_view(auto &&in, exts_t &&exts) {
@@ -101,7 +55,7 @@ template <extents_c exts_t>
 
 } // namespace detail
 
-template <Copy copy = Copy::AUTO>
+template <CopyMode copy = CopyMode::AUTO>
 [[nodiscard]] constexpr auto reshape(auto &&in, auto &&shape) {
     const auto in_mds = to_mdspan(std::forward<decltype(in)>(in));
     const auto exts = to_extents(std::forward<decltype(shape)>(shape));
@@ -124,23 +78,22 @@ template <Copy copy = Copy::AUTO>
     constexpr bool can_borrow =
         std::is_lvalue_reference_v<decltype(in)> || mdspan_c<decltype(in)>;
 
-    if constexpr (copy == Copy::AUTO) {
-        if constexpr (can_borrow &&
-                      detail::is_always_c_contiguous<in_mds_t>()) {
-            return reshape<Copy::FALSE>(in_mds, exts);
+    if constexpr (copy == CopyMode::AUTO) {
+        if constexpr (can_borrow && is_always_c_contiguous<in_mds_t>()) {
+            return reshape<CopyMode::FALSE>(in_mds, exts);
 
         } else {
-            return reshape<Copy::TRUE>(in_mds, exts);
+            return reshape<CopyMode::TRUE>(in_mds, exts);
         }
 
-    } else if constexpr (copy == Copy::TRUE) {
+    } else if constexpr (copy == CopyMode::TRUE) {
         return detail::make_reshape_copy(in_mds, exts);
 
-    } else if constexpr (copy == Copy::FALSE) {
+    } else if constexpr (copy == CopyMode::FALSE) {
         static_assert(can_borrow, "Reshape error: zero-copy reshape cannot "
                                   "bind to a temporary owning tensor.");
 
-        if (!detail::is_c_contiguous(in_mds)) {
+        if (!is_c_contiguous(in_mds)) {
             throw std::invalid_argument("Reshape error: zero-copy reshape "
                                         "requires a C-contiguous input.");
         }

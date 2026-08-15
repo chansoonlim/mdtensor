@@ -30,4 +30,28 @@
 
 #include "concept.hpp"
 #include "kokkos.hpp"
-#include "promote.hpp"
+#include "promote_type.hpp"
+
+namespace mdtensor::core {
+
+enum class Backend {
+    AUTO,   // Automatically select backend based on input types and sizes
+    NATIVE, // Native mdtensor implementation
+    SIMD,   // SIMD parallelization
+
+#ifdef MDTENSOR_USE_EIGEN
+    EIGEN, // Eigen backend
+#endif
+
+#ifdef MDTENSOR_USE_OPENMP
+    OPENMP, // CPU multi-processing with OpenMP
+#endif
+};
+
+enum class CopyMode {
+    TRUE,  // CopyMode the input tensor to a new tensor
+    FALSE, // Do not copy the input tensor; return a view of the input tensor
+    AUTO,  // Automatically determine whether to copy or not based on input
+};
+
+} // namespace mdtensor::core

@@ -12,21 +12,6 @@
 #include "../broadcast/broadcast.hpp"
 
 namespace mdtensor::core {
-
-enum class Backend {
-    AUTO,   // Automatically select backend based on input types and sizes
-    NATIVE, // Native mdtensor implementation
-    SIMD,   // SIMD parallelization
-
-#ifdef MDTENSOR_USE_EIGEN
-    EIGEN, // Eigen backend
-#endif
-
-#ifdef MDTENSOR_USE_OPENMP
-    OPENMP, // CPU multi-processing with OpenMP
-#endif
-};
-
 namespace detail {
 
 template <std::size_t brank, bool has_escape, mdspan_c io_t, mdspan_c... ios_t>

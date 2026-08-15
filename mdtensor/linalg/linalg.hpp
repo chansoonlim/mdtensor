@@ -20,31 +20,31 @@
 
 namespace mdtensor {
 
-constexpr void matmul_to(auto &&...elems) {
-    linalg::matmul_to(std::forward<decltype(elems)>(elems)...);
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto matmul(auto &&in1, auto &&in2,
+                                    out_t &&out = out_t{std::nullopt}) {
+    return linalg::matmul<dtype, backend>(std::forward<decltype(in1)>(in1),
+                                          std::forward<decltype(in2)>(in2),
+                                          std::forward<decltype(out)>(out));
 }
 
-template <typename dtype = void>
-[[nodiscard]] constexpr auto matmul(auto &&...elems) {
-    return linalg::matmul<dtype>(std::forward<decltype(elems)>(elems)...);
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto matvec(auto &&in1, auto &&in2,
+                                    out_t &&out = out_t{std::nullopt}) {
+    return linalg::matvec<dtype, backend>(std::forward<decltype(in1)>(in1),
+                                          std::forward<decltype(in2)>(in2),
+                                          std::forward<decltype(out)>(out));
 }
 
-constexpr void matvec_to(auto &&...elems) {
-    linalg::matvec_to(std::forward<decltype(elems)>(elems)...);
-}
-
-template <typename dtype = void>
-[[nodiscard]] constexpr auto matvec(auto &&...elems) {
-    return linalg::matvec<dtype>(std::forward<decltype(elems)>(elems)...);
-}
-
-constexpr void vecmat_to(auto &&...elems) {
-    linalg::vecmat_to(std::forward<decltype(elems)>(elems)...);
-}
-
-template <typename dtype = void>
-[[nodiscard]] constexpr auto vecmat(auto &&...elems) {
-    return linalg::vecmat<dtype>(std::forward<decltype(elems)>(elems)...);
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto vecmat(auto &&in1, auto &&in2,
+                                    out_t &&out = out_t{std::nullopt}) {
+    return linalg::vecmat<dtype, backend>(std::forward<decltype(in1)>(in1),
+                                          std::forward<decltype(in2)>(in2),
+                                          std::forward<decltype(out)>(out));
 }
 
 } // namespace mdtensor

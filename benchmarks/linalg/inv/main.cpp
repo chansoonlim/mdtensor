@@ -7,6 +7,10 @@
  * See README and LICENSE files for full attribution details.
  */
 
+#ifdef MDTENSOR_USE_EIGEN
+#define BENCHMARK_MPMODE_EIGEN
+#endif
+
 #define BENCHMARK_SKIP_INTEGER_TYPES
 
 #include "benchmarks/common/benchmarking.hpp"
@@ -22,12 +26,11 @@ struct Target {
 
         const auto in = md::random::rand<dtype>(md::dims<2>{len, len});
         auto out = md::empty<dtype>(md::dims<2>{len, len});
-        std::int8_t valid;
 
         benchmark::ClobberMemory();
 
         for (auto _ : state) {
-            md::linalg::inv_to<backend>(in, out, valid);
+            static_cast<void>(md::linalg::inv<void, backend>(in, out));
             benchmark::ClobberMemory();
         }
 
@@ -38,9 +41,9 @@ struct Target {
 int main(int argc, char **argv) {
     benchmarking::Settings settings;
 
-    settings.benchmark_name = "inv_to";
+    settings.benchmark_name = "inv";
     settings.defaults.dtype = "ps";
-    settings.defaults.backend = "auto";
+    settings.defaults.backend = "all";
 
     settings.defaults.range_multiplier = false;
     settings.defaults.range_step = 1;

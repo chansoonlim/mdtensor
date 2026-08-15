@@ -9,6 +9,12 @@
 
 #define BENCHMARK_SKIP_INTEGER_TYPES
 
+#define BENCHMARK_MPMODE_SIMD
+
+#ifdef MDTENSOR_USE_EIGEN
+#define BENCHMARK_MPMODE_EIGEN
+#endif
+
 #include "benchmarks/common/benchmarking.hpp"
 
 #include "mdtensor/mdtensor.hpp"
@@ -21,12 +27,11 @@ struct Target {
         const auto len = static_cast<std::size_t>(state.range(0));
 
         const auto in = md::ones<dtype>(md::dims<1>{len});
-        dtype out;
 
         benchmark::ClobberMemory();
 
         for (auto _ : state) {
-            md::linalg::norm_to<backend>(in, out);
+            static_cast<void>(md::linalg::norm<void, backend>(in));
             benchmark::ClobberMemory();
         }
 
@@ -37,9 +42,9 @@ struct Target {
 int main(int argc, char **argv) {
     benchmarking::Settings settings;
 
-    settings.benchmark_name = "norm_to";
+    settings.benchmark_name = "norm";
     settings.defaults.dtype = "ps";
-    settings.defaults.backend = "auto";
+    settings.defaults.backend = "all";
 
     settings.defaults.range_multiplier = false;
     settings.defaults.range_step = 10;

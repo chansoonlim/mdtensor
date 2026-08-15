@@ -18,7 +18,7 @@ template <std::integral axes_t, axes_t... axes>
 expand_dims(auto &&in, std::integer_sequence<axes_t, axes...>) {
     const auto in_mds = to_mdspan(std::forward<decltype(in)>(in));
 
-    return reshape<Copy::FALSE>(
+    return reshape<CopyMode::FALSE>(
         in_mds, expand_extents_dims(in_mds.extents(),
                                     std::integer_sequence<axes_t, axes...>{}));
 }

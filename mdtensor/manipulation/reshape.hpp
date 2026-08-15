@@ -13,7 +13,7 @@
 
 namespace mdtensor {
 
-template <core::Copy copy = core::Copy::AUTO>
+template <core::CopyMode copy = core::CopyMode::AUTO>
 [[nodiscard]] constexpr auto reshape(auto &&in, auto &&shape) {
     return core::reshape<copy>(std::forward<decltype(in)>(in),
                                std::forward<decltype(shape)>(shape));

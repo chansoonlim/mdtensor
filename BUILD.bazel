@@ -5,10 +5,7 @@ cc_library(
     hdrs = glob(["mdtensor/**/*.hpp"]),
     deps = [
         "@mdspan",
-        # "@eigen",
-    ],
-    defines = [
-        # "MDTENSOR_USE_EIGEN",
+        "@eigen", # Use only when MDTENSOR_USE_EIGEN is defined
     ],
     visibility = ["//visibility:public"],
 )

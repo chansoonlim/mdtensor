@@ -118,9 +118,19 @@ template <bool upper>
 
 } // namespace ufunc
 
-template <core::Backend backend = core::Backend::AUTO>
-constexpr void cholesky_to(auto &&in, auto &&out, auto &&valid,
-                           const bool upper = false) {
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto cholesky(auto &&in, const bool upper = false,
+                                      out_t &&out = out_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    using calc_t = core::calc_type_t<dtype, decltype(in_mds)>;
+
+    auto out_md = core::resolve_output_like<calc_t>(
+        std::forward<decltype(out)>(out), in_mds);
+    auto valid = core::make_broadcasted_tensor<bool>(
+        std::index_sequence<2>{}, core::extents<std::uint8_t>{}, in_mds);
+
     const auto run_batch = [&]<bool upper_v>() {
         core::batch<backend>(
             [](auto &&in, auto &&out, auto &&valid) {
@@ -129,9 +139,8 @@ constexpr void cholesky_to(auto &&in, auto &&out, auto &&valid,
                     std::forward<decltype(out)>(out));
             },
             std::index_sequence<2, 2, 0>{},
-            std::integer_sequence<bool, true, false, false>{},
-            std::forward<decltype(in)>(in), std::forward<decltype(out)>(out),
-            std::forward<decltype(valid)>(valid));
+            std::integer_sequence<bool, true, false, false>{}, in_mds, out_md,
+            valid);
     };
 
     if (upper) {
@@ -140,19 +149,8 @@ constexpr void cholesky_to(auto &&in, auto &&out, auto &&valid,
     } else {
         run_batch.template operator()<false>();
     }
-}
 
-template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto cholesky(auto &&in, const bool upper = false) {
-    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
-
-    auto out = empty_like(in_mds);
-    auto valid = core::make_broadcasted_tensor<bool>(
-        std::index_sequence<2>{}, core::extents<std::uint8_t>{}, in_mds);
-
-    cholesky_to<backend>(in_mds, out, valid, upper);
-
-    return std::pair{out, valid};
+    return std::pair{out_md, valid};
 }
 
 } // namespace mdtensor::linalg
