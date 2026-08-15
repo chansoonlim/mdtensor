@@ -279,7 +279,7 @@ concept mdarray_c = detail::is_mdarray_v<std::remove_cvref_t<T>>;
 
 } // namespace mdtensor::core
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/concept.hpp
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/promote.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/promote_type.hpp
 /**
  * @file
  * @brief Numpy-like type promotion for arithmetic types
@@ -428,7 +428,31 @@ using promote_type_t =
     typename detail::promote_type_impl<std::remove_cvref_t<Ts>...>::type;
 
 } // namespace mdtensor::core
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/promote.hpp
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/promote_type.hpp
+
+namespace mdtensor::core {
+
+enum class Backend {
+    AUTO,   // Automatically select backend based on input types and sizes
+    NATIVE, // Native mdtensor implementation
+    SIMD,   // SIMD parallelization
+
+#ifdef MDTENSOR_USE_EIGEN
+    EIGEN, // Eigen backend
+#endif
+
+#ifdef MDTENSOR_USE_OPENMP
+    OPENMP, // CPU multi-processing with OpenMP
+#endif
+};
+
+enum class CopyMode {
+    TRUE,  // CopyMode the input tensor to a new tensor
+    FALSE, // Do not copy the input tensor; return a view of the input tensor
+    AUTO,  // Automatically determine whether to copy or not based on input
+};
+
+} // namespace mdtensor::core
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/type/type.hpp
 
 //BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/base/extents.hpp
@@ -812,6 +836,44 @@ template <mdspan_c io_t>
 
     } else {
         return std::forward<io_t>(io);
+    }
+}
+
+template <mdspan_c in_t>
+[[nodiscard]] consteval bool is_always_c_contiguous() noexcept {
+    return std::same_as<typename std::remove_cvref_t<in_t>::layout_type,
+                        stdex::layout_right>;
+}
+
+template <mdspan_c in_t>
+[[nodiscard]] constexpr bool is_c_contiguous(in_t &&in) noexcept {
+    if constexpr (in.rank() == 0) {
+        return true;
+
+    } else {
+        // Empty tensors have no observable element ordering.
+        if (extents_size(in.extents()) == 0) {
+            return true;
+        }
+
+        if (!in.is_unique() || !in.is_exhaustive() || !in.is_strided()) {
+            return false;
+        }
+
+        std::size_t expected_stride = 1;
+
+        for (std::size_t i = in.rank(); i-- > 0;) {
+            const std::size_t extent = static_cast<std::size_t>(in.extent(i));
+
+            if (extent > 1 &&
+                static_cast<std::size_t>(in.stride(i)) != expected_stride) {
+                return false;
+            }
+
+            expected_stride *= extent;
+        }
+
+        return true;
     }
 }
 
@@ -1328,10 +1390,22 @@ can_broadcast(std::index_sequence<uranks...>,
  */
 
 
-//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/output_value_type.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/calc_type.hpp
 /**
  * @file
- * @brief Make tensor utilities for mdtensor.
+ * @brief Calculation type utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/ufunc/common_value_type.hpp
+/**
+ * @file
+ * @brief Numpy-like common type promotion for md-like types (mdspan, mdarray,
+ * etc.)
  *
  * @copyright
  * SPDX-License-Identifier: Apache-2.0
@@ -1396,43 +1470,49 @@ template <typename T, typename... Ts> struct value_type_filter<T, Ts...> {
 };
 
 //////////////////////////////////////////////////////////////////////
-/////////////// choose_dtype_or //////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-template <typename dtype, typename... Ts> struct choose_dtype_or;
-
-template <typename dtype, typename... Ts>
-    requires(!std::is_void_v<std::remove_cvref_t<dtype>>)
-struct choose_dtype_or<dtype, Ts...> {
-    using type = std::remove_cvref_t<dtype>;
-};
-
-template <typename... Ts>
-    requires(sizeof...(Ts) > 0 &&
-             (std::is_arithmetic_v<std::remove_cvref_t<Ts>> && ...))
-struct choose_dtype_or<void, Ts...> {
-    using type = core::promote_type_t<std::remove_cvref_t<Ts>...>;
-};
-
-//////////////////////////////////////////////////////////////////////
 /////////////// get_value_from_filter ////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-template <typename dtype, typename Tuple> struct get_value_from_filter {};
+template <typename Tuple> struct get_value_from_filter {};
 
-template <typename dtype, typename... Ts>
-struct get_value_from_filter<dtype, std::tuple<Ts...>>
-    : choose_dtype_or<dtype, Ts...> {};
+template <typename... Ts> struct get_value_from_filter<std::tuple<Ts...>> {
+    using type = core::promote_type_t<std::remove_cvref_t<Ts>...>;
+};
 
 } // namespace detail
 
 //////////////////////////////////////////////////////////////////////
-/////////////// calc_type_t //////////////////////////////////////////
+/////////////// common_value_type_t //////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
+template <typename... Ts>
+using common_value_type_t = typename detail::get_value_from_filter<
+    typename detail::value_type_filter<Ts...>::type>::type;
+
+} // namespace mdtensor::core
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/ufunc/common_value_type.hpp
+
+namespace mdtensor::core {
+namespace detail {
+
+template <typename dtype, typename... Ts> struct calc_type_impl;
+
 template <typename dtype, typename... Ts>
-using calc_type_t = typename detail::get_value_from_filter<
-    dtype, typename detail::value_type_filter<Ts...>::type>::type;
+    requires(!std::is_void_v<std::remove_cvref_t<dtype>>)
+struct calc_type_impl<dtype, Ts...> {
+    using type = std::remove_cvref_t<dtype>;
+};
+
+template <typename... Ts>
+    requires(sizeof...(Ts) > 0)
+struct calc_type_impl<void, Ts...> {
+    using type = core::common_value_type_t<Ts...>;
+};
+
+} // namespace detail
+
+template <typename dtype, typename... Ts>
+using calc_type_t = detail::calc_type_impl<dtype, Ts...>::type;
 
 template <typename dtype, typename... Ts>
 using signed_calc_type_t =
@@ -1442,7 +1522,7 @@ template <typename dtype, typename... Ts>
 using floating_calc_type_t = promote_type_t<calc_type_t<dtype, Ts...>, float>;
 
 } // namespace mdtensor::core
-//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/output_value_type.hpp
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/calc_type.hpp
 
 namespace mdtensor::core {
 
@@ -1583,21 +1663,6 @@ template <typename dtype = void>
 
 
 namespace mdtensor::core {
-
-enum class Backend {
-    AUTO,   // Automatically select backend based on input types and sizes
-    NATIVE, // Native mdtensor implementation
-    SIMD,   // SIMD parallelization
-
-#ifdef MDTENSOR_USE_EIGEN
-    EIGEN, // Eigen backend
-#endif
-
-#ifdef MDTENSOR_USE_OPENMP
-    OPENMP, // CPU multi-processing with OpenMP
-#endif
-};
-
 namespace detail {
 
 template <std::size_t brank, bool has_escape, mdspan_c io_t, mdspan_c... ios_t>
@@ -2147,7 +2212,52 @@ make_reduced_tensor(std::integer_sequence<axes_t, axes...>,
     }(std::make_index_sequence<sizeof...(ins)>{});
 }
 
-// TODO: develop make_reduce_outputs
+template <typename dtype = void, bool keepdims = false, std::integral axes_t,
+          axes_t... axes, std::size_t... uranks>
+[[nodiscard]] constexpr auto
+make_reduced_tensors(std::integer_sequence<axes_t, axes...>,
+                     std::index_sequence<uranks...>, auto &&uout_exts_tuple,
+                     auto &&...ins) {
+    static_assert(sizeof...(uranks) == sizeof...(ins),
+                  "Number of uranks must match number of inputs.");
+
+    constexpr std::size_t ins_num = sizeof...(uranks);
+    constexpr std::size_t outs_num =
+        std::tuple_size_v<std::remove_cvref_t<decltype(uout_exts_tuple)>>;
+
+    if constexpr (ins_num == 0) {
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            return std::tuple{
+                make_tensor<dtype>(std::get<Is>(uout_exts_tuple))...};
+        }(std::make_index_sequence<outs_num>{});
+
+    } else {
+        using value_t = calc_type_t<dtype, decltype(ins)...>;
+
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            return std::tuple{
+                make_tensor<value_t>(make_reduced_extents<keepdims>(
+                    std::integer_sequence<axes_t, axes...>{},
+                    std::index_sequence<uranks...>{},
+                    std::get<Is>(uout_exts_tuple),
+                    std::forward<decltype(ins)>(ins)...))...};
+        }(std::make_index_sequence<outs_num>{});
+    }
+}
+
+template <typename dtype = void, bool keepdims = false, std::integral axes_t,
+          axes_t... axes>
+[[nodiscard]] constexpr auto
+make_reduced_tensors(std::integer_sequence<axes_t, axes...>,
+                     auto &&uout_exts_tuple, auto &&...ins) {
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return make_reduced_tensors<dtype, keepdims>(
+            std::integer_sequence<axes_t, axes...>{},
+            std::index_sequence<((void)Is, 0)...>{},
+            std::forward<decltype(uout_exts_tuple)>(uout_exts_tuple),
+            std::forward<decltype(ins)>(ins)...);
+    }(std::make_index_sequence<sizeof...(ins)>{});
+}
 
 } // namespace mdtensor::core
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/make_reduced_tensor.hpp
@@ -2254,7 +2364,59 @@ resolve_broadcasted_output(auto &&out, uout_exts_t &&uout_exts, auto &&...ins) {
     }(std::make_index_sequence<sizeof...(ins)>{});
 }
 
-// TODO: develop resolve_broadcasted_outputs
+template <typename dtype = void, std::size_t... uranks>
+[[nodiscard]] constexpr auto
+resolve_broadcasted_outputs(auto &&out_tuple, std::index_sequence<uranks...>,
+                            auto &&uout_exts_tuple, auto &&...ins) {
+    static_assert(sizeof...(uranks) == sizeof...(ins),
+                  "Number of uranks must match number of inputs.");
+
+    if constexpr (core::nullopt_t_c<decltype(out_tuple)>) {
+        return make_broadcasted_tensors<dtype>(
+            std::index_sequence<uranks...>{},
+            std::forward<decltype(uout_exts_tuple)>(uout_exts_tuple),
+            std::forward<decltype(ins)>(ins)...);
+
+    } else {
+        constexpr std::size_t ins_num = sizeof...(uranks);
+        constexpr std::size_t outs_num =
+            std::tuple_size_v<std::remove_cvref_t<decltype(uout_exts_tuple)>>;
+
+        if constexpr (ins_num == 0) {
+            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                return std::tuple{resolve_output<dtype>(
+                    std::get<Is>(out_tuple), std::get<Is>(uout_exts_tuple))...};
+            }(std::make_index_sequence<outs_num>{});
+
+        } else {
+            using value_t = calc_type_t<dtype, decltype(ins)...>;
+
+            // calculate broadcasted extents
+            const auto bexts = get_broadcast_extents(
+                std::index_sequence<uranks...>{},
+                to_const_mdspan(std::forward<decltype(ins)>(ins))...);
+
+            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                return std::tuple{resolve_output<value_t>(
+                    std::get<Is>(out_tuple),
+                    compose_extents(bexts, std::get<Is>(uout_exts_tuple)))...};
+            }(std::make_index_sequence<outs_num>{});
+        }
+    }
+}
+
+template <typename dtype = void>
+[[nodiscard]] constexpr auto resolve_broadcasted_outputs(auto &&out_tuple,
+                                                         auto &&uout_exts_tuple,
+                                                         auto &&...ins) {
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return resolve_broadcasted_outputs<dtype>(
+            std::forward<decltype(out_tuple)>(out_tuple),
+            std::index_sequence<((void)Is, 0)...>{},
+            std::forward<uout_exts_tuple>(uout_exts_tuple),
+            std::forward<decltype(ins)>(ins)...);
+    }(std::make_index_sequence<sizeof...(ins)>{});
+}
 
 } // namespace mdtensor::core
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/resolve_broadcasted_output.hpp
@@ -2314,60 +2476,70 @@ resolve_reduced_output(auto &&out, std::integer_sequence<axes_t, axes...>,
     }(std::make_index_sequence<sizeof...(ins)>{});
 }
 
-// TODO: develop resolve_reduced_outputs
+template <typename dtype = void, bool keepdims = false, std::integral axes_t,
+          axes_t... axes, std::size_t... uranks>
+[[nodiscard]] constexpr auto resolve_reduced_outputs(
+    auto &&out_tuple, std::integer_sequence<axes_t, axes...>,
+    std::index_sequence<uranks...>, auto &&uout_exts_tuple, auto &&...ins) {
+    static_assert(sizeof...(uranks) == sizeof...(ins),
+                  "Number of uranks must match number of inputs.");
+
+    if constexpr (core::nullopt_t_c<decltype(out_tuple)>) {
+        return make_reduced_tensors<dtype, keepdims>(
+            std::integer_sequence<axes_t, axes...>{},
+            std::index_sequence<uranks...>{},
+            std::forward<decltype(uout_exts_tuple)>(uout_exts_tuple),
+            std::forward<decltype(ins)>(ins)...);
+
+    } else {
+        constexpr std::size_t ins_num = sizeof...(uranks);
+        constexpr std::size_t outs_num =
+            std::tuple_size_v<std::remove_cvref_t<decltype(uout_exts_tuple)>>;
+
+        if constexpr (ins_num == 0) {
+            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                return std::tuple{resolve_output<dtype>(
+                    std::get<Is>(out_tuple), std::get<Is>(uout_exts_tuple))...};
+            }(std::make_index_sequence<outs_num>{});
+
+        } else {
+            using value_t = calc_type_t<dtype, decltype(ins)...>;
+
+            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                return std::tuple{resolve_output<value_t>(
+                    std::get<Is>(out_tuple),
+                    make_reduced_extents<keepdims>(
+                        std::integer_sequence<axes_t, axes...>{},
+                        std::index_sequence<uranks...>{},
+                        std::get<Is>(uout_exts_tuple),
+                        std::forward<decltype(ins)>(ins)...))...};
+            }(std::make_index_sequence<outs_num>{});
+        }
+    }
+}
+
+template <typename dtype = void, bool keepdims = false, std::integral axes_t,
+          axes_t... axes>
+[[nodiscard]] constexpr auto
+resolve_reduced_outputs(auto &&out_tuple,
+                        std::integer_sequence<axes_t, axes...>,
+                        auto &&uout_exts_tuple, auto &&...ins) {
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return resolve_reduced_outputs<dtype, keepdims>(
+            std::forward<decltype(out_tuple)>(out_tuple),
+            std::integer_sequence<axes_t, axes...>{},
+            std::index_sequence<((void)Is, 0)...>{},
+            std::forward<decltype(uout_exts_tuple)>(uout_exts_tuple),
+            std::forward<decltype(ins)>(ins)...);
+    }(std::make_index_sequence<sizeof...(ins)>{});
+}
 
 } // namespace mdtensor::core
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/resolve_reduced_output.hpp
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/tensor/tensor.hpp
 
 namespace mdtensor::core {
-
-enum class Copy {
-    TRUE,  // Copy the input tensor to a new tensor
-    FALSE, // Do not copy the input tensor; return a view of the input tensor
-    AUTO,  // Automatically determine whether to copy or not based on input
-};
-
 namespace detail {
-
-template <typename in_t>
-    requires(mdspan_c<in_t> || mdarray_c<in_t>)
-[[nodiscard]] consteval bool is_always_c_contiguous() noexcept {
-    return std::same_as<typename std::remove_cvref_t<in_t>::layout_type,
-                        stdex::layout_right>;
-}
-
-template <mdspan_c in_t>
-[[nodiscard]] constexpr bool is_c_contiguous(const in_t &in) noexcept {
-    if constexpr (in.rank() == 0) {
-        return true;
-
-    } else {
-        // Empty tensors have no observable element ordering.
-        if (extents_size(in.extents()) == 0) {
-            return true;
-        }
-
-        if (!in.is_unique() || !in.is_exhaustive() || !in.is_strided()) {
-            return false;
-        }
-
-        std::size_t expected_stride = 1;
-
-        for (std::size_t i = in.rank(); i-- > 0;) {
-            const std::size_t extent = static_cast<std::size_t>(in.extent(i));
-
-            if (extent > 1 &&
-                static_cast<std::size_t>(in.stride(i)) != expected_stride) {
-                return false;
-            }
-
-            expected_stride *= extent;
-        }
-
-        return true;
-    }
-}
 
 template <extents_c exts_t>
 [[nodiscard]] constexpr auto make_reshape_view(auto &&in, exts_t &&exts) {
@@ -2409,7 +2581,7 @@ template <extents_c exts_t>
 
 } // namespace detail
 
-template <Copy copy = Copy::AUTO>
+template <CopyMode copy = CopyMode::AUTO>
 [[nodiscard]] constexpr auto reshape(auto &&in, auto &&shape) {
     const auto in_mds = to_mdspan(std::forward<decltype(in)>(in));
     const auto exts = to_extents(std::forward<decltype(shape)>(shape));
@@ -2432,23 +2604,22 @@ template <Copy copy = Copy::AUTO>
     constexpr bool can_borrow =
         std::is_lvalue_reference_v<decltype(in)> || mdspan_c<decltype(in)>;
 
-    if constexpr (copy == Copy::AUTO) {
-        if constexpr (can_borrow &&
-                      detail::is_always_c_contiguous<in_mds_t>()) {
-            return reshape<Copy::FALSE>(in_mds, exts);
+    if constexpr (copy == CopyMode::AUTO) {
+        if constexpr (can_borrow && is_always_c_contiguous<in_mds_t>()) {
+            return reshape<CopyMode::FALSE>(in_mds, exts);
 
         } else {
-            return reshape<Copy::TRUE>(in_mds, exts);
+            return reshape<CopyMode::TRUE>(in_mds, exts);
         }
 
-    } else if constexpr (copy == Copy::TRUE) {
+    } else if constexpr (copy == CopyMode::TRUE) {
         return detail::make_reshape_copy(in_mds, exts);
 
-    } else if constexpr (copy == Copy::FALSE) {
+    } else if constexpr (copy == CopyMode::FALSE) {
         static_assert(can_borrow, "Reshape error: zero-copy reshape cannot "
                                   "bind to a temporary owning tensor.");
 
-        if (!detail::is_c_contiguous(in_mds)) {
+        if (!is_c_contiguous(in_mds)) {
             throw std::invalid_argument("Reshape error: zero-copy reshape "
                                         "requires a C-contiguous input.");
         }
@@ -2472,7 +2643,7 @@ template <std::integral axes_t, axes_t... axes>
 expand_dims(auto &&in, std::integer_sequence<axes_t, axes...>) {
     const auto in_mds = to_mdspan(std::forward<decltype(in)>(in));
 
-    return reshape<Copy::FALSE>(
+    return reshape<CopyMode::FALSE>(
         in_mds, expand_extents_dims(in_mds.extents(),
                                     std::integer_sequence<axes_t, axes...>{}));
 }
@@ -3818,9 +3989,19 @@ template <bool upper>
 
 } // namespace ufunc
 
-template <core::Backend backend = core::Backend::AUTO>
-constexpr void cholesky_to(auto &&in, auto &&out, auto &&valid,
-                           const bool upper = false) {
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto cholesky(auto &&in, const bool upper = false,
+                                      out_t &&out = out_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    using calc_t = core::calc_type_t<dtype, decltype(in_mds)>;
+
+    auto out_md = core::resolve_output_like<calc_t>(
+        std::forward<decltype(out)>(out), in_mds);
+    auto valid = core::make_broadcasted_tensor<bool>(
+        std::index_sequence<2>{}, core::extents<std::uint8_t>{}, in_mds);
+
     const auto run_batch = [&]<bool upper_v>() {
         core::batch<backend>(
             [](auto &&in, auto &&out, auto &&valid) {
@@ -3829,9 +4010,8 @@ constexpr void cholesky_to(auto &&in, auto &&out, auto &&valid,
                     std::forward<decltype(out)>(out));
             },
             std::index_sequence<2, 2, 0>{},
-            std::integer_sequence<bool, true, false, false>{},
-            std::forward<decltype(in)>(in), std::forward<decltype(out)>(out),
-            std::forward<decltype(valid)>(valid));
+            std::integer_sequence<bool, true, false, false>{}, in_mds, out_md,
+            valid);
     };
 
     if (upper) {
@@ -3840,19 +4020,8 @@ constexpr void cholesky_to(auto &&in, auto &&out, auto &&valid,
     } else {
         run_batch.template operator()<false>();
     }
-}
 
-template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto cholesky(auto &&in, const bool upper = false) {
-    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
-
-    auto out = empty_like(in_mds);
-    auto valid = core::make_broadcasted_tensor<bool>(
-        std::index_sequence<2>{}, core::extents<std::uint8_t>{}, in_mds);
-
-    cholesky_to<backend>(in_mds, out, valid, upper);
-
-    return std::pair{out, valid};
+    return std::pair{out_md, valid};
 }
 
 } // namespace mdtensor::linalg
@@ -3930,29 +4099,436 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/absolute.hpp
 
 #ifdef MDTENSOR_USE_EIGEN
-#include "../core/eigen/eigen.hpp"
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/external/eigen/eigen.hpp
+/**
+ * @file
+ * @brief Eigen interop utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/external/eigen/eigen_extent.hpp
+/**
+ * @file
+ * @brief Eigen extent interop utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+#include <Eigen/Dense>
+
+
+namespace mdtensor::core::eigen {
+
+template <std::size_t Extent>
+[[nodiscard]] consteval int to_eigen_static_extent() {
+    static_assert(
+        Extent == core::dyn ||
+            Extent <= static_cast<std::size_t>(std::numeric_limits<int>::max()),
+        "Static extent value exceeds maximum int value for Eigen mapping.");
+
+    if constexpr (Extent == core::dyn) {
+        return Eigen::Dynamic;
+
+    } else {
+        return static_cast<int>(Extent);
+    }
+}
+
+template <core::integral_c ext_t>
+[[nodiscard]] constexpr Eigen::Index to_eigen_extent(ext_t &&ext) {
+    if constexpr (std::signed_integral<ext_t>) {
+        if (ext < 0) {
+            throw std::invalid_argument(
+                "Negative extent value is invalid for Eigen mapping.");
+        }
+    }
+
+    if (!std::in_range<Eigen::Index>(ext)) {
+        throw std::invalid_argument(
+            "Extent value exceeds maximum int value for Eigen mapping.");
+    }
+
+    return static_cast<Eigen::Index>(ext);
+}
+
+} // namespace mdtensor::core::eigen
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/external/eigen/eigen_extent.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/external/eigen/eigen_matrix.hpp
+/**
+ * @file
+ * @brief Eigen matrix interop utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor::core::eigen {
+namespace detail {
+
+template <typename T> consteval bool is_eigen_matrix_mappable_impl() {
+    using mds_t = decltype(to_mdspan(std::declval<T>()));
+
+    using element_t = typename mds_t::element_type;
+    using layout_t = typename mds_t::layout_type;
+    using accessor_t = typename mds_t::accessor_type;
+
+    constexpr bool supported_layout =
+        std::same_as<layout_t, core::stdex::layout_right> ||
+        std::same_as<layout_t, core::stdex::layout_left>;
+
+    constexpr bool supported_accessor =
+        std::same_as<accessor_t, core::stdex::default_accessor<element_t>>;
+
+    return mds_t::rank() == 2 && supported_layout && supported_accessor &&
+           mds_t::is_always_unique() && mds_t::is_always_exhaustive() &&
+           mds_t::is_always_strided();
+}
+
+template <typename T>
+struct is_eigen_matrix_mappable
+    : std::bool_constant<is_eigen_matrix_mappable_impl<T>()> {};
+
+template <typename T>
+inline constexpr bool is_eigen_matrix_mappable_v =
+    is_eigen_matrix_mappable<T>::value;
+
+template <typename Layout, int Rows, int Cols>
+consteval int get_storage_option() {
+    if constexpr (Rows == 1 && Cols != 1) {
+        return Eigen::RowMajor;
+
+    } else if constexpr (Cols == 1 && Rows != 1) {
+        return Eigen::ColMajor;
+
+    } else if constexpr (std::same_as<Layout, core::stdex::layout_right>) {
+        return Eigen::RowMajor;
+
+    } else {
+        return Eigen::ColMajor;
+    }
+}
+
+} // namespace detail
+
+template <typename T>
+concept eigen_matrix_mappable_c =
+    detail::is_eigen_matrix_mappable_v<std::remove_cvref_t<T>>;
+
+namespace detail {
+
+template <typename in_t>
+    requires eigen_matrix_mappable_c<in_t>
+[[nodiscard]] auto make_eigen_matrix_view(in_t &&in) {
+    const auto in_mds = core::to_mdspan(std::forward<in_t>(in));
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
+
+    static_assert(in_mds_t::rank() == 2,
+                  "Input tensor must be rank-2 for Eigen matrix mapping.");
+
+    constexpr int static_rows =
+        to_eigen_static_extent<in_mds_t::static_extent(0)>();
+    constexpr int static_cols =
+        to_eigen_static_extent<in_mds_t::static_extent(1)>();
+    constexpr auto option =
+        detail::get_storage_option<typename in_mds_t::layout_type, static_rows,
+                                   static_cols>();
+
+    const Eigen::Index rows = to_eigen_extent(in_mds.extent(0));
+    const Eigen::Index cols = to_eigen_extent(in_mds.extent(1));
+
+    using matrix_t = Eigen::Matrix<typename in_mds_t::value_type, static_rows,
+                                   static_cols, option>;
+
+    using map_t = Eigen::Map<
+        std::conditional_t<std::is_const_v<typename in_mds_t::element_type>,
+                           const matrix_t, matrix_t>,
+        Eigen::Unaligned>;
+
+    if constexpr (static_rows == Eigen::Dynamic ||
+                  static_cols == Eigen::Dynamic) {
+        return map_t{in_mds.data_handle(), rows, cols};
+
+    } else {
+        return map_t{in_mds.data_handle()};
+    }
+}
+
+[[nodiscard]] auto make_eigen_matrix_copy(auto &&in) {
+    const auto in_mds = core::to_mdspan(std::forward<decltype(in)>(in));
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
+
+    static_assert(in_mds_t::rank() == 2,
+                  "Input tensor must be rank-2 for Eigen matrix copy.");
+
+    constexpr int static_rows =
+        to_eigen_static_extent<in_mds_t::static_extent(0)>();
+    constexpr int static_cols =
+        to_eigen_static_extent<in_mds_t::static_extent(1)>();
+    constexpr auto option =
+        detail::get_storage_option<typename in_mds_t::layout_type, static_rows,
+                                   static_cols>();
+
+    using matrix_t = Eigen::Matrix<typename in_mds_t::value_type, static_rows,
+                                   static_cols, option>;
+
+    matrix_t out{};
+
+    if constexpr (static_rows == Eigen::Dynamic ||
+                  static_cols == Eigen::Dynamic) {
+        out.resize(to_eigen_extent(in_mds.extent(0)),
+                   to_eigen_extent(in_mds.extent(1)));
+    }
+
+    using index_t = typename in_mds_t::index_type;
+
+    for (index_t i = 0; i < in_mds.extent(0); i++) {
+        for (index_t j = 0; j < in_mds.extent(1); j++) {
+            out.coeffRef(i, j) = in_mds(i, j);
+        }
+    }
+
+    return out;
+}
+
+} // namespace detail
+
+template <CopyMode copy = CopyMode::AUTO>
+[[nodiscard]] auto to_eigen_matrix(auto &&in) {
+    const auto in_mds = core::to_mdspan(std::forward<decltype(in)>(in));
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
+
+    static_assert(in_mds_t::rank() == 2,
+                  "Input tensor must be rank-2 for Eigen matrix conversion.");
+
+    constexpr bool can_borrow =
+        std::is_lvalue_reference_v<decltype(in)> ||
+        core::mdspan_c<std::remove_cvref_t<decltype(in)>>;
+
+    constexpr bool can_map = eigen_matrix_mappable_c<decltype(in_mds)>;
+
+    if constexpr (copy == CopyMode::AUTO) {
+        if constexpr (can_borrow && can_map) {
+            return detail::make_eigen_matrix_view(in_mds);
+
+        } else {
+            return detail::make_eigen_matrix_copy(in_mds);
+        }
+
+    } else if constexpr (copy == CopyMode::TRUE) {
+        return detail::make_eigen_matrix_copy(in_mds);
+
+    } else if constexpr (copy == CopyMode::FALSE) {
+        static_assert(can_borrow,
+                      "Eigen matrix conversion error: zero-copy mapping cannot "
+                      "bind to a temporary owning tensor.");
+        static_assert(
+            can_map,
+            "Eigen matrix conversion error: zero-copy mapping requires a "
+            "rank-2, unique, strided mdspan with direct scalar storage.");
+
+        return detail::make_eigen_matrix_view(in_mds);
+    }
+}
+
+} // namespace mdtensor::core::eigen
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/external/eigen/eigen_matrix.hpp
+//BEGIN_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/external/eigen/eigen_vector.hpp
+/**
+ * @file
+ * @brief Eigen vector interop utilities for mdtensor.
+ *
+ * @copyright
+ * SPDX-License-Identifier: Apache-2.0
+ * See README and LICENSE files for full attribution details.
+ */
+
+
+
+namespace mdtensor::core::eigen {
+namespace detail {
+
+template <typename T>
+[[nodiscard]] consteval bool is_eigen_vector_mappable_impl() {
+    using mds_t = decltype(to_mdspan(std::declval<T>()));
+
+    using element_t = typename mds_t::element_type;
+    using layout_t = typename mds_t::layout_type;
+    using accessor_t = typename mds_t::accessor_type;
+
+    constexpr bool supported_layout =
+        std::same_as<layout_t, core::stdex::layout_right> ||
+        std::same_as<layout_t, core::stdex::layout_left> ||
+        std::same_as<layout_t, core::stdex::layout_stride>;
+
+    constexpr bool supported_accessor =
+        std::same_as<accessor_t, core::stdex::default_accessor<element_t>>;
+
+    return mds_t::rank() == 1 && supported_layout && supported_accessor &&
+           !std::is_volatile_v<element_t> && mds_t::is_always_unique() &&
+           mds_t::is_always_strided() &&
+           std::convertible_to<typename mds_t::data_handle_type, element_t *>;
+}
+
+template <typename T>
+struct is_eigen_vector_mappable
+    : std::bool_constant<is_eigen_vector_mappable_impl<T>()> {};
+
+template <typename T>
+inline constexpr bool is_eigen_vector_mappable_v =
+    is_eigen_vector_mappable<T>::value;
+
+} // namespace detail
+
+template <typename T>
+concept eigen_vector_mappable_c =
+    detail::is_eigen_vector_mappable_v<std::remove_cvref_t<T>>;
+
+namespace detail {
+
+template <bool col = true, typename in_t>
+    requires eigen_vector_mappable_c<in_t>
+[[nodiscard]] auto make_eigen_vector_view(in_t &&in) {
+    const auto in_mds = core::to_mdspan(std::forward<in_t>(in));
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
+
+    static_assert(in_mds_t::rank() == 1,
+                  "Input tensor must be rank-1 for Eigen vector mapping.");
+
+    constexpr int static_size =
+        to_eigen_static_extent<in_mds_t::static_extent(0)>();
+    constexpr int static_rows = col ? static_size : 1;
+    constexpr int static_cols = col ? 1 : static_size;
+    constexpr auto option = col ? Eigen::ColMajor : Eigen::RowMajor;
+
+    using vector_t = Eigen::Matrix<typename in_mds_t::value_type, static_rows,
+                                   static_cols, option>;
+
+    using stride_t = Eigen::InnerStride<Eigen::Dynamic>;
+
+    using map_t = Eigen::Map<
+        std::conditional_t<std::is_const_v<typename in_mds_t::element_type>,
+                           const vector_t, vector_t>,
+        Eigen::Unaligned, stride_t>;
+
+    const stride_t stride{to_eigen_extent(in_mds.stride(0))};
+
+    if constexpr (static_size == Eigen::Dynamic) {
+        return map_t{in_mds.data_handle(), to_eigen_extent(in_mds.extent(0)),
+                     stride};
+
+    } else {
+        return map_t{in_mds.data_handle(), stride};
+    }
+}
+
+template <bool col = true>
+[[nodiscard]] auto make_eigen_vector_copy(auto &&in) {
+    const auto in_mds = core::to_mdspan(std::forward<decltype(in)>(in));
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
+
+    static_assert(in_mds_t::rank() == 1,
+                  "Input tensor must be rank-1 for Eigen vector copy.");
+
+    constexpr int static_size =
+        to_eigen_static_extent<in_mds_t::static_extent(0)>();
+    constexpr int static_rows = col ? static_size : 1;
+    constexpr int static_cols = col ? 1 : static_size;
+    constexpr auto option = col ? Eigen::ColMajor : Eigen::RowMajor;
+
+    using vector_t = Eigen::Matrix<typename in_mds_t::value_type, static_rows,
+                                   static_cols, option>;
+
+    auto out = [&]() {
+        if constexpr (static_size == Eigen::Dynamic) {
+            return vector_t{to_eigen_extent(in_mds.extent(0))};
+
+        } else {
+            return vector_t{};
+        }
+    }();
+
+    using index_t = typename in_mds_t::index_type;
+
+    for (index_t i = 0; i < in_mds.extent(0); i++) {
+        out.coeffRef(i) = in_mds(i);
+    }
+
+    return out;
+}
+
+} // namespace detail
+
+template <bool col = true, CopyMode copy = CopyMode::AUTO>
+[[nodiscard]] auto to_eigen_vector(auto &&in) {
+    const auto in_mds = core::to_mdspan(std::forward<decltype(in)>(in));
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
+
+    static_assert(in_mds_t::rank() == 1,
+                  "Input tensor must be rank-1 for Eigen vector conversion.");
+
+    constexpr bool can_borrow =
+        std::is_lvalue_reference_v<decltype(in)> ||
+        core::mdspan_c<std::remove_cvref_t<decltype(in)>>;
+
+    constexpr bool can_map = eigen_vector_mappable_c<decltype(in_mds)>;
+
+    if constexpr (copy == CopyMode::AUTO) {
+        if constexpr (can_borrow && can_map) {
+            return detail::make_eigen_vector_view<col>(in_mds);
+
+        } else {
+            return detail::make_eigen_vector_copy<col>(in_mds);
+        }
+
+    } else if constexpr (copy == CopyMode::TRUE) {
+        return detail::make_eigen_vector_copy<col>(in_mds);
+
+    } else if constexpr (copy == CopyMode::FALSE) {
+        static_assert(can_borrow,
+                      "Eigen vector conversion error: zero-copy mapping cannot "
+                      "bind to a temporary owning tensor.");
+        static_assert(
+            can_map,
+            "Eigen vector conversion error: zero-copy mapping requires a "
+            "rank-1, unique, strided mdspan with direct scalar storage.");
+
+        return detail::make_eigen_vector_view<col>(in_mds);
+    }
+}
+
+} // namespace mdtensor::core::eigen
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/external/eigen/eigen_vector.hpp
+//END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/core/external/eigen/eigen.hpp
 #endif
 
 namespace mdtensor::linalg {
 namespace ufunc {
 
-[[nodiscard]] constexpr bool inv_native(auto &&in, auto &&out) {
+[[nodiscard]] constexpr bool inv_ufunc_native(auto &&in, auto &&out) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
     const auto out_mds =
         core::to_output_mdspan(std::forward<decltype(out)>(out));
 
     using index_t = typename decltype(in_mds)::index_type;
 
-    const index_t n = in_mds.extent(0);
-
     auto in_copy = copy(in_mds);
     static_cast<void>(eye(out_mds.extents(), 0, out_mds));
 
-    for (index_t i = 0; i < n; i++) {
+    for (index_t i = 0; i < in_mds.extent(0); i++) {
         index_t pivot_row = i;
         auto max_abs = absolute(in_copy(i, i));
 
-        for (index_t row = i + 1; row < n; row++) {
+        for (index_t row = i + 1; row < in_mds.extent(0); row++) {
             const auto candidate = absolute(in_copy(row, i));
 
             if (candidate > max_abs) {
@@ -3967,7 +4543,7 @@ namespace ufunc {
         }
 
         if (pivot_row != i) {
-            for (index_t j = 0; j < n; j++) {
+            for (index_t j = 0; j < in_mds.extent(0); j++) {
                 std::swap(in_copy(i, j), in_copy(pivot_row, j));
                 std::swap(out_mds(i, j), out_mds(pivot_row, j));
             }
@@ -3975,12 +4551,12 @@ namespace ufunc {
 
         const auto pivot = in_copy(i, i);
 
-        for (index_t j = 0; j < n; j++) {
+        for (index_t j = 0; j < in_mds.extent(0); j++) {
             in_copy(i, j) /= pivot;
             out_mds(i, j) /= pivot;
         }
 
-        for (index_t j = 0; j < n; j++) {
+        for (index_t j = 0; j < in_mds.extent(0); j++) {
             if (i == j) {
                 continue;
             }
@@ -3991,7 +4567,7 @@ namespace ufunc {
                 continue;
             }
 
-            for (index_t k = 0; k < n; k++) {
+            for (index_t k = 0; k < in_mds.extent(0); k++) {
                 in_copy(j, k) -= factor * in_copy(i, k);
                 out_mds(j, k) -= factor * out_mds(i, k);
             }
@@ -4001,56 +4577,67 @@ namespace ufunc {
     return true;
 }
 
-[[nodiscard]] constexpr bool inv_ufunc(auto &&in, auto &&out) {
 #ifdef MDTENSOR_USE_EIGEN
-#if __cplusplus >= 202302L // TODO: Impliement for C++20
-    if constexpr (core::eigen::eigen_mappable_c<in_t> &&
-                  core::eigen::eigen_mappable_c<out_t>) {
-        if (!std::is_constant_evaluated()) {
-            const auto ein = core::eigen::to_eigen(in);
-            auto eout = core::eigen::to_eigen(out);
 
-            eout = ein.inverse();
+[[nodiscard]] constexpr bool inv_ufunc_eigen(auto &&in, auto &&out) {
+    const auto ein =
+        core::eigen::to_eigen_matrix(std::forward<decltype(in)>(in));
+    auto eout = core::eigen::to_eigen_matrix<core::CopyMode::FALSE>(
+        std::forward<decltype(out)>(out));
 
-            return true;
-        }
-    }
+    eout = ein.inverse();
 
-#else
-    assert(false && "Eigen inverse not implemented for C++20");
-
-#endif
-#endif
-
-    return inv_native(in, out);
+    return true;
 }
+
+#endif
 
 } // namespace ufunc
 
-template <core::Backend backend = core::Backend::AUTO>
-constexpr void inv_to(auto &&in, auto &&out, auto &&valid) {
-    core::batch<backend>(
-        [](auto &&in, auto &&out, auto &&valid) {
-            valid = ufunc::inv_ufunc(std::forward<decltype(in)>(in),
-                                     std::forward<decltype(out)>(out));
-        },
-        std::index_sequence<2, 2, 0>{},
-        std::integer_sequence<bool, true, false, false>{},
-        std::forward<decltype(in)>(in), std::forward<decltype(out)>(out),
-        std::forward<decltype(valid)>(valid));
-}
-
-template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto inv(auto &&in) {
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto inv(auto &&in, out_t &&out = out_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    auto out = empty_like<dtype>(in_mds);
+    using calc_t = core::calc_type_t<dtype, decltype(in_mds)>;
+
+    auto out_md = core::resolve_output_like<calc_t>(
+        std::forward<decltype(out)>(out), in_mds);
     auto valid = core::make_broadcasted_tensor<bool>(
         std::index_sequence<2>{}, core::extents<std::uint8_t>{}, in_mds);
 
-    inv_to<backend>(in_mds, out, valid);
+    if constexpr (
+#ifdef MDTENSOR_USE_EIGEN
+        backend == core::Backend::EIGEN
+#else
+        false
+#endif
+    ) {
+#ifdef MDTENSOR_USE_EIGEN
+        core::batch<core::Backend::NATIVE>(
+            [](auto &&in, auto &&out, auto &&valid) {
+                valid =
+                    ufunc::inv_ufunc_eigen(std::forward<decltype(in)>(in),
+                                           std::forward<decltype(out)>(out));
+            },
+            std::index_sequence<2, 2, 0>{},
+            std::integer_sequence<bool, true, false, false>{}, in_mds, out_md,
+            valid);
+#endif
 
-    return std::pair{out, valid};
+    } else {
+        core::batch<backend>(
+            [](auto &&in, auto &&out, auto &&valid) {
+                valid =
+                    ufunc::inv_ufunc_native(std::forward<decltype(in)>(in),
+                                            std::forward<decltype(out)>(out));
+            },
+            std::index_sequence<2, 2, 0>{},
+            std::integer_sequence<bool, true, false, false>{}, in_mds, out_md,
+            valid);
+    }
+
+    return std::pair{out_md, valid};
 }
 
 } // namespace mdtensor::linalg
@@ -4242,167 +4829,164 @@ constexpr void lu_permute_l_ufunc(auto &&in, auto &&pl, auto &&u) {
 
 } // namespace ufunc
 
-template <core::Backend backend = core::Backend::AUTO>
-constexpr void lu_p_indices_to(auto &&in, auto &&p_indices, auto &&l,
-                               auto &&u) {
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_tuple_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+lu_p_indices(auto &&in, out_tuple_t &&out_tuple = out_tuple_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    using in_mds_t = decltype(in_mds);
+    using index_t = typename in_mds_t::index_type;
+
+    constexpr std::size_t rank = in_mds_t::rank();
+
+    constexpr std::size_t m_s = in_mds_t::static_extent(rank - 2);
+    constexpr std::size_t n_s = in_mds_t::static_extent(rank - 1);
+    constexpr std::size_t k_s = [] {
+        if constexpr (m_s == dyn || n_s == dyn) {
+            return dyn;
+
+        } else {
+            return m_s < n_s ? m_s : n_s;
+        }
+    }();
+
+    const index_t m = in_mds.extent(rank - 2);
+    const index_t n = in_mds.extent(rank - 1);
+    const index_t k = m < n ? m : n;
+
+    using calc_t = core::calc_type_t<dtype, decltype(in_mds)>;
+
+    auto [p_indices_md, l_md, u_md] = core::resolve_broadcasted_outputs<calc_t>(
+        std::forward<decltype(out_tuple)>(out_tuple), std::index_sequence<2>{},
+        std::tuple{core::extents<index_t, m_s>{m},
+                   core::extents<index_t, m_s, k_s>{m, k},
+                   core::extents<index_t, k_s, n_s>{k, n}},
+        in_mds);
+
     core::batch<backend>(
         [](auto &&...elems) {
             ufunc::lu_p_indices_ufunc(std::forward<decltype(elems)>(elems)...);
         },
         std::index_sequence<2, 1, 2, 2>{},
-        std::integer_sequence<bool, true, false, false, false>{},
-        std::forward<decltype(in)>(in),
-        std::forward<decltype(p_indices)>(p_indices),
-        std::forward<decltype(l)>(l), std::forward<decltype(u)>(u));
+        std::integer_sequence<bool, true, false, false, false>{}, in_mds,
+        p_indices_md, l_md, u_md);
+
+    return std::tuple{p_indices_md, l_md, u_md};
 }
 
-template <core::Backend backend = core::Backend::AUTO>
-constexpr void lu_full_to(auto &&in, auto &&p, auto &&l, auto &&u) {
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_tuple_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+lu_full(auto &&in, out_tuple_t &&out_tuple = out_tuple_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    using in_mds_t = decltype(in_mds);
+    using index_t = typename in_mds_t::index_type;
+
+    constexpr std::size_t rank = in_mds_t::rank();
+
+    constexpr std::size_t m_s = in_mds_t::static_extent(rank - 2);
+    constexpr std::size_t n_s = in_mds_t::static_extent(rank - 1);
+    constexpr std::size_t k_s = [] {
+        if constexpr (m_s == dyn || n_s == dyn) {
+            return dyn;
+
+        } else {
+            return m_s < n_s ? m_s : n_s;
+        }
+    }();
+
+    const index_t m = in_mds.extent(rank - 2);
+    const index_t n = in_mds.extent(rank - 1);
+    const index_t k = m < n ? m : n;
+
+    using calc_t = core::calc_type_t<dtype, decltype(in_mds)>;
+
+    auto [p_md, l_md, u_md] = core::resolve_broadcasted_outputs<calc_t>(
+        std::forward<decltype(out_tuple)>(out_tuple), std::index_sequence<2>{},
+        std::tuple{core::extents<index_t, m_s, m_s>{m, m},
+                   core::extents<index_t, m_s, k_s>{m, k},
+                   core::extents<index_t, k_s, n_s>{k, n}},
+        in_mds);
+
     core::batch<backend>(
         [](auto &&...elems) {
             ufunc::lu_full_ufunc(std::forward<decltype(elems)>(elems)...);
         },
         std::index_sequence<2, 2, 2, 2>{},
-        std::integer_sequence<bool, true, false, false, false>{},
-        std::forward<decltype(in)>(in), std::forward<decltype(p)>(p),
-        std::forward<decltype(l)>(l), std::forward<decltype(u)>(u));
+        std::integer_sequence<bool, true, false, false, false>{}, in_mds, p_md,
+        l_md, u_md);
+
+    return std::tuple{p_md, l_md, u_md};
 }
 
-template <core::Backend backend = core::Backend::AUTO>
-constexpr void lu_permute_l_to(auto &&in, auto &&pl, auto &&u) {
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_tuple_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+lu_permute_l(auto &&in, out_tuple_t &&out_tuple = out_tuple_t{std::nullopt}) {
+    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
+
+    using in_mds_t = decltype(in_mds);
+    using index_t = typename in_mds_t::index_type;
+
+    constexpr std::size_t rank = in_mds_t::rank();
+
+    constexpr std::size_t m_s = in_mds_t::static_extent(rank - 2);
+    constexpr std::size_t n_s = in_mds_t::static_extent(rank - 1);
+    constexpr std::size_t k_s = [] {
+        if constexpr (m_s == dyn || n_s == dyn) {
+            return dyn;
+
+        } else {
+            return m_s < n_s ? m_s : n_s;
+        }
+    }();
+
+    const index_t m = in_mds.extent(rank - 2);
+    const index_t n = in_mds.extent(rank - 1);
+    const index_t k = m < n ? m : n;
+
+    using calc_t = core::calc_type_t<dtype, decltype(in_mds)>;
+
+    auto [pl_md, u_md] = core::resolve_broadcasted_outputs<calc_t>(
+        std::forward<decltype(out_tuple)>(out_tuple), std::index_sequence<2>{},
+        std::tuple{core::extents<index_t, m_s, k_s>{m, k},
+                   core::extents<index_t, k_s, n_s>{k, n}},
+        in_mds);
+
     core::batch<backend>(
         [](auto &&...elems) {
             ufunc::lu_permute_l_ufunc(std::forward<decltype(elems)>(elems)...);
         },
         std::index_sequence<2, 2, 2>{},
-        std::integer_sequence<bool, true, false, false>{},
-        std::forward<decltype(in)>(in), std::forward<decltype(pl)>(pl),
-        std::forward<decltype(u)>(u));
-}
+        std::integer_sequence<bool, true, false, false>{}, in_mds, pl_md, u_md);
 
-template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto lu_p_indices(auto &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
-
-    using in_mds_t = decltype(in_mds);
-    using index_t = typename in_mds_t::index_type;
-
-    constexpr std::size_t rank = in_mds_t::rank();
-
-    constexpr std::size_t m_s = in_mds_t::static_extent(rank - 2);
-    constexpr std::size_t n_s = in_mds_t::static_extent(rank - 1);
-    constexpr std::size_t k_s = [] {
-        if constexpr (m_s == dyn || n_s == dyn) {
-            return dyn;
-
-        } else {
-            return m_s < n_s ? m_s : n_s;
-        }
-    }();
-
-    const index_t m = in_mds.extent(rank - 2);
-    const index_t n = in_mds.extent(rank - 1);
-    const index_t k = m < n ? m : n;
-
-    auto outs = core::make_broadcasted_tensors<dtype>(
-        std::index_sequence<2>{},
-        std::tuple{extents<index_t, m_s>{m},
-                   core::extents<index_t, m_s, k_s>{m, k},
-                   core::extents<index_t, k_s, n_s>{k, n}},
-        in_mds);
-
-    lu_p_indices_to<backend>(in_mds, std::get<0>(outs), std::get<1>(outs),
-                             std::get<2>(outs));
-
-    return outs;
-}
-
-template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto lu_full(auto &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
-
-    using in_mds_t = decltype(in_mds);
-    using index_t = typename in_mds_t::index_type;
-
-    constexpr std::size_t rank = in_mds_t::rank();
-
-    constexpr std::size_t m_s = in_mds_t::static_extent(rank - 2);
-    constexpr std::size_t n_s = in_mds_t::static_extent(rank - 1);
-    constexpr std::size_t k_s = [] {
-        if constexpr (m_s == dyn || n_s == dyn) {
-            return dyn;
-
-        } else {
-            return m_s < n_s ? m_s : n_s;
-        }
-    }();
-
-    const index_t m = in_mds.extent(rank - 2);
-    const index_t n = in_mds.extent(rank - 1);
-    const index_t k = m < n ? m : n;
-
-    auto outs = core::make_broadcasted_tensors<dtype>(
-        std::index_sequence<2>{},
-        std::tuple{extents<index_t, m_s, m_s>{m, m},
-                   core::extents<index_t, m_s, k_s>{m, k},
-                   core::extents<index_t, k_s, n_s>{k, n}},
-        in_mds);
-
-    lu_full_to<backend>(in_mds, std::get<0>(outs), std::get<1>(outs),
-                        std::get<2>(outs));
-
-    return outs;
-}
-
-template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto lu_permute_l(auto &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
-
-    using in_mds_t = decltype(in_mds);
-    using index_t = typename in_mds_t::index_type;
-
-    constexpr std::size_t rank = in_mds_t::rank();
-
-    constexpr std::size_t m_s = in_mds_t::static_extent(rank - 2);
-    constexpr std::size_t n_s = in_mds_t::static_extent(rank - 1);
-    constexpr std::size_t k_s = [] {
-        if constexpr (m_s == dyn || n_s == dyn) {
-            return dyn;
-
-        } else {
-            return m_s < n_s ? m_s : n_s;
-        }
-    }();
-
-    const index_t m = in_mds.extent(rank - 2);
-    const index_t n = in_mds.extent(rank - 1);
-    const index_t k = m < n ? m : n;
-
-    auto outs = core::make_broadcasted_tensors<dtype>(
-        std::index_sequence<2>{},
-        std::tuple{extents<index_t, m_s, k_s>{m, k},
-                   core::extents<index_t, k_s, n_s>{k, n}},
-        in_mds);
-
-    lu_permute_l_to<backend>(in_mds, std::get<0>(outs), std::get<1>(outs));
-
-    return outs;
+    return std::tuple{pl_md, u_md};
 }
 
 template <bool permute_l = false, bool p_indices = false, typename dtype = void,
-          core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto lu(auto &&in) {
+          core::Backend backend = core::Backend::AUTO,
+          typename out_tuple_t = std::nullopt_t>
+[[nodiscard]] constexpr auto
+lu(auto &&in, out_tuple_t &&out_tuple = out_tuple_t{std::nullopt}) {
     static_assert(!(permute_l && p_indices),
                   "lu cannot return both permuted L and P indices.");
 
     if constexpr (permute_l) {
-        return lu_permute_l<dtype, backend>(std::forward<decltype(in)>(in));
+        return lu_permute_l<dtype, backend>(
+            std::forward<decltype(in)>(in),
+            std::forward<decltype(out_tuple)>(out_tuple));
 
     } else if constexpr (p_indices) {
-        return lu_p_indices<dtype, backend>(std::forward<decltype(in)>(in));
+        return lu_p_indices<dtype, backend>(
+            std::forward<decltype(in)>(in),
+            std::forward<decltype(out_tuple)>(out_tuple));
 
     } else {
-        return lu_full<dtype, backend>(std::forward<decltype(in)>(in));
+        return lu_full<dtype, backend>(
+            std::forward<decltype(in)>(in),
+            std::forward<decltype(out_tuple)>(out_tuple));
     }
 }
 
@@ -4461,19 +5045,21 @@ template <std::int64_t... axes>
 
 
 #ifdef MDTENSOR_USE_EIGEN
-#include "../core/eigen/eigen.hpp"
 #endif
 
 namespace mdtensor::linalg {
 namespace ufunc {
 
-constexpr void matvec_native_noalias(auto &&in1, auto &&in2, auto &&out) {
+constexpr void matvec_ufunc_native_noalias(auto &&in1, auto &&in2, auto &&out) {
     const auto in1_mds =
         core::to_const_mdspan(std::forward<decltype(in1)>(in1));
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
     const auto out_mds =
         core::to_output_mdspan(std::forward<decltype(out)>(out));
+
+    using calc_t =
+        core::common_value_type_t<decltype(in1_mds), decltype(in2_mds)>;
 
     using out_index_t = typename decltype(out_mds)::index_type;
     using in1_index_t = typename decltype(in1_mds)::index_type;
@@ -4482,135 +5068,107 @@ constexpr void matvec_native_noalias(auto &&in1, auto &&in2, auto &&out) {
         out_mds(i) = 0;
 
         for (in1_index_t j = 0; j < in1_mds.extent(1); j++) {
-            out_mds(i) += in1_mds(i, j) * in2_mds(j);
+            out_mds(i) += static_cast<calc_t>(in1_mds(i, j)) *
+                          static_cast<calc_t>(in2_mds(j));
         }
     }
 }
 
-constexpr void matvec_naive(auto &&in1, auto &&in2, auto &&out) {
+constexpr void matvec_ufunc_native(auto &&in1, auto &&in2, auto &&out) {
     const auto in1_mds =
         core::to_const_mdspan(std::forward<decltype(in1)>(in1));
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
     const auto out_mds =
         core::to_output_mdspan(std::forward<decltype(out)>(out));
-
-    if (std::is_constant_evaluated()) {
-        auto out_tmp = empty_like(out_mds);
-        matvec_native_noalias(in1_mds, in2_mds, out_tmp);
-        static_cast<void>(copy(out_tmp, out_mds));
-        return;
-    }
 
     bool need_copy = false;
 
-    if constexpr (requires {
-                      in1_mds.data_handle() == out_mds.data_handle();
-                  }) {
-        if (in1_mds.data_handle() == out_mds.data_handle()) {
-            need_copy = true;
-        }
-    }
+    if (std::is_constant_evaluated()) {
+        need_copy = true;
 
-    if constexpr (requires {
-                      in2_mds.data_handle() == out_mds.data_handle();
-                  }) {
-        if (in2_mds.data_handle() == out_mds.data_handle()) {
-            need_copy = true;
-        }
+    } else if ((void *)in1_mds.data_handle() == (void *)out_mds.data_handle() ||
+               (void *)in2_mds.data_handle() == (void *)out_mds.data_handle()) {
+        need_copy = true;
     }
 
     if (!need_copy) {
-        matvec_native_noalias(in1_mds, in2_mds, out_mds);
+        matvec_ufunc_native_noalias(in1_mds, in2_mds, out_mds);
 
     } else {
         auto out_tmp = empty_like(out_mds);
-        matvec_native_noalias(in1_mds, in2_mds, out_tmp);
+        matvec_ufunc_native_noalias(in1_mds, in2_mds, out_tmp);
         static_cast<void>(copy(out_tmp, out_mds));
     }
 }
 
-constexpr void matvec_ufunc(auto &&in1, auto &&in2, auto &&out) {
-    const auto in1_mds =
-        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
-    const auto in2_mds =
-        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
-    const auto out_mds =
-        core::to_output_mdspan(std::forward<decltype(out)>(out));
-
 #ifdef MDTENSOR_USE_EIGEN
-#if __cplusplus >= 202302L // TODO: Impliement for C++20
-    using in1_mds_t = decltype(in1_mds);
-    using in2_mds_t = decltype(in2_mds);
-    using out_mds_t = decltype(out_mds);
 
-    if constexpr (core::eigen::eigen_mappable_c<in1_mds_t> &&
-                  core::eigen::eigen_mappable_c<in2_mds_t> &&
-                  core::eigen::eigen_mappable_c<out_mds_t>) {
-        if (!std::is_constant_evaluated() &&
-            8 <= out_mds.extent(0) + out_mds.extent(1)) {
-            using value_t = core::promote_type_t<
-                typename std::remove_cvref_t<in1_mds_t>::value_type,
-                typename std::remove_cvref_t<in2_mds_t>::value_type>;
+inline void matvec_ufunc_eigen(auto &&in1, auto &&in2, auto &&out) {
+    const auto ein1 = core::eigen::to_eigen_matrix(in1);
+    const auto ein2 = core::eigen::to_eigen_vector<true>(in2);
+    auto eout = core::eigen::to_eigen_vector<true, core::CopyMode::FALSE>(out);
 
-            const auto ein1 =
-                core::eigen::to_eigen(in1_mds).template cast<value_t>();
-            const auto ein2 =
-                core::eigen::to_eigen(in2_mds).template cast<value_t>();
-            auto eout = core::eigen::to_eigen(out_mds);
+    using calc_t = core::promote_type_t<typename decltype(ein1)::Scalar,
+                                        typename decltype(ein2)::Scalar>;
 
-            eout =
-                (ein1 * ein2)
-                    .template cast<
-                        typename std::remove_cvref_t<out_mds_t>::value_type>();
-
-            return;
-        }
-    }
-
-#else
-    assert(false && "Eigen inverse not implemented for C++20");
-
-#endif
-#endif
-
-    matvec_naive(in1_mds, in2_mds, out_mds);
+    eout = (ein1.template cast<calc_t>() * ein2.template cast<calc_t>())
+               .template cast<typename decltype(eout)::Scalar>();
 }
+
+#endif
 
 } // namespace ufunc
 
-template <core::Backend backend = core::Backend::AUTO>
-constexpr void matvec_to(auto &&in1, auto &&in2, auto &&out) {
-    core::batch<backend>(
-        [](auto &&...elems) {
-            ufunc::matvec_ufunc(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<2, 1, 1>{},
-        std::integer_sequence<bool, true, true, false>{},
-        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
-        std::forward<decltype(out)>(out));
-}
-
-template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto matvec(auto &&in1, auto &&in2) {
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto matvec(auto &&in1, auto &&in2,
+                                    out_t &&out = out_t{std::nullopt}) {
     const auto in1_mds =
         core::to_const_mdspan(std::forward<decltype(in1)>(in1));
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    const auto uin1_exts = core::slice_extents_from_right<2>(in1_mds.extents());
-    const auto uin2_exts = core::slice_extents_from_right<2>(in2_mds.extents());
-    const auto uout_exts = core::extents<
-        std::common_type_t<typename decltype(uin1_exts)::index_type,
-                           typename decltype(uin2_exts)::index_type>,
-        decltype(uin1_exts)::static_extent(0)>{uin1_exts.extent(0)};
+    using calc_t =
+        core::calc_type_t<dtype, decltype(in1_mds), decltype(in2_mds)>;
 
-    auto out = core::make_broadcasted_tensor<dtype>(
-        std::index_sequence<2, 1>{}, uout_exts, in1_mds, in2_mds);
+    const auto uout_exts = core::slice_extents_from_left<1>(
+        core::slice_extents_from_right<2>(in1_mds.extents()));
 
-    matvec_to<backend>(in1_mds, in2_mds, out);
+    auto out_md = core::resolve_broadcasted_output<calc_t>(
+        std::forward<decltype(out)>(out), std::index_sequence<2, 1>{},
+        uout_exts, in1_mds, in2_mds);
 
-    return out;
+    if constexpr (
+#ifdef MDTENSOR_USE_EIGEN
+        backend == core::Backend::EIGEN
+#else
+        false
+#endif
+    ) {
+#ifdef MDTENSOR_USE_EIGEN
+        core::batch<core::Backend::NATIVE>(
+            [](auto &&...elems) {
+                ufunc::matvec_ufunc_eigen(
+                    std::forward<decltype(elems)>(elems)...);
+            },
+            std::index_sequence<2, 1, 1>{},
+            std::integer_sequence<bool, true, true, false>{}, in1_mds, in2_mds,
+            out_md);
+#endif
+
+    } else {
+        core::batch<backend>(
+            [](auto &&...elems) {
+                ufunc::matvec_ufunc_native(
+                    std::forward<decltype(elems)>(elems)...);
+            },
+            std::index_sequence<2, 1, 1>{},
+            std::integer_sequence<bool, true, true, false>{}, in1_mds, in2_mds,
+            out_md);
+    }
+
+    return out_md;
 }
 
 } // namespace mdtensor::linalg
@@ -4628,19 +5186,21 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
 
 
 #ifdef MDTENSOR_USE_EIGEN
-#include "../core/eigen/eigen.hpp"
 #endif
 
 namespace mdtensor::linalg {
 namespace ufunc {
 
-constexpr void vecmat_naive_noalias(auto &&in1, auto &&in2, auto &&out) {
+constexpr void vecmat_ufunc_native_noalias(auto &&in1, auto &&in2, auto &&out) {
     const auto in1_mds =
         core::to_const_mdspan(std::forward<decltype(in1)>(in1));
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
     const auto out_mds =
         core::to_output_mdspan(std::forward<decltype(out)>(out));
+
+    using calc_t =
+        core::common_value_type_t<decltype(in1_mds), decltype(in2_mds)>;
 
     using out_index_t = typename decltype(out_mds)::index_type;
     using in1_index_t = typename decltype(in1_mds)::index_type;
@@ -4649,145 +5209,114 @@ constexpr void vecmat_naive_noalias(auto &&in1, auto &&in2, auto &&out) {
         out_mds(i) = 0;
 
         for (in1_index_t j = 0; j < in1_mds.extent(0); j++) {
-            out_mds(i) += in1_mds(j) * in2_mds(j, i);
+            out_mds(i) += static_cast<calc_t>(in1_mds(j)) *
+                          static_cast<calc_t>(in2_mds(j, i));
         }
     }
 }
 
-constexpr void vecmat_naive(auto &&in1, auto &&in2, auto &&out) {
+constexpr void vecmat_ufunc_native(auto &&in1, auto &&in2, auto &&out) {
     const auto in1_mds =
         core::to_const_mdspan(std::forward<decltype(in1)>(in1));
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
     const auto out_mds =
         core::to_output_mdspan(std::forward<decltype(out)>(out));
-
-    if (std::is_constant_evaluated()) {
-        auto out_tmp = empty_like(out_mds);
-        vecmat_naive_noalias(in1_mds, in2_mds, out_tmp);
-        static_cast<void>(copy(out_tmp, out_mds));
-        return;
-    }
 
     bool need_copy = false;
 
-    if constexpr (requires {
-                      in1_mds.data_handle() == out_mds.data_handle();
-                  }) {
-        if (in1_mds.data_handle() == out_mds.data_handle()) {
-            need_copy = true;
-        }
-    }
+    if (std::is_constant_evaluated()) {
+        need_copy = true;
 
-    if constexpr (requires {
-                      in2_mds.data_handle() == out_mds.data_handle();
-                  }) {
-        if (in2_mds.data_handle() == out_mds.data_handle()) {
-            need_copy = true;
-        }
+    } else if ((void *)in1_mds.data_handle() == (void *)out_mds.data_handle() ||
+               (void *)in2_mds.data_handle() == (void *)out_mds.data_handle()) {
+        need_copy = true;
     }
 
     if (!need_copy) {
-        vecmat_naive_noalias(in1_mds, in2_mds, out_mds);
+        vecmat_ufunc_native_noalias(in1_mds, in2_mds, out_mds);
 
     } else {
         auto out_tmp = empty_like(out_mds);
-        vecmat_naive_noalias(in1_mds, in2_mds, out_tmp);
+        vecmat_ufunc_native_noalias(in1_mds, in2_mds, out_tmp);
         static_cast<void>(copy(out_tmp, out_mds));
     }
 }
 
-constexpr void vecmat_ufunc(auto &&in1, auto &&in2, auto &&out) {
-    const auto in1_mds =
-        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
-    const auto in2_mds =
-        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
-    const auto out_mds =
-        core::to_output_mdspan(std::forward<decltype(out)>(out));
-
 #ifdef MDTENSOR_USE_EIGEN
-#if __cplusplus >= 202302L // TODO: Impliement for C++20
-    using in1_mds_t = decltype(in1_mds);
-    using in2_mds_t = decltype(in2_mds);
-    using out_mds_t = decltype(out_mds);
 
-    if constexpr (core::eigen::eigen_mappable_c<in1_mds_t> &&
-                  core::eigen::eigen_mappable_c<in2_mds_t> &&
-                  core::eigen::eigen_mappable_c<out_mds_t>) {
-        if (!std::is_constant_evaluated() &&
-            8 <= out_mds.extent(0) + out_mds.extent(1)) {
-            using value_t = core::promote_type_t<
-                typename std::remove_cvref_t<in1_mds_t>::value_type,
-                typename std::remove_cvref_t<in2_mds_t>::value_type>;
+inline void vecmat_ufunc_eigen(auto &&in1, auto &&in2, auto &&out) {
+    const auto ein1 = core::eigen::to_eigen_vector<false>(in1);
+    const auto ein2 = core::eigen::to_eigen_matrix(in2);
+    auto eout = core::eigen::to_eigen_vector<false, core::CopyMode::FALSE>(out);
 
-            const auto ein1 =
-                core::eigen::to_eigen(in1_mds).template cast<value_t>();
-            const auto ein2 =
-                core::eigen::to_eigen(in2_mds).template cast<value_t>();
-            auto eout = core::eigen::to_eigen(out_mds);
+    using calc_t = core::promote_type_t<typename decltype(ein1)::Scalar,
+                                        typename decltype(ein2)::Scalar>;
 
-            eout =
-                (ein1 * ein2)
-                    .template cast<
-                        typename std::remove_cvref_t<out_mds_t>::value_type>();
-
-            return;
-        }
-    }
-
-#else
-    assert(false && "Eigen inverse not implemented for C++20");
-
-#endif
-#endif
-
-    vecmat_naive(in1_mds, in2_mds, out_mds);
+    eout = (ein1.template cast<calc_t>() * ein2.template cast<calc_t>())
+               .template cast<typename decltype(eout)::Scalar>();
 }
+
+#endif
 
 } // namespace ufunc
 
-template <core::Backend backend = core::Backend::AUTO>
-constexpr void vecmat_to(auto &&in1, auto &&in2, auto &&out) {
-    core::batch<backend>(
-        [](auto &&...elems) {
-            ufunc::vecmat_ufunc(std::forward<decltype(elems)>(elems)...);
-        },
-        std::index_sequence<1, 2, 1>{},
-        std::integer_sequence<bool, true, true, false>{},
-        std::forward<decltype(in1)>(in1), std::forward<decltype(in2)>(in2),
-        std::forward<decltype(out)>(out));
-}
-
-template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto vecmat(auto &&in1, auto &&in2) {
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto vecmat(auto &&in1, auto &&in2,
+                                    out_t &&out = out_t{std::nullopt}) {
     const auto in1_mds =
         core::to_const_mdspan(std::forward<decltype(in1)>(in1));
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    const auto uin1_exts = core::slice_extents_from_right<2>(in1_mds.extents());
-    const auto uin2_exts = core::slice_extents_from_right<2>(in2_mds.extents());
-    const auto uout_exts = core::extents<
-        std::common_type_t<typename decltype(uin1_exts)::index_type,
-                           typename decltype(uin2_exts)::index_type>,
-        decltype(uin2_exts)::static_extent(1)>{uin2_exts.extent(1)};
+    using calc_t =
+        core::calc_type_t<dtype, decltype(in1_mds), decltype(in2_mds)>;
 
-    auto out = core::make_broadcasted_tensor<dtype>(
-        std::index_sequence<1, 2>{}, uout_exts, in1_mds, in2_mds);
+    const auto uout_exts = core::slice_extents_from_left<1>(
+        core::slice_extents_from_right<2>(in2_mds.extents()));
 
-    vecmat_to<backend>(in1_mds, in2_mds, out);
+    auto out_md = core::resolve_broadcasted_output<calc_t>(
+        std::forward<decltype(out)>(out), std::index_sequence<1, 2>{},
+        uout_exts, in1_mds, in2_mds);
 
-    return out;
+    if constexpr (
+#ifdef MDTENSOR_USE_EIGEN
+        backend == core::Backend::EIGEN
+#else
+        false
+#endif
+    ) {
+#ifdef MDTENSOR_USE_EIGEN
+        core::batch<core::Backend::NATIVE>(
+            [](auto &&...elems) {
+                ufunc::vecmat_ufunc_eigen(
+                    std::forward<decltype(elems)>(elems)...);
+            },
+            std::index_sequence<1, 2, 1>{},
+            std::integer_sequence<bool, true, true, false>{}, in1_mds, in2_mds,
+            out_md);
+#endif
+
+    } else {
+        core::batch<backend>(
+            [](auto &&...elems) {
+                ufunc::vecmat_ufunc_native(
+                    std::forward<decltype(elems)>(elems)...);
+            },
+            std::index_sequence<1, 2, 1>{},
+            std::integer_sequence<bool, true, true, false>{}, in1_mds, in2_mds,
+            out_md);
+    }
+
+    return out_md;
 }
 
 } // namespace mdtensor::linalg
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/linalg/vecmat.hpp
 
 #ifdef MDTENSOR_USE_EIGEN
-#include "../core/eigen/eigen.hpp"
 #endif
-
-// TODO: modifiy
 
 namespace mdtensor::linalg {
 namespace ufunc {
@@ -4800,6 +5329,9 @@ constexpr void matmul_ufunc_native_noalias(auto &&in1, auto &&in2, auto &&out) {
     const auto out_mds =
         core::to_output_mdspan(std::forward<decltype(out)>(out));
 
+    using calc_t =
+        core::common_value_type_t<decltype(in1_mds), decltype(in2_mds)>;
+
     using out_index_t = typename decltype(out_mds)::index_type;
     using in1_index_t = typename decltype(in1_mds)::index_type;
 
@@ -4808,7 +5340,8 @@ constexpr void matmul_ufunc_native_noalias(auto &&in1, auto &&in2, auto &&out) {
             out_mds(i, j) = 0;
 
             for (in1_index_t k = 0; k < in1_mds.extent(1); k++) {
-                out_mds(i, j) += in1_mds(i, k) * in2_mds(k, j);
+                out_mds(i, j) += static_cast<calc_t>(in1_mds(i, k)) *
+                                 static_cast<calc_t>(in2_mds(k, j));
             }
         }
     }
@@ -4844,75 +5377,61 @@ constexpr void matmul_ufunc_native(auto &&in1, auto &&in2, auto &&out) {
 
 #ifdef MDTENSOR_USE_EIGEN
 
-template <core::mdspan_c in1_t, core::mdspan_c in2_t, core::mdspan_c out_t>
-    requires(core::eigen::eigen_mappable_c<in1_t> &&
-             core::eigen::eigen_mappable_c<in2_t> &&
-             core::eigen::eigen_mappable_c<out_t>)
-inline void matmul_ufunc_eigen(const in1_t &in1, const in2_t &in2,
-                               const out_t &out) {
-    using value_t = core::promote_type_t<typename in1_t::value_type,
-                                         typename in2_t::value_type>;
+inline void matmul_ufunc_eigen(auto &&in1, auto &&in2, auto &&out) {
+    const auto ein1 = core::eigen::to_eigen_matrix(in1);
+    const auto ein2 = core::eigen::to_eigen_matrix(in2);
+    auto eout = core::eigen::to_eigen_matrix<core::CopyMode::FALSE>(out);
 
-    const auto ein1 = core::eigen::to_eigen(in1);
-    const auto ein2 = core::eigen::to_eigen(in2);
-    auto eout = core::eigen::to_eigen(out);
+    using calc_t = core::promote_type_t<typename decltype(ein1)::Scalar,
+                                        typename decltype(ein2)::Scalar>;
 
-    eout = (ein1.template cast<value_t>() * ein2.template cast<value_t>())
-               .template cast<typename out_t::value_type>();
+    eout = (ein1.template cast<calc_t>() * ein2.template cast<calc_t>())
+               .template cast<typename decltype(eout)::Scalar>();
 }
 
 #endif
-
-constexpr core::Backend matmul_auto_backend(auto &&in1, auto &&in2,
-                                            auto &&out) {
-    if (std::is_constant_evaluated()) {
-        return core::Backend::NATIVE;
-    }
-
-#ifdef MDTENSOR_USE_EIGEN
-    if constexpr (core::eigen::eigen_mappable_c<decltype(in1)> &&
-                  core::eigen::eigen_mappable_c<decltype(in2)> &&
-                  core::eigen::eigen_mappable_c<decltype(out)>) {
-        return core::Backend::EIGEN;
-    }
-#endif
-
-    return core::Backend::NATIVE;
-}
 
 } // namespace ufunc
 
-template <core::Backend backend = core::Backend::AUTO>
-constexpr void matmul_to(auto &&in1, auto &&in2, auto &&out) {
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto matmul(auto &&in1, auto &&in2,
+                                    out_t &&out = out_t{std::nullopt}) {
     const auto in1_mds =
         core::to_const_mdspan(std::forward<decltype(in1)>(in1));
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
-    const auto out_mds =
-        core::to_output_mdspan(std::forward<decltype(out)>(out));
 
     constexpr bool is_in1_mds_1d = (in1_mds.rank() == 1);
     constexpr bool is_in2_mds_1d = (in2_mds.rank() == 1);
 
     if constexpr (is_in1_mds_1d && !is_in2_mds_1d) {
-        vecmat_to<backend>(in1_mds, in2_mds, out_mds);
+        return vecmat<dtype, backend>(in1_mds, in2_mds,
+                                      std::forward<decltype(out)>(out));
 
     } else if constexpr (!is_in1_mds_1d && is_in2_mds_1d) {
-        matvec_to<backend>(in1_mds, in2_mds, out_mds);
+        return matvec<dtype, backend>(in1_mds, in2_mds,
+                                      std::forward<decltype(out)>(out));
 
     } else {
-        const auto be = backend;
-        // constexpr auto be =
-        //     (backend == core::Backend::AUTO)
-        //         ?
-        // ufunc::matmul_auto_backend(std::forward<decltype(in1)>(in1),
-        // std::forward<decltype(in2)>(in2),
-        // std::forward<decltype(out)>(out))
-        //         : backend;
+        using calc_t =
+            core::calc_type_t<dtype, decltype(in1_mds), decltype(in2_mds)>;
 
-        if (
+        const auto uin1_exts =
+            core::slice_extents_from_right<2>(in1_mds.extents());
+        const auto uin2_exts =
+            core::slice_extents_from_right<2>(in2_mds.extents());
+        const auto uout_exts =
+            core::compose_extents(core::slice_extents_from_left<1>(uin1_exts),
+                                  core::slice_extents_from_right<1>(uin2_exts));
+
+        auto out_md = core::resolve_broadcasted_output<calc_t>(
+            std::forward<decltype(out)>(out), std::index_sequence<2, 2>{},
+            uout_exts, in1_mds, in2_mds);
+
+        if constexpr (
 #ifdef MDTENSOR_USE_EIGEN
-            be == core::Backend::EIGEN
+            backend == core::Backend::EIGEN
 #else
             false
 #endif
@@ -4924,71 +5443,22 @@ constexpr void matmul_to(auto &&in1, auto &&in2, auto &&out) {
                         std::forward<decltype(elems)>(elems)...);
                 },
                 std::index_sequence<2, 2, 2>{},
-                std::integer_sequence<bool, true, true, false>{},
-                std::forward<decltype(in1)>(in1),
-                std::forward<decltype(in2)>(in2),
-                std::forward<decltype(out)>(out));
+                std::integer_sequence<bool, true, true, false>{}, in1_mds,
+                in2_mds, out_md);
 #endif
 
-        } else if (be == core::Backend::NATIVE) {
-            core::batch<core::Backend::NATIVE>(
-                [](auto &&...elems) {
-                    ufunc::matmul_ufunc_native(
-                        std::forward<decltype(elems)>(elems)...);
-                },
-                std::index_sequence<2, 2, 2>{},
-                std::integer_sequence<bool, true, true, false>{},
-                std::forward<decltype(in1)>(in1),
-                std::forward<decltype(in2)>(in2),
-                std::forward<decltype(out)>(out));
-
         } else {
-            core::batch<core::Backend::NATIVE>(
+            core::batch<backend>(
                 [](auto &&...elems) {
                     ufunc::matmul_ufunc_native(
                         std::forward<decltype(elems)>(elems)...);
                 },
                 std::index_sequence<2, 2, 2>{},
-                std::integer_sequence<bool, true, true, false>{},
-                std::forward<decltype(in1)>(in1),
-                std::forward<decltype(in2)>(in2),
-                std::forward<decltype(out)>(out));
+                std::integer_sequence<bool, true, true, false>{}, in1_mds,
+                in2_mds, out_md);
         }
-    }
-}
 
-template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto matmul(auto &&in1, auto &&in2) {
-    const auto in1_mds =
-        core::to_const_mdspan(std::forward<decltype(in1)>(in1));
-    const auto in2_mds =
-        core::to_const_mdspan(std::forward<decltype(in2)>(in2));
-
-    constexpr bool is_in1_mds_1d = (in1_mds.rank() == 1);
-    constexpr bool is_in2_mds_1d = (in2_mds.rank() == 1);
-
-    if constexpr (is_in1_mds_1d && !is_in2_mds_1d) {
-        return vecmat<dtype, backend>(in1_mds, in2_mds);
-
-    } else if constexpr (!is_in1_mds_1d && is_in2_mds_1d) {
-        return matvec<dtype, backend>(in1_mds, in2_mds);
-
-    } else {
-        const auto uin1_exts =
-            core::slice_extents_from_right<2>(in1_mds.extents());
-        const auto uin2_exts =
-            core::slice_extents_from_right<2>(in2_mds.extents());
-        const auto uout_exts =
-            core::compose_extents(core::slice_extents_from_left<1>(uin1_exts),
-                                  core::slice_extents_from_right<1>(uin2_exts));
-
-        auto out = core::make_broadcasted_tensor<dtype>(
-            std::index_sequence<uin1_exts.rank(), uin2_exts.rank()>{},
-            uout_exts, in1_mds, in2_mds);
-
-        matmul_to<backend>(in1_mds, in2_mds, out);
-
-        return out;
+        return out_md;
     }
 }
 
@@ -5257,59 +5727,85 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
 } // namespace mdtensor
 //END_FILE_INCLUDE: /home/runner/work/mdtensor/mdtensor/mdtensor/math/sum.hpp
 
+#ifdef MDTENSOR_USE_EIGEN
+#endif
+
 namespace mdtensor::linalg {
 namespace ufunc {
 
-constexpr void norm_ufunc(auto &&in, auto &&out) {
+[[nodiscard]] constexpr auto norm_ufunc_native(auto &&in) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
-    const auto out_mds =
-        core::to_output_mdspan(std::forward<decltype(out)>(out));
 
+    using value_t = typename decltype(in_mds)::value_type;
     using index_t = typename decltype(in_mds)::index_type;
 
-    out_mds() = 0;
+    value_t sum = 0;
+
     for (index_t i = 0; i < in_mds.extent(0); i++) {
-        out_mds() += in_mds(i) * in_mds(i);
+        sum += in_mds(i) * in_mds(i);
     }
 
-    if (out_mds() > 0) {
-        out_mds() = sqrt(out_mds());
-    }
+    return sqrt(sum);
 }
+
+#ifdef MDTENSOR_USE_EIGEN
+
+[[nodiscard]] constexpr auto norm_ufunc_eigen(auto &&in) {
+    const auto ein =
+        core::eigen::to_eigen_vector(std::forward<decltype(in)>(in));
+
+    return ein.norm();
+}
+
+#endif
 
 } // namespace ufunc
 
-template <core::Backend backend = core::Backend::AUTO>
-constexpr void norm_to(auto &&in, auto &&out) {
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto norm(auto &&in,
+                                  out_t &&out = out_t{std::nullopt}) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
-    const auto out_mds =
-        core::to_output_mdspan(std::forward<decltype(out)>(out));
+
+    using calc_t = core::calc_type_t<dtype, decltype(in_mds)>;
+
+    auto out_md = core::resolve_broadcasted_output<calc_t>(
+        std::forward<decltype(out)>(out), std::index_sequence<1>{},
+        core::extents<std::uint8_t>{}, in_mds);
 
     if constexpr (backend == core::Backend::SIMD) {
-        static_cast<void>(sum<-1, void, false, backend>(
-            multiply<void, backend>(in_mds, in_mds), out_mds));
-        static_cast<void>(sqrt<void, backend>(out_mds, out_mds));
+        static_cast<void>(sum<void, false, backend>(
+            multiply<void, backend>(in_mds, in_mds),
+            std::integer_sequence<int, -1>{}, out_md));
+        static_cast<void>(sqrt<void, backend>(out_md, out_md));
+
+    } else if constexpr (
+#ifdef MDTENSOR_USE_EIGEN
+        backend == core::Backend::EIGEN
+#else
+        false
+#endif
+    ) {
+#ifdef MDTENSOR_USE_EIGEN
+        core::batch<core::Backend::NATIVE>(
+            [](auto &&in, auto &&out) {
+                out = ufunc::norm_ufunc_eigen(std::forward<decltype(in)>(in));
+            },
+            std::index_sequence<1, 0>{},
+            std::integer_sequence<bool, true, false>{}, in_mds, out_md);
+
+#endif
 
     } else {
         core::batch<backend>(
-            [](auto &&...elems) {
-                ufunc::norm_ufunc(std::forward<decltype(elems)>(elems)...);
+            [](auto &&in, auto &&out) {
+                out = ufunc::norm_ufunc_native(std::forward<decltype(in)>(in));
             },
             std::index_sequence<1, 0>{},
-            std::integer_sequence<bool, true, false>{}, in_mds, out_mds);
+            std::integer_sequence<bool, true, false>{}, in_mds, out_md);
     }
-}
 
-template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto norm(auto &&in) {
-    const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
-
-    auto out = core::make_broadcasted_tensor<dtype>(
-        std::index_sequence<1>{}, core::extents<std::uint8_t>{}, in_mds);
-
-    norm_to<backend>(in_mds, out);
-
-    return out;
+    return out_md;
 }
 
 } // namespace mdtensor::linalg
@@ -5416,33 +5912,19 @@ namespace ufunc {
 
 } // namespace ufunc
 
-template <core::Backend backend = core::Backend::AUTO>
-constexpr void solve_to(auto &&a, auto &&b, auto &&x, auto &&valid) {
-    const auto b_mds = core::to_const_mdspan(std::forward<decltype(b)>(b));
-
-    constexpr std::size_t rhs_rank = b_mds.rank() == 1 ? 1 : 2;
-
-    core::batch<backend>(
-        [](auto &&a, auto &&b, auto &&x, auto &&valid) {
-            valid = ufunc::solve_ufunc(std::forward<decltype(a)>(a),
-                                       std::forward<decltype(b)>(b),
-                                       std::forward<decltype(x)>(x));
-        },
-        std::index_sequence<2, rhs_rank, rhs_rank, 0>{},
-        std::integer_sequence<bool, true, true, false, false>{},
-        std::forward<decltype(a)>(a), b_mds, std::forward<decltype(x)>(x),
-        std::forward<decltype(valid)>(valid));
-}
-
-template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
-[[nodiscard]] constexpr auto solve(auto &&a, auto &&b) {
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto solve(auto &&a, auto &&b,
+                                   out_t &&out = out_t{std::nullopt}) {
     const auto a_mds = core::to_const_mdspan(std::forward<decltype(a)>(a));
     const auto b_mds = core::to_const_mdspan(std::forward<decltype(b)>(b));
 
+    using calc_t = core::calc_type_t<dtype, decltype(a_mds), decltype(b_mds)>;
+
     constexpr std::size_t rhs_rank = b_mds.rank() == 1 ? 1 : 2;
 
-    auto x = core::make_broadcasted_tensor<dtype>(
-        std::index_sequence<2, rhs_rank>{},
+    auto out_md = core::resolve_broadcasted_output<calc_t>(
+        std::forward<decltype(out)>(out), std::index_sequence<2, rhs_rank>{},
         core::slice_extents_from_right<rhs_rank>(b_mds.extents()), a_mds,
         b_mds);
 
@@ -5450,9 +5932,17 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
         std::index_sequence<2, rhs_rank>{}, core::extents<std::uint8_t>{},
         a_mds, b_mds);
 
-    solve_to<backend>(a_mds, b_mds, x, valid);
+    core::batch<backend>(
+        [](auto &&a, auto &&b, auto &&o, auto &&valid) {
+            valid = ufunc::solve_ufunc(std::forward<decltype(a)>(a),
+                                       std::forward<decltype(b)>(b),
+                                       std::forward<decltype(o)>(o));
+        },
+        std::index_sequence<2, rhs_rank, rhs_rank, 0>{},
+        std::integer_sequence<bool, true, true, false, false>{}, a_mds, b_mds,
+        out_md, valid);
 
-    return std::pair{x, valid};
+    return std::pair{out_md, valid};
 }
 
 } // namespace mdtensor::linalg
@@ -5460,31 +5950,31 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO>
 
 namespace mdtensor {
 
-constexpr void matmul_to(auto &&...elems) {
-    linalg::matmul_to(std::forward<decltype(elems)>(elems)...);
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto matmul(auto &&in1, auto &&in2,
+                                    out_t &&out = out_t{std::nullopt}) {
+    return linalg::matmul<dtype, backend>(std::forward<decltype(in1)>(in1),
+                                          std::forward<decltype(in2)>(in2),
+                                          std::forward<decltype(out)>(out));
 }
 
-template <typename dtype = void>
-[[nodiscard]] constexpr auto matmul(auto &&...elems) {
-    return linalg::matmul<dtype>(std::forward<decltype(elems)>(elems)...);
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto matvec(auto &&in1, auto &&in2,
+                                    out_t &&out = out_t{std::nullopt}) {
+    return linalg::matvec<dtype, backend>(std::forward<decltype(in1)>(in1),
+                                          std::forward<decltype(in2)>(in2),
+                                          std::forward<decltype(out)>(out));
 }
 
-constexpr void matvec_to(auto &&...elems) {
-    linalg::matvec_to(std::forward<decltype(elems)>(elems)...);
-}
-
-template <typename dtype = void>
-[[nodiscard]] constexpr auto matvec(auto &&...elems) {
-    return linalg::matvec<dtype>(std::forward<decltype(elems)>(elems)...);
-}
-
-constexpr void vecmat_to(auto &&...elems) {
-    linalg::vecmat_to(std::forward<decltype(elems)>(elems)...);
-}
-
-template <typename dtype = void>
-[[nodiscard]] constexpr auto vecmat(auto &&...elems) {
-    return linalg::vecmat<dtype>(std::forward<decltype(elems)>(elems)...);
+template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
+          typename out_t = std::nullopt_t>
+[[nodiscard]] constexpr auto vecmat(auto &&in1, auto &&in2,
+                                    out_t &&out = out_t{std::nullopt}) {
+    return linalg::vecmat<dtype, backend>(std::forward<decltype(in1)>(in1),
+                                          std::forward<decltype(in2)>(in2),
+                                          std::forward<decltype(out)>(out));
 }
 
 } // namespace mdtensor
@@ -6682,7 +7172,7 @@ template <std::int64_t axis = 0, typename dtype = void>
 
 namespace mdtensor {
 
-template <core::Copy copy = core::Copy::AUTO>
+template <core::CopyMode copy = core::CopyMode::AUTO>
 [[nodiscard]] constexpr auto reshape(auto &&in, auto &&shape) {
     return core::reshape<copy>(std::forward<decltype(in)>(in),
                                std::forward<decltype(shape)>(shape));
@@ -6733,8 +7223,8 @@ template <core::extents_c in_t>
 [[nodiscard]] constexpr auto flatten(auto &&in) {
     const auto in_mds = core::to_const_mdspan(std::forward<decltype(in)>(in));
 
-    return reshape<core::Copy::TRUE>(in_mds,
-                                     detail::flatten_extents(in_mds.extents()));
+    return reshape<core::CopyMode::TRUE>(
+        in_mds, detail::flatten_extents(in_mds.extents()));
 }
 
 } // namespace mdtensor
