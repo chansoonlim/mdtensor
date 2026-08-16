@@ -10,17 +10,15 @@
 #pragma once
 
 #include "../core/core.hpp"
+#include "isnan.hpp"
 
 namespace mdtensor {
 namespace ufunc {
 
 template <bool equal_nan>
 constexpr bool array_equal_ufunc(auto &&in1, auto &&in2) {
-    if constexpr (equal_nan && requires {
-                      { std::isnan(in1) } -> std::convertible_to<bool>;
-                      { std::isnan(in2) } -> std::convertible_to<bool>;
-                  }) {
-        if (std::isnan(in1) && std::isnan(in2)) {
+    if constexpr (equal_nan) {
+        if (isnan(in1) && isnan(in2)) {
             return true;
         }
     }

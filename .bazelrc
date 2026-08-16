@@ -7,3 +7,6 @@ build:fastmath --linkopt=-ffast-math
 
 # using eigen option (use as bazel run --config=eigen)
 build:eigen --cxxopt=-DMDTENSOR_USE_EIGEN
+
+build:clang \
+    --extra_toolchains=@llvm_toolchain//:cc-toolchain-x86_64-linux --cxxopt=-fconstexpr-steps=5000000

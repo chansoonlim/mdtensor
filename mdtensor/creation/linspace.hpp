@@ -81,8 +81,9 @@ template <std::int64_t axis = 0, typename dtype = void,
                                       out_t &&out = out_t{std::nullopt}) {
     // TODO: modify batch and use linspace_impl.
     const auto exts = core::to_extents(std::forward<decltype(shape)>(shape));
+    using exts_t = std::remove_cvref_t<decltype(exts)>;
 
-    static_assert(exts.rank() == 1,
+    static_assert(exts_t::rank() == 1,
                   "The extents for linspace must be a 1D tensor.");
 
     const auto [bcasts, bexts] = core::broadcast(
@@ -92,9 +93,9 @@ template <std::int64_t axis = 0, typename dtype = void,
     const auto start_bcast = std::get<0>(bcasts);
     const auto stop_bcast = std::get<1>(bcasts);
 
-    constexpr std::size_t baxis =
-        static_cast<std::size_t>(core::bounding_index(axis, bexts.rank()));
-    constexpr std::size_t out_urank = bexts.rank() + 1 - baxis;
+    constexpr std::size_t baxis = static_cast<std::size_t>(
+        core::bounding_index(axis, decltype(bexts)::rank()));
+    constexpr std::size_t out_urank = decltype(bexts)::rank() + 1 - baxis;
 
     using calc_t = core::floating_calc_type_t<dtype, decltype(start_bcast),
                                               decltype(stop_bcast)>;

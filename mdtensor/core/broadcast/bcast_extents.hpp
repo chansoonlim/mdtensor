@@ -33,22 +33,36 @@ template <std::size_t I, std::size_t brank, extents_c in_t>
 }
 
 template <std::size_t... Extents>
-[[nodiscard]] consteval std::size_t broadcast_static_extent() noexcept {
+[[nodiscard]] consteval bool always_cannot_broadcast_static_extent() noexcept {
     static_assert(sizeof...(Extents) > 0,
                   "At least one extent must be provided for broadcasting.");
+
+    if constexpr (((Extents == 1 || Extents == dyn) && ...)) {
+        return false;
+
+    } else {
+        // select the broadcast extent candidate that is not 1 or dyn
+        constexpr std::size_t bext_cand =
+            std::max({((Extents != 1 && Extents != dyn) ? Extents : 0)...});
+
+        return (!(Extents == bext_cand || Extents == 1 || Extents == dyn) ||
+                ...);
+    }
+}
+
+template <std::size_t... Extents>
+[[nodiscard]] consteval std::size_t broadcast_static_extent() noexcept {
+    static_assert(!always_cannot_broadcast_static_extent<Extents...>(),
+                  "Incompatible static extents for broadcasting.");
 
     if constexpr (((Extents == 1 || Extents == dyn) && ...)) {
         // return dyn if any extent is dyn, else return 1
         return std::max({Extents...});
 
     } else {
-        // select the extent that is not 1 or dyn
+        // select the broadcast extent candidate that is not 1 or dyn
         constexpr std::size_t bext =
             std::max({((Extents != 1 && Extents != dyn) ? Extents : 0)...});
-
-        static_assert(
-            ((Extents == bext || Extents == 1 || Extents == dyn) && ...),
-            "Incompatible static extents for broadcasting.");
 
         return bext;
     }
@@ -56,9 +70,10 @@ template <std::size_t... Extents>
 
 template <std::size_t I, std::size_t brank, extents_c in_t>
 [[nodiscard]] constexpr auto aligned_extent(in_t &&in) noexcept {
-    using index_t = typename std::remove_cvref_t<in_t>::index_type;
+    using base_t = std::remove_cvref_t<in_t>;
+    using index_t = typename base_t::index_type;
 
-    constexpr std::size_t rank = in.rank();
+    constexpr std::size_t rank = base_t::rank();
 
     static_assert(I < brank, "Index I must be less than broadcast rank brank.");
     static_assert(rank <= brank,
@@ -98,6 +113,29 @@ template <typename index_t, std::convertible_to<index_t>... exts_t>
 } // namespace detail
 
 template <extents_c... ins_t>
+[[nodiscard]] consteval bool always_cannot_broadcast_extents() noexcept {
+    if constexpr (sizeof...(ins_t) == 0) {
+        return false;
+
+    } else if constexpr (((std::remove_cvref_t<ins_t>::rank() == 0) && ...)) {
+        return false;
+
+    } else {
+        constexpr std::size_t brank =
+            std::max({std::remove_cvref_t<ins_t>::rank()...});
+
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            const auto check_at = [&]<std::size_t I>() {
+                return detail::always_cannot_broadcast_static_extent<
+                    detail::aligned_static_extent<I, brank, ins_t>()...>();
+            };
+
+            return (check_at.template operator()<Is>() || ...);
+        }(std::make_index_sequence<brank>{});
+    }
+}
+
+template <extents_c... ins_t>
 [[nodiscard]] constexpr auto broadcast_extents(ins_t &&...ins) {
     static_assert(sizeof...(ins) > 0,
                   "At least one extents must be provided for broadcasting.");
@@ -105,7 +143,8 @@ template <extents_c... ins_t>
     using index_t =
         std::common_type_t<typename std::remove_cvref_t<ins_t>::index_type...>;
 
-    constexpr std::size_t brank = std::max({ins.rank()...});
+    constexpr std::size_t brank =
+        std::max({std::remove_cvref_t<ins_t>::rank()...});
 
     if constexpr (brank == 0) {
         return extents<index_t>{};

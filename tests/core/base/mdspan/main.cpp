@@ -17,10 +17,14 @@
 
 namespace md = mdtensor;
 
-template <typename... Ts> using test_t = typename md::core::mdspan<Ts...>;
-
-template <typename... Ts>
-constexpr bool assigned = requires { typename test_t<Ts...>; };
+template <typename ElementType, typename Extents,
+          typename LayoutPolicy = md::core::stdex::layout_right,
+          typename AccessorPolicy =
+              md::core::stdex::default_accessor<ElementType>>
+constexpr bool assigned = requires {
+    typename md::core::mdspan<ElementType, Extents, LayoutPolicy,
+                              AccessorPolicy>;
+};
 
 TEST(test, 1) {
     using value_t = int;

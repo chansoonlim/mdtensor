@@ -19,7 +19,8 @@ template <typename dtype = void, core::extents_c exts_t,
 [[nodiscard]] constexpr auto arange(exts_t &&exts, start_t &&start = start_t{0},
                                     step_t &&step = step_t{1},
                                     out_t &&out = out_t{std::nullopt}) {
-    static_assert(exts.rank() == 1, "arange only supports rank-1 extents");
+    static_assert(std::remove_cvref_t<exts_t>::rank() == 1,
+                  "arange only supports rank-1 extents");
 
     using calc_t = core::calc_type_t<dtype, start_t, step_t>;
 

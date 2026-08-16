@@ -27,6 +27,6 @@ TEST(make_tensor, 1) {
     constexpr auto a2 =
         md::core::make_tensor(md::core::extents<index_t, 2, 2>{});
 
-    std::cout << "a1: " << md::core::to_string(a1) << std::endl;
-    std::cout << "a2: " << md::core::to_string(a2) << std::endl;
+    std::cout << "a1: " << md::to_string(a1) << std::endl;
+    std::cout << "a2: " << md::to_string(a2) << std::endl;
 }

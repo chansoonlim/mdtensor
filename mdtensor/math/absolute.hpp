@@ -21,15 +21,15 @@ constexpr void absolute_ufunc(auto &&in, auto &&out, auto &&where) {
         }
     }
 
-    if constexpr (std::is_signed_v<std::remove_cvref_t<decltype(in)>>) {
-#ifdef REAL_GCC // NOTE: std::abs is not constexpr in clang 16.
-        out = std::abs(in);
-#else
+    if constexpr (!std::is_signed_v<std::remove_cvref_t<decltype(in)>>) {
+        out = in;
+
+    } else if (std::is_constant_evaluated()) {
+        // NOTE: std::abs is not required to be constexpr in C++20.
         out = in < 0 ? -in : in;
-#endif
 
     } else {
-        out = in;
+        out = std::abs(in);
     }
 }
 

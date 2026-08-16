@@ -28,6 +28,6 @@ TEST(test, 1) {
 
     auto b = md::core::submdspan(a, std::pair{0, 1}, 1);
 
-    std::cout << "a: " << md::core::to_string(a) << std::endl;
-    std::cout << "b: " << md::core::to_string(b) << std::endl;
+    std::cout << "a: " << md::to_string(a) << std::endl;
+    std::cout << "b: " << md::to_string(b) << std::endl;
 }

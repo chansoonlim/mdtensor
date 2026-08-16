@@ -15,15 +15,32 @@
 namespace mdtensor::core {
 
 template <std::size_t... uranks, extents_c... ios_t>
+[[nodiscard]] consteval bool
+always_cannot_get_broadcast_extents(std::index_sequence<uranks...>,
+                                    std::type_identity<ios_t>...) noexcept {
+    static_assert(sizeof...(uranks) == sizeof...(ios_t),
+                  "Number of uranks must match number of inputs.");
+
+    if constexpr (((std::remove_cvref_t<ios_t>::rank() < uranks) || ...)) {
+        return true;
+
+    } else {
+        return always_cannot_broadcast_extents<slice_extents_from_left_t<
+            std::remove_cvref_t<ios_t>::rank() - uranks, ios_t>...>();
+    }
+}
+
+template <std::size_t... uranks, extents_c... ios_t>
 [[nodiscard]] constexpr auto
 get_broadcast_extents(std::index_sequence<uranks...>, ios_t &&...ios) {
     static_assert(sizeof...(uranks) == sizeof...(ios_t),
                   "Number of uranks must match number of inputs.");
-    static_assert(((ios.rank() >= uranks) && ...),
+    static_assert(((std::remove_cvref_t<ios_t>::rank() >= uranks) && ...),
                   "Input rank must be greater than or equal to urank.");
 
     return broadcast_extents(
-        slice_extents_from_left<ios.rank() - uranks>(ios)...);
+        slice_extents_from_left<std::remove_cvref_t<ios_t>::rank() - uranks>(
+            std::forward<ios_t>(ios))...);
 }
 
 template <std::size_t... uranks, mdspan_c... ios_t>
@@ -31,6 +48,23 @@ template <std::size_t... uranks, mdspan_c... ios_t>
 get_broadcast_extents(std::index_sequence<uranks...>, ios_t &&...ios) {
     return get_broadcast_extents(std::index_sequence<uranks...>{},
                                  ios.extents()...);
+}
+
+template <std::size_t... uranks, bool... bcast, typename... ios_t>
+[[nodiscard]] consteval bool
+always_cannot_broadcast(std::index_sequence<uranks...>,
+                        std::integer_sequence<bool, bcast...>,
+                        std::type_identity<ios_t>...) noexcept {
+    static_assert(sizeof...(uranks) == sizeof...(ios_t),
+                  "Number of uranks must match number of inputs.");
+
+    static_assert(sizeof...(bcast) == sizeof...(ios_t),
+                  "Number of bcast flags must match number of inputs.");
+
+    return always_cannot_get_broadcast_extents(
+        std::index_sequence<uranks...>{},
+        std::type_identity<typename std::remove_cvref_t<decltype(to_mdspan(
+            std::declval<ios_t>()))>::extents_type>{}...);
 }
 
 template <std::size_t... uranks, bool... bcast>
@@ -51,6 +85,7 @@ template <std::size_t... uranks, bool... bcast>
         return get_broadcast_extents(std::index_sequence<ur[Is]...>{},
                                      std::get<Is>(ios_mds)...);
     }(std::make_index_sequence<sizeof...(ios)>{});
+    using bexts_t = std::remove_cvref_t<decltype(bexts)>;
 
     // calculate broadcasted mdspans
     constexpr auto bc = std::array{bcast...};
@@ -62,7 +97,7 @@ template <std::size_t... uranks, bool... bcast>
                     // change to mdspan without broadcasting
                     return std::get<I>(ios_mds);
 
-                } else if constexpr (bexts.rank() == 0) {
+                } else if constexpr (bexts_t::rank() == 0) {
                     // change to const mdspan without broadcasting
                     return to_const_mdspan(std::get<I>(ios_mds));
 

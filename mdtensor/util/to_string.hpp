@@ -18,29 +18,20 @@
 #include <stdexcept>
 #include <type_traits>
 
-#include "../base/base.hpp"
+#include "../core/core.hpp"
 
-namespace mdtensor::core {
+namespace mdtensor {
 namespace detail {
 
 inline constexpr int numpy_default_precision = 8;
 
 template <std::floating_point value_t>
 [[nodiscard]] inline std::string floating_value_to_string(const value_t value) {
-    if constexpr (requires {
-                      { std::isnan(value) } -> std::convertible_to<bool>;
-                  }) {
-        if (std::isnan(value)) {
-            return "nan";
-        }
-    }
+    if (isnan(value)) {
+        return "nan";
 
-    if constexpr (requires {
-                      { std::isinf(value) } -> std::convertible_to<bool>;
-                  }) {
-        if (std::isinf(value)) {
-            return std::signbit(value) ? "-inf" : "inf";
-        }
+    } else if (isinf(value)) {
+        return std::signbit(value) ? "-inf" : "inf";
     }
 
     const value_t magnitude = std::abs(value);
@@ -164,7 +155,7 @@ value_to_string(const std::optional<value_t> &value) {
 
 } // namespace detail
 
-template <extents_c exts_t>
+template <core::extents_c exts_t>
 [[nodiscard]] inline std::string to_string(exts_t &&exts) {
     using base_t = std::remove_cvref_t<exts_t>;
 
@@ -186,13 +177,14 @@ template <extents_c exts_t>
 }
 
 template <typename in_t>
-    requires(!extents_c<in_t>)
+    requires(!core::extents_c<in_t>)
 [[nodiscard]] inline std::string to_string(in_t &&in) {
-    const auto in_mds = to_const_mdspan(std::forward<in_t>(in));
+    const auto in_mds = core::to_const_mdspan(std::forward<in_t>(in));
+    using in_mds_t = std::remove_cvref_t<decltype(in_mds)>;
 
     std::string str = "[";
 
-    if constexpr (in_mds.rank() == 0) {
+    if constexpr (in_mds_t::rank() == 0) {
         if constexpr (requires { detail::value_to_string(in_mds()); }) {
             return detail::value_to_string(in_mds());
 
@@ -201,18 +193,18 @@ template <typename in_t>
         }
 
     } else {
-        using index_t = typename decltype(in_mds)::index_type;
+        using index_t = typename in_mds_t::index_type;
 
         for (index_t i = 0; i < in_mds.extent(0); i++) {
             if (i != 0) {
                 str += ", ";
             }
 
-            str += to_string(submdspan_from_left(in_mds, i));
+            str += to_string(core::submdspan_from_left(in_mds, i));
         }
     }
 
     return str + "]";
 }
 
-} // namespace mdtensor::core
+} // namespace mdtensor

@@ -50,6 +50,9 @@ TEST(compile_time, 1) {
         md::fill(a, 0);
         return a;
     }();
+
+    static_assert(md::array_equal(
+        a, md::tensor<value_t, md::extents<index_t, 2>>{{0, 0}}));
 }
 
 TEST(compile_time, 2) {
@@ -61,4 +64,7 @@ TEST(compile_time, 2) {
         md::fill(a, 1);
         return a;
     }();
+
+    static_assert(md::array_equal(
+        a, md::tensor<value_t, md::extents<index_t, 2>>{{1, 1}}));
 }

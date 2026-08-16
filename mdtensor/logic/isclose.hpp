@@ -10,44 +10,41 @@
 #pragma once
 
 #include "../math/absolute.hpp"
+#include "isinf.hpp"
+#include "isnan.hpp"
 
 namespace mdtensor {
 namespace ufunc {
 
 constexpr void isclose_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&rtol,
                              auto &&atol, const bool equal_nan) {
-    if constexpr (requires {
-                      { std::isnan(in1) } -> std::convertible_to<bool>;
-                      { std::isnan(in2) } -> std::convertible_to<bool>;
-                  }) {
-        if (equal_nan) {
-            if (std::isnan(in1) && std::isnan(in2)) {
-                out = true;
-                return;
-            }
-        }
-    }
-
-    // if both inputs are inf and same sign, return true (numpy-like)
-    if constexpr (requires {
-                      { std::isinf(in1) } -> std::convertible_to<bool>;
-                      { std::isinf(in2) } -> std::convertible_to<bool>;
-                      { std::signbit(in1) } -> std::convertible_to<bool>;
-                      { std::signbit(in2) } -> std::convertible_to<bool>;
-                  }) {
-        if (std::isinf(in1) && std::isinf(in2) &&
-            std::signbit(in1) == std::signbit(in2)) {
-            out = true;
-            return;
-        }
-    }
-
     using common_t = core::promote_type_t<decltype(in1), decltype(in2),
                                           decltype(rtol), decltype(atol)>;
 
-    out = absolute(static_cast<common_t>(in1) - static_cast<common_t>(in2)) <=
-          (static_cast<common_t>(atol) +
-           static_cast<common_t>(rtol) * absolute(static_cast<common_t>(in2)));
+    const bool is_in1_nan = isnan(in1);
+    const bool is_in2_nan = isnan(in2);
+
+    if (is_in1_nan || is_in2_nan) {
+        // true if equal_nan is true and both inputs are nan
+        out = equal_nan && is_in1_nan && is_in2_nan;
+
+    } else if (in1 == in2) {
+        // true when exact finite equality, signed zeroes, or same-sign
+        // infinities
+        out = true;
+
+    } else if (isinf(in1) || isinf(in2)) {
+        // false when one input is infinite and the other is finite or
+        // opposite-sign infinity
+        out = false;
+
+    } else {
+        out =
+            absolute(static_cast<common_t>(in1) - static_cast<common_t>(in2)) <=
+            (static_cast<common_t>(atol) +
+             static_cast<common_t>(rtol) *
+                 absolute(static_cast<common_t>(in2)));
+    }
 }
 
 } // namespace ufunc

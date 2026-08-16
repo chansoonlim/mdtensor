@@ -104,7 +104,9 @@ template <mdspan_c in_t>
 
 template <mdspan_c in_t>
 [[nodiscard]] constexpr bool is_c_contiguous(in_t &&in) noexcept {
-    if constexpr (in.rank() == 0) {
+    using base_t = std::remove_cvref_t<in_t>;
+
+    if constexpr (base_t::rank() == 0) {
         return true;
 
     } else {
@@ -119,7 +121,7 @@ template <mdspan_c in_t>
 
         std::size_t expected_stride = 1;
 
-        for (std::size_t i = in.rank(); i-- > 0;) {
+        for (std::size_t i = base_t::rank(); i-- > 0;) {
             const std::size_t extent = static_cast<std::size_t>(in.extent(i));
 
             if (extent > 1 &&

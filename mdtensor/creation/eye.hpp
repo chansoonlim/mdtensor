@@ -40,7 +40,7 @@ template <core::arithmetic value_t = std::int8_t,
         const auto exts =
             core::to_extents(std::forward<decltype(shape)>(shape));
 
-        static_assert(exts.rank() >= 2, "eye requires rank >= 2");
+        static_assert(decltype(exts)::rank() >= 2, "eye requires rank >= 2");
 
         auto out_md =
             core::resolve_output<value_t>(std::forward<decltype(out)>(out),

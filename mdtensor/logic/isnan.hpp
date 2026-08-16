@@ -21,16 +21,18 @@ constexpr void isnan_ufunc(auto &&in, auto &&out, auto &&where) {
         }
     }
 
-    if constexpr (requires {
-                      { std::isnan(in) } -> std::convertible_to<bool>;
-                  }) {
-        if (std::isnan(in)) {
-            out = true;
-            return;
-        }
-    }
+    if (std::is_constant_evaluated()) {
+        // NOTE: std::isnan is not required to be constexpr in C++20.
+        out = in != in;
 
-    out = false;
+    } else if constexpr (requires {
+                             { std::isnan(in) } -> std::convertible_to<bool>;
+                         }) {
+        out = std::isnan(in);
+
+    } else {
+        out = false;
+    }
 }
 
 } // namespace ufunc

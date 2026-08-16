@@ -10,6 +10,7 @@
 #pragma once
 
 #include "../core/core.hpp"
+#include "../logic/isnan.hpp"
 
 namespace mdtensor {
 namespace ufunc {
@@ -22,22 +23,13 @@ constexpr void maximum_ufunc(auto &&in1, auto &&in2, auto &&out, auto &&where) {
     }
 
     // if one of the inputs is NaN, return NaN (numpy-like)
-    if constexpr (requires {
-                      { std::isnan(in1) } -> std::convertible_to<bool>;
-                  }) {
-        if (std::isnan(in1)) {
-            out = in1;
-            return;
-        }
-    }
+    if (isnan(in1)) {
+        out = in1;
+        return;
 
-    if constexpr (requires {
-                      { std::isnan(in2) } -> std::convertible_to<bool>;
-                  }) {
-        if (std::isnan(in2)) {
-            out = in2;
-            return;
-        }
+    } else if (isnan(in2)) {
+        out = in2;
+        return;
     }
 
     using common_t = core::promote_type_t<decltype(in1), decltype(in2)>;

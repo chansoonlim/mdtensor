@@ -33,7 +33,7 @@ namespace ufunc {
         }
     }
 
-    if constexpr (b_mds.rank() == 1) {
+    if constexpr (decltype(b_mds)::rank() == 1) {
         // initialize out
         for (index_t idx = 0; idx < n; idx++) {
             x_mds(p_indices(idx)) = b_mds(idx);
@@ -110,7 +110,7 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
 
     using calc_t = core::calc_type_t<dtype, decltype(a_mds), decltype(b_mds)>;
 
-    constexpr std::size_t rhs_rank = b_mds.rank() == 1 ? 1 : 2;
+    constexpr std::size_t rhs_rank = decltype(b_mds)::rank() == 1 ? 1 : 2;
 
     auto out_md = core::resolve_broadcasted_output<calc_t>(
         std::forward<decltype(out)>(out), std::index_sequence<2, rhs_rank>{},

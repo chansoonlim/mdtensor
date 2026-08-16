@@ -17,13 +17,18 @@
 
 namespace md = mdtensor;
 
-template <typename... Ts> using test_t = typename md::core::mdarray<Ts...>;
+template <typename ElementType, typename Extents,
+          typename LayoutPolicy = md::core::stdex::layout_right,
+          typename Container = std::vector<ElementType>>
+constexpr bool assigned = requires {
+    typename md::core::mdarray<ElementType, Extents, LayoutPolicy, Container>;
+};
 
-template <typename... Ts>
-constexpr bool assigned = requires { typename test_t<Ts...>; };
-
-template <typename... Ts>
-constexpr bool is_constexpr = std::is_trivially_copyable_v<test_t<Ts...>>;
+template <typename ElementType, typename Extents,
+          typename LayoutPolicy = md::core::stdex::layout_right,
+          typename Container = std::vector<ElementType>>
+constexpr bool is_constexpr = std::is_trivially_copyable_v<
+    md::core::mdarray<ElementType, Extents, LayoutPolicy, Container>>;
 
 TEST(test, constexpr) {
     using value_t = int;

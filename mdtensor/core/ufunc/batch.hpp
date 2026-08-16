@@ -124,15 +124,15 @@ template <Backend backend = Backend::NATIVE, std::size_t... uranks,
           bool... bcast>
 constexpr void batch(auto &&ufunc, std::index_sequence<uranks...>,
                      std::integer_sequence<bool, bcast...>, auto &&...ios) {
-    // broadcast which bcast = true
-    const auto [ios_bcast, bexts] =
-        broadcast(std::index_sequence<uranks...>{},
-                  std::integer_sequence<bool, bcast...>{},
-                  std::forward<decltype(ios)>(ios)...);
+    const auto broadcasted = broadcast(std::index_sequence<uranks...>{},
+                                       std::integer_sequence<bool, bcast...>{},
+                                       std::forward<decltype(ios)>(ios)...);
+    const auto &ios_bcast = std::get<0>(broadcasted);
+    using bexts_t = std::remove_cvref_t<decltype(std::get<1>(broadcasted))>;
 
     // batch
     [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        detail::batch_impl<backend, bexts.rank(), false>(
+        detail::batch_impl<backend, bexts_t::rank(), false>(
             std::forward<decltype(ufunc)>(ufunc), std::get<Is>(ios_bcast)...);
     }(std::make_index_sequence<sizeof...(ios)>{});
 }
@@ -162,15 +162,15 @@ template <std::size_t... uranks, bool... bcast>
 [[nodiscard]] constexpr bool
 batch_while(auto &&ufunc, std::index_sequence<uranks...>,
             std::integer_sequence<bool, bcast...>, auto &&...ios) {
-    // broadcast which bcast = true
-    const auto [ios_bcast, bexts] =
-        broadcast(std::index_sequence<uranks...>{},
-                  std::integer_sequence<bool, bcast...>{},
-                  std::forward<decltype(ios)>(ios)...);
+    const auto broadcasted = broadcast(std::index_sequence<uranks...>{},
+                                       std::integer_sequence<bool, bcast...>{},
+                                       std::forward<decltype(ios)>(ios)...);
+    const auto &ios_bcast = std::get<0>(broadcasted);
+    using bexts_t = std::remove_cvref_t<decltype(std::get<1>(broadcasted))>;
 
     // batch
     return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        return detail::batch_impl<Backend::NATIVE, bexts.rank(), true>(
+        return detail::batch_impl<Backend::NATIVE, bexts_t::rank(), true>(
             std::forward<decltype(ufunc)>(ufunc), std::get<Is>(ios_bcast)...);
     }(std::make_index_sequence<sizeof...(ios)>{});
 }

@@ -124,12 +124,14 @@ broadcast_only_input(std::index_sequence<uranks...>,
     }();
 
     // broadcast inputs only
-    const auto [ins_bcast, ins_bexts] =
+    const auto broadcasted =
         [&]<std::size_t... Is>(std::index_sequence<Is...>) {
             return broadcast(std::index_sequence<ins_uranks[Is]...>{},
                              std::integer_sequence<bool, (void(Is), true)...>{},
                              std::get<Is>(ins_tuple)...);
         }(std::make_index_sequence<ins_num>{});
+    const auto &ins_bcast = std::get<0>(broadcasted);
+    const auto &ins_bexts = std::get<1>(broadcasted);
 
     // return broadcasted inputs and outputs in same order as original inputs
     return std::make_tuple(
@@ -166,13 +168,13 @@ reduce(auto &&func, std::integer_sequence<axes_t, axes...>,
        auto &&...ios) {
     static_assert(sizeof...(is_input) == sizeof...(ios));
 
-    // broadcast inputs only
-    const auto [ios_bcast, ins_bexts] =
+    const auto broadcasted =
         detail::broadcast_only_input(std::index_sequence<uranks...>{},
                                      std::integer_sequence<bool, is_input...>{},
                                      std::forward<decltype(ios)>(ios)...);
-
-    using ins_bexts_t = decltype(ins_bexts);
+    const auto &ios_bcast = std::get<0>(broadcasted);
+    const auto &ins_bexts = std::get<1>(broadcasted);
+    using ins_bexts_t = std::remove_cvref_t<decltype(ins_bexts)>;
 
     // get sorted array
     constexpr auto axes_sorted = [&]() {

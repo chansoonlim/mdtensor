@@ -33,19 +33,21 @@ namespace mdtensor::core {
 
 template <extents_c in_t>
 [[nodiscard]] constexpr std::size_t extents_size(in_t &&in) noexcept {
-    if constexpr (in.rank() == 0) {
+    using base_t = std::remove_cvref_t<in_t>;
+
+    if constexpr (base_t::rank() == 0) {
         // NOTE: mdspan with rank 0 can capture a single element.
         return 1;
 
-    } else if constexpr (in.rank_dynamic() == 0) {
+    } else if constexpr (base_t::rank_dynamic() == 0) {
         return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-            return (in.static_extent(Is) * ...);
-        }(std::make_index_sequence<in.rank()>{});
+            return (base_t::static_extent(Is) * ...);
+        }(std::make_index_sequence<base_t::rank()>{});
 
     } else {
         return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
             return (static_cast<std::size_t>(in.extent(Is)) * ...);
-        }(std::make_index_sequence<in.rank()>{});
+        }(std::make_index_sequence<base_t::rank()>{});
     }
 }
 
@@ -148,15 +150,46 @@ template <extents_c in1_t, extents_c in2_t, extents_c... ins_t>
     }
 }
 
+namespace detail {
+
+template <std::size_t offset, std::size_t rank, extents_c in_t>
+struct slice_extents_type {
+    using base_t = std::remove_cvref_t<in_t>;
+    using index_t = typename base_t::index_type;
+
+    static_assert(base_t::rank() >= offset + rank,
+                  "Incompatible offset and rank for slicing.");
+
+    template <std::size_t... Is>
+    static auto make(std::index_sequence<Is...>)
+        -> extents<index_t, base_t::static_extent(offset + Is)...>;
+
+    using type = decltype(make(std::make_index_sequence<rank>{}));
+};
+
+} // namespace detail
+
+template <std::size_t offset, std::size_t rank, extents_c in_t>
+using slice_extents_type_t =
+    typename detail::slice_extents_type<offset, rank, in_t>::type;
+
+template <std::size_t rank, extents_c in_t>
+using slice_extents_from_left_t = slice_extents_type_t<0, rank, in_t>;
+
+template <std::size_t rank, extents_c in_t>
+using slice_extents_from_right_t =
+    slice_extents_type_t<std::remove_cvref_t<in_t>::rank() - rank, rank, in_t>;
+
 template <std::size_t offset, std::size_t rank, extents_c in_t>
 [[nodiscard]] constexpr auto slice_extents(in_t &&in) noexcept {
-    using index_t = typename std::remove_cvref_t<in_t>::index_type;
+    using base_t = std::remove_cvref_t<in_t>;
+    using index_t = typename base_t::index_type;
 
-    static_assert(in.rank() >= offset + rank,
+    static_assert(base_t::rank() >= offset + rank,
                   "Incompatible offset and rank for slicing.");
 
     return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        return extents<index_t, in.static_extent(offset + Is)...>{
+        return extents<index_t, base_t::static_extent(offset + Is)...>{
             in.extent(offset + Is)...};
     }(std::make_index_sequence<rank>{});
 }
@@ -275,8 +308,11 @@ get_sorted_axes(std::integer_sequence<axes_t, axes...>,
 template <extents_c in_t, std::integral axes_t, axes_t... axes>
 [[nodiscard]] constexpr auto
 expand_extents_dims(in_t &&in, std::integer_sequence<axes_t, axes...>) {
-    constexpr auto axes_sorted = get_sorted_axes<in.rank() + sizeof...(axes)>(
-        std::integer_sequence<axes_t, axes...>{}, std::less<std::size_t>{});
+    using base_t = std::remove_cvref_t<in_t>;
+
+    constexpr auto axes_sorted =
+        get_sorted_axes<base_t::rank() + sizeof...(axes)>(
+            std::integer_sequence<axes_t, axes...>{}, std::less<std::size_t>{});
 
     return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
         return expand_extents_dims_impl_(

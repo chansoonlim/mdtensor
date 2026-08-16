@@ -10,6 +10,8 @@
 #pragma once
 
 #include "../creation/empty_like.hpp"
+#include "../logic/isinf.hpp"
+#include "../logic/isnan.hpp"
 
 namespace mdtensor {
 namespace ufunc {
@@ -33,31 +35,17 @@ constexpr void sqrt_ufunc(auto &&in, auto &&out, auto &&where) {
         }
     }
 
-    if constexpr (requires {
-                      { std::isnan(in) } -> std::convertible_to<bool>;
-                  }) {
-        if (std::isnan(in)) {
-            out = in;
-            return;
-        }
-    }
-
-    if constexpr (requires {
-                      { std::isinf(in) } -> std::convertible_to<bool>;
-                  }) {
-        if (std::isinf(in)) {
-            out = in;
-            return;
-        }
+    if (isnan(in) || isinf(in)) {
+        out = in;
+        return;
     }
 
     if constexpr (core::bool_c<decltype(in)>) {
         out = in;
-        return;
 
-    } else {
-        using calc_t =
-            core::floating_calc_type_t<dtype, decltype(in), decltype(out)>;
+    } else if (std::is_constant_evaluated()) {
+        // NOTE: std::sqrt is not required to be constexpr in C++20.
+        using calc_t = core::floating_calc_type_t<dtype, decltype(in)>;
 
         // NOTE: std::sqrt is not used here becase it is not constexpr in C++20.
         out = (in >= 0 && in < std::numeric_limits<calc_t>::infinity())
@@ -65,6 +53,9 @@ constexpr void sqrt_ufunc(auto &&in, auto &&out, auto &&where) {
                                                 static_cast<calc_t>(in),
                                                 static_cast<calc_t>(0))
                   : std::numeric_limits<calc_t>::quiet_NaN();
+
+    } else {
+        out = std::sqrt(in);
     }
 }
 

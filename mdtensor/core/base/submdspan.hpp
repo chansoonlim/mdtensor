@@ -40,7 +40,8 @@ template <std::size_t lspace = 0>
 [[nodiscard]] constexpr auto submdspan_from_left(auto &&io, auto &&...slices) {
     const auto io_mds = to_mdspan(std::forward<decltype(io)>(io));
 
-    constexpr std::size_t rspace = io_mds.rank() - (lspace + sizeof...(slices));
+    constexpr std::size_t rspace =
+        decltype(io_mds)::rank() - (lspace + sizeof...(slices));
 
     return submdspan_with_space<lspace, rspace>(
         std::forward<decltype(io)>(io),
@@ -51,7 +52,8 @@ template <std::size_t rspace = 0>
 [[nodiscard]] constexpr auto submdspan_from_right(auto &&io, auto &&...slices) {
     const auto io_mds = to_mdspan(std::forward<decltype(io)>(io));
 
-    constexpr std::size_t lspace = io_mds.rank() - (rspace + sizeof...(slices));
+    constexpr std::size_t lspace =
+        decltype(io_mds)::rank() - (rspace + sizeof...(slices));
 
     return submdspan_with_space<lspace, rspace>(
         std::forward<decltype(io)>(io),

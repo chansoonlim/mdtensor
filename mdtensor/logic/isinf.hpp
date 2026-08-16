@@ -21,16 +21,36 @@ constexpr void isinf_ufunc(auto &&in, auto &&out, auto &&where) {
         }
     }
 
-    if constexpr (requires {
-                      { std::isinf(in) } -> std::convertible_to<bool>;
-                  }) {
-        if (std::isinf(in)) {
-            out = true;
-            return;
-        }
-    }
+    using in_t = std::remove_cvref_t<decltype(in)>;
 
-    out = false;
+    if (std::is_constant_evaluated()) {
+        // NOTE: std::isinf is not required to be constexpr in C++20.
+        if constexpr (std::numeric_limits<in_t>::has_infinity &&
+                      requires(const in_t &value) {
+                          {
+                              value == std::numeric_limits<in_t>::infinity()
+                          } -> std::convertible_to<bool>;
+
+                          {
+                              value == -std::numeric_limits<in_t>::infinity()
+                          } -> std::convertible_to<bool>;
+                      }) {
+            const auto inf = std::numeric_limits<in_t>::infinity();
+
+            out = static_cast<bool>(in == inf) || static_cast<bool>(in == -inf);
+
+        } else {
+            out = false;
+        }
+
+    } else if constexpr (requires {
+                             { std::isinf(in) } -> std::convertible_to<bool>;
+                         }) {
+        out = std::isinf(in);
+
+    } else {
+        out = false;
+    }
 }
 
 } // namespace ufunc

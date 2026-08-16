@@ -24,24 +24,24 @@ TEST(tensor, 1) {
     constexpr auto a1 =
         md::core::tensor<value_t, md::core::extents<index_t, 2, 2>>{};
 
-    std::cout << "a1: " << md::core::to_string(a1) << std::endl;
+    std::cout << "a1: " << md::to_string(a1) << std::endl;
 
     auto a2 = md::core::tensor<value_t, md::core::extents<index_t, 2, 2>>{
         {1, 2, 3, 4}};
 
-    std::cout << "a2: " << md::core::to_string(a2) << std::endl;
+    std::cout << "a2: " << md::to_string(a2) << std::endl;
 
     const auto b1 = md::core::tensor<value_t, md::core::dextents<index_t, 2>>{
         md::core::dextents<index_t, 2>{2, 2}};
 
-    std::cout << "b1: " << md::core::to_string(b1) << std::endl;
+    std::cout << "b1: " << md::to_string(b1) << std::endl;
 
     const auto b2 = md::core::tensor<value_t, md::core::dextents<index_t, 2>>{
         {1, 2, 3, 4}, md::core::dextents<index_t, 2>{2, 2}};
 
-    std::cout << "b2: " << md::core::to_string(b2) << std::endl;
+    std::cout << "b2: " << md::to_string(b2) << std::endl;
 
     constexpr auto c = md::core::tensor<value_t, md::core::extents<index_t>>{};
 
-    std::cout << "c: " << md::core::to_string(c) << std::endl;
+    std::cout << "c: " << md::to_string(c) << std::endl;
 }

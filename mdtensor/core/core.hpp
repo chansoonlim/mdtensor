@@ -14,7 +14,6 @@
 #include "manipulation/manipulation.hpp"
 #include "tensor/tensor.hpp"
 #include "ufunc/ufunc.hpp"
-#include "util/util.hpp"
 
 namespace mdtensor {
 
@@ -99,17 +98,6 @@ template <std::size_t rspace = 0>
     return core::submdspan_from_right<rspace>(
         std::forward<decltype(io)>(io),
         std::forward<decltype(slices)>(slices)...);
-}
-
-template <extents_c exts_t>
-[[nodiscard]] constexpr std::string to_string(exts_t &&exts) {
-    return core::to_string(std::forward<exts_t>(exts));
-}
-
-template <typename in_t>
-    requires(!extents_c<in_t>)
-[[nodiscard]] constexpr std::string to_string(in_t &&in) {
-    return core::to_string(std::forward<in_t>(in));
 }
 
 } // namespace mdtensor

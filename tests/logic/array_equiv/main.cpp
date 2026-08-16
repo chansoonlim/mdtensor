@@ -104,7 +104,7 @@ TEST(compile_time, 4) {
     constexpr auto b = md::tensor<value_t, md::extents<index_t, 2, 4>>{
         {1, 2, 1, 2, 1, 2, 1, 2}};
 
-    // static_assert(!md::array_equiv(a, b)); // compile-time fails occur.
+    static_assert(!md::array_equiv(a, b));
 }
 
 TEST(compile_time, 5) {

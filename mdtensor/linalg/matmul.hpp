@@ -104,8 +104,8 @@ template <typename dtype = void, core::Backend backend = core::Backend::AUTO,
     const auto in2_mds =
         core::to_const_mdspan(std::forward<decltype(in2)>(in2));
 
-    constexpr bool is_in1_mds_1d = (in1_mds.rank() == 1);
-    constexpr bool is_in2_mds_1d = (in2_mds.rank() == 1);
+    constexpr bool is_in1_mds_1d = (decltype(in1_mds)::rank() == 1);
+    constexpr bool is_in2_mds_1d = (decltype(in2_mds)::rank() == 1);
 
     if constexpr (is_in1_mds_1d && !is_in2_mds_1d) {
         return vecmat<dtype, backend>(in1_mds, in2_mds,
